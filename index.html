@@ -56,7 +56,8 @@
   <button class="big" id="bStart">Neues Spiel starten</button>
   <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
   <div class="help">
-    <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Straßen zu Förderstätten bringen +50 % Förderung.<br>
+    <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Jedes Gebäude braucht eine <b>Zufahrt</b> (Straße zum Rathaus) – sie wird automatisch mitgeplant. Lass Platz: Höfe brauchen freie Äcker, Häuser Freiraum, und Feuer springt auf angrenzende Gebäude über.<br>
+    <b>Haushalt:</b> Gebäude, Soldaten und die Stadtverwaltung kosten laufend Geld. Lager sind begrenzt – Lagerhaus bauen oder Überschuss über das Kontor verkaufen.<br>
     <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
     <b>Krieg:</b> Wer ein Gebäude zerstört oder einen Tanklaster abschießt, erbeutet einen Teil der Vorräte des Gegners.<br>
     <b>Touch:</b> Tippen = auswählen/Befehl (Boden = bewegen, Feind = angreifen, Ölfeld = fördern) · Wischen = Karte verschieben · Zwei Finger = Zoom · <b>▢ Rahmen</b> = mehrere wählen · Doppeltipp = alle dieses Typs<br>
@@ -92,7 +93,8 @@
     <dt>Unterstrichen</dt><dd>Rot gewellt = Engpass eurer Region, grün = Stärke eurer Region. Jede Stadt hat einen anderen Engpass – handelt über 🤝 mit dem, was die andere Seite braucht.</dd>
     <h4>Bevölkerung &amp; Strom</h4>
     <dt>👥 52/140</dt><dd>Einwohner / Wohnraum. Wächst von selbst, solange Platz, Nahrung und Strom reichen. Der Balken zeigt den Weg zur nächsten Stadtstufe (Dorf → Kleinstadt 100 → Stadt 250 → Großstadt 500 → Metropole 1000 → Weltstadt 2000).</dd>
-    <dt>$ Geld</dt><dd>Steuern (0,07 $ pro Einwohner und Sekunde), Handel mit Kastrova, Milizmarkt, Beute und das Handelskontor, das Überschüsse über einer Reserve laufend exportiert.</dd>
+    <dt>$ Geld</dt><dd>Einnahmen: Steuern (0,05 $ pro Einwohner und Sekunde), Handel mit Kastrova, Milizmarkt, Beute und das Handelskontor. Ausgaben: Unterhalt der Gebäude, Sold für Soldaten und Arbeiter, Stadtverwaltung (wächst mit der Stadtgröße). Rot = Kasse leer, dann läuft alles nur halb so schnell.</dd>
+    <dt>Orange Zahl</dt><dd>Lager voll. Rathaus fasst 800 je Rohstoff, jedes Lagerhaus +1000. Was nicht hineinpasst, geht verloren.</dd>
     <dt>👥 Kastrova</dt><dd>Einwohner des Gegners – er versucht dasselbe Ziel zu erreichen.</dd>
     <dt>⚡ 75/130</dt><dd>Stromverbrauch / Stromerzeugung. Rot = Mangel: Produktion und Wachstum laufen nur halb so schnell → Kraftwerk bauen.</dd>
     <dt>Frieden / Krieg</dt><dd>Beziehung zu Kastrova. Im Frieden schießt niemand.</dd>
@@ -103,7 +105,9 @@
     <dt>Schwarze Flecken</dt><dd>Ölfelder · <b>Graue Felsen</b> = Erz · Wald = Deckung für Infanterie · Schlamm bremst Fahrzeuge · Ortschaften = Deckung.</dd>
     <dt>Grüne Felder</dt><dd>Beim Platzieren: hier darf gebaut werden. Gelbe Rahmen = Erz, Felsen oder Wald, an die das Gebäude grenzen muss.</dd>
     <dt>Baustelle</dt><dd>Gerüst mit gelbem Fortschrittsbalken. Bauarbeiter (gelber Helm) bauen sie fertig – bis zu 4 gleichzeitig. Erst danach liefert das Gebäude Strom, Wohnraum oder Waren. Arbeiter auswählen und Baustelle antippen = dorthin schicken.</dd>
-    <dt>Straßen</dt><dd>Gestrichelt = geplant, Schotter = gebaut. Auf Straßen sind alle fast doppelt so schnell. Ist eine Mine, ein Steinbruch, Holzfäller oder eine Raffinerie per Straße mit dem Rathaus verbunden, fördert sie 50 % mehr. Gebäude wählen → 🛣 Straße legt den Weg automatisch an.</dd>
+    <dt>Straßen</dt><dd>Gestrichelt = geplant, Schotter = gebaut. Auf Straßen sind alle fast doppelt so schnell. <b>Zufahrt:</b> Jedes Gebäude (außer Stellungen) arbeitet nur mit Straßenanschluss zum Rathaus oder wenn es direkt ans Rathaus grenzt. Die Zufahrt wird beim Bauen automatisch geplant; „🛣 keine Zufahrt“ blinkt sonst über dem Gebäude → auswählen, 🛣 Straße.</dd>
+    <dt>Äcker</dt><dd>Gelbgrün gestreifte Felder um Bauernhöfe. Ein Hof braucht 14 freie Felder Steppe im Umkreis von 2 für vollen Ertrag – jedes zugebaute Feld kostet Ernte.</dd>
+    <dt>Dichte Bebauung</dt><dd>Wohnhäuser ohne Freiraum drumherum haben schlechtere Wohnqualität. Brennt ein Gebäude nieder, springt das Feuer auf direkt angrenzende Gebäude über.</dd>
     <dt>🗑 Abriss</dt><dd>Eigenes Gebäude wählen → Abriss (zweimal tippen). Baustellen werden voll erstattet, fertige Gebäude zu 30 %.</dd>
     <h4>Verteidigung &amp; Krieg</h4>
     <dt>Verteidigung</dt><dd>Mauern, Stacheldraht und Gräben antippen oder über die Karte ziehen. Stellungen brauchen nach dem Platzieren einige Sekunden Aufbau (gestrichelter Rahmen).</dd>

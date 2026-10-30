@@ -3,7 +3,8 @@ import { hash, idx, inMap } from '../core/util';
 import { BUILDINGS, FACTIONS, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
-import { siteWorkers } from '../sim/build';
+import { previewFields, roadReach, siteWorkers } from '../sim/build';
+import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -23,6 +24,10 @@ export function render(){
   const vis=(x,y,m=2)=>x>vx0-m&&x<vx1+m&&y>vy0-m&&y<vy1+m;
   for(const s of G.scorch){ if(!vis(s.x,s.y)) continue; const a=Math.max(0,1-(G.t-s.t)/90)*0.45; if(a<=0) continue;
     c.fillStyle=`rgba(25,20,12,${a})`; c.beginPath(); c.arc(s.x*TILE,s.y*TILE,s.r*TILE,0,7); c.fill(); }
+  // Äcker der Bauernhöfe
+  if(G.field) for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ if(!G.field[idx(x,y)]) continue; const px=x*TILE, py=y*TILE, h=hash(x,y);
+    c.fillStyle=h<0.5?'rgba(150,140,70,.55)':'rgba(120,130,60,.5)'; c.fillRect(px+1,py+1,TILE-2,TILE-2);
+    c.fillStyle=h<0.5?'rgba(190,170,90,.6)':'rgba(150,165,80,.55)'; for(let k=3;k<TILE-2;k+=6) c.fillRect(px+2,py+k,TILE-4,2.5); }
   // Straßen (fertig = Schotter, geplant = gestrichelt)
   for(const pass of [0,1,2]) for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const r=G.road[idx(x,y)]; if(!r||(pass===2)!==(r===1)) continue;
     const on=(xx,yy)=>inMap(xx,yy)&&(r===2?G.road[idx(xx,yy)]===2:G.road[idx(xx,yy)]>0), dirs=[];
@@ -101,6 +106,8 @@ export function render(){
     else if(e.k==='boom'){const r=e.r*TILE*(0.4+k);c.fillStyle=`rgba(255,${Math.floor(200-150*k)},60,${(1-k)*0.9})`;c.beginPath();c.arc(e.x*TILE,e.y*TILE,r,0,7);c.fill();
       c.fillStyle=`rgba(70,65,60,${(1-k)*0.6})`;c.beginPath();c.arc(e.x*TILE,e.y*TILE-k*6,r*0.8,0,7);c.fill();}
     else if(e.k==='smoke'){c.fillStyle=e.col?`rgba(30,28,25,${(1-k)*0.5})`:`rgba(110,108,100,${(1-k)*0.45})`;c.beginPath();c.arc(e.x*TILE+k*4,e.y*TILE-k*14,e.r*TILE*(0.6+k),0,7);c.fill();}
+    else if(e.k==='flame'){const r=e.r*TILE*(1-k*0.5);c.fillStyle=`rgba(255,${Math.floor(170-120*k)},40,${(1-k)*0.85})`;c.beginPath();c.ellipse(e.x*TILE,e.y*TILE-k*10,r*0.7,r,0,0,7);c.fill();
+      c.fillStyle=`rgba(255,240,150,${(1-k)*0.7})`;c.beginPath();c.ellipse(e.x*TILE,e.y*TILE-k*10+r*0.3,r*0.3,r*0.5,0,0,7);c.fill();}
     else if(e.k==='marker'){c.strokeStyle=e.col;c.globalAlpha=1-k;c.lineWidth=2;c.beginPath();c.arc(e.x*TILE,e.y*TILE,12*(1-k)+3,0,7);c.stroke();c.globalAlpha=1;}
     else if(e.k==='loot'){c.globalAlpha=Math.min(1,(1-k)*2);c.font='bold 13px sans-serif';const tw=c.measureText(e.txt).width;c.fillStyle='#000c';c.fillRect(e.x*TILE-tw/2-4,e.y*TILE-30-k*20,tw+8,17);c.fillStyle=e.col;c.fillText(e.txt,e.x*TILE-tw/2,e.y*TILE-17-k*20);c.globalAlpha=1;}
   }
@@ -119,17 +126,27 @@ export function render(){
       if(b.quality<0.95){ c.fillStyle=`rgba(80,78,70,${(1-b.quality)*0.55})`; c.fillRect(b.tx*TILE+1,b.ty*TILE+1,b.w*TILE-2,b.h*TILE-2); }
       if(b.owner===0){ const w=b.w*TILE-8; c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w,4); c.fillStyle='#7fb3ff'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w*(b.resid||0)/b.def.cap,4); }
     }
+    if(b.owner===0&&!b.site&&!b.connected&&!b.def.def&&b.type!=='hq'&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='🛣 keine Zufahrt'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#ff9a6a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
     if(b.site&&b.owner===0&&!siteWorkers(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='wartet auf Arbeiter'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#e8c84a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
     if(b.owner===2||(s&&b.owner!==0)||(b.empty&&b.owner===0&&!b.site)){c.fillStyle='#000a';c.font='bold 10px sans-serif';const t=b.empty?'erschöpft':b.def.name;const tw=c.measureText(t).width;c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE+b.h*TILE+2,tw+6,13);c.fillStyle=G.players[b.owner].col;c.fillText(t,b.x*TILE-tw/2,b.ty*TILE+b.h*TILE+12);}
   }
   if(G.placing&&G.hover&&!isDefType(G.placing)){ const d=BUILDINGS[G.placing], tx=Math.floor(G.hover.x)-Math.floor((d.w-1)/2), ty=Math.floor(G.hover.y)-Math.floor((d.h-1)/2);
     const ok=canPlace(0,G.placing,tx,ty); c.globalAlpha=0.6; drawBuildingShape(c,G.placing,FACTIONS[0].col,FACTIONS[0].dark,tx*TILE,ty*TILE,d.w,d.h,0); c.globalAlpha=1;
-    if(d.cap&&ok){ const q=housingQuality(0,tx,ty,d.w,d.h).q, t='Wohnqualität '+Math.round(q*100)+' %'; c.font='bold 11px sans-serif'; const tw=c.measureText(t).width;
-      c.fillStyle='#000c'; c.fillRect(tx*TILE+d.w*TILE/2-tw/2-4,ty*TILE-18,tw+8,15); c.fillStyle=q>=0.9?'#9fd88a':q>=0.6?'#e8d27a':'#ff9a6a'; c.fillText(t,tx*TILE+d.w*TILE/2-tw/2,ty*TILE-7); }
+    if(ok){ // Vorschau: Wohnqualität bzw. Äcker und Zufahrt
+      if(!G.reachT||G.t-G.reachT>0.5||G.reachV!==G.road.length+G.buildings.length){ G.reach=roadReach(0); G.reachT=G.t; G.reachV=G.road.length+G.buildings.length; }
+      const hq=G.buildings.find(b=>b.owner===0&&b.type==='hq'&&!b.dead);
+      const acc=!!hq&&(Math.max(hq.tx-(tx+d.w),tx-(hq.tx+hq.w),hq.ty-(ty+d.h),ty-(hq.ty+hq.h),0)===0 || ringOf(tx,ty,d.w,d.h).some(i=>G.reach[i]));
+      const parts=[]; let good=1;
+      if(d.cap){ const q=housingQuality(0,tx,ty,d.w,d.h).q; parts.push('Wohnqualität '+Math.round(q*100)+' %'); good=Math.min(good,q>=0.9?1:q>=0.6?0.5:0); }
+      if(G.placing==='farm'){ const n=previewFields(tx,ty,d.w,d.h), f=Math.min(1,n/DENSITY.farmFields); parts.push('Äcker '+Math.round(f*100)+' %'); good=Math.min(good,f>=0.9?1:f>=0.6?0.5:0); }
+      if(!acc){ parts.push('keine Zufahrt!'); good=0; }
+      if(parts.length){ const t=parts.join(' · '); c.font='bold 11px sans-serif'; const tw=c.measureText(t).width;
+        c.fillStyle='#000c'; c.fillRect(tx*TILE+d.w*TILE/2-tw/2-4,ty*TILE-18,tw+8,15); c.fillStyle=good>=1?'#9fd88a':good>=0.5?'#e8d27a':'#ff9a6a'; c.fillText(t,tx*TILE+d.w*TILE/2-tw/2,ty*TILE-7); } }
     c.fillStyle=ok?'rgba(80,255,80,.25)':'rgba(255,60,60,.35)'; c.fillRect(tx*TILE,ty*TILE,d.w*TILE,d.h*TILE); }
   c.setTransform(dpr,0,0,dpr,0,0);
   if(input.box){const b=input.box;c.strokeStyle='#9ff07a';c.lineWidth=1.5;c.setLineDash([5,4]);c.strokeRect(Math.min(b.x0,b.x1),Math.min(b.y0,b.y1),Math.abs(b.x1-b.x0),Math.abs(b.y1-b.y0));c.setLineDash([]);c.fillStyle='rgba(159,240,122,.08)';c.fillRect(Math.min(b.x0,b.x1),Math.min(b.y0,b.y1),Math.abs(b.x1-b.x0),Math.abs(b.y1-b.y0));}
 }
+function ringOf(tx,ty,w,h){const out=[];for(let y=ty-1;y<=ty+h;y++)for(let x=tx-1;x<=tx+w;x++){if((x===tx-1||x===tx+w||y===ty-1||y===ty+h)&&inMap(x,y))out.push(idx(x,y));}return out;}
 export function renderMini(){
   if(!G) return; const s=mini.width/MAP_W;
   mctx.imageSmoothingEnabled=false; mctx.drawImage(G.miniBg,0,0,mini.width,mini.height);

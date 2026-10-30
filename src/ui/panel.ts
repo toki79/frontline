@@ -86,6 +86,8 @@ export function updatePanel(){
   $('#rMetal').textContent=fmt(p.res.metal);
   $('#rWood').textContent=fmt(p.res.wood);
   $('#rStone').textContent=fmt(p.res.stone);
+  for(const [r,id] of [['food','#rFood'],['wood','#rWood'],['stone','#rStone'],['metal','#rMetal'],['oil','#rOil']]) $(id).parentElement.classList.toggle('full',p.res[r]>=p.store-1);
+  $('#rMoney').classList.toggle('broke',!!p.broke);
   for(const [r,id] of [['food','#rFood'],['metal','#rMetal'],['oil','#rOil']]){ const el=$(id).parentElement; el.classList.toggle('scarce',G.profile[0].scarce===r); el.classList.toggle('rich',G.profile[0].rich===r); }
   $('#rOil').textContent=fmt(p.res.oil);
   const pw=$('#power'); pw.textContent=`⚡ ${p.use}/${p.power}`; pw.classList.toggle('low',p.use>p.power);

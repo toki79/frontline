@@ -10,8 +10,11 @@
    Metall (Mine an Erz), Öl (Raffinerie mit Kapazität, Tanklaster).
 3. **Bauen vor Ort:** Gebäude werden als Baustelle gesetzt und sofort bezahlt; **Bauarbeiter** (am Rathaus ausgebildet)
    laufen hin und bauen – bis zu 4 je Baustelle. Erst fertige Gebäude liefern Strom, Wohnraum oder Waren.
-4. **Straßen** werden geplant (Stein je Feld) und von den Arbeitern gebaut: Einheiten sind darauf fast doppelt so schnell,
-   Förderstätten mit Straße zum Rathaus fördern +50 %.
+4. **Straßen & Zufahrt:** Jedes Gebäude arbeitet nur mit Straßenanschluss zum Rathaus (oder direkt daneben); die Zufahrt
+   wird beim Setzen der Baustelle automatisch geplant. Auf Straßen sind Einheiten fast doppelt so schnell.
+   **Knappheit statt Überfluss:** Unterhalt je Gebäude, Sold, Stadtverwaltung (wächst quadratisch mit der Einwohnerzahl),
+   begrenzte Lager (Lagerhaus), teure Rüstungsbetriebe, lange Forschung.
+   **Dichte Bebauung hat Nachteile:** Höfe brauchen freie Äcker, enge Wohnviertel senken die Wohnqualität, Feuer springt über.
 5. **Regionen:** Jede Stadt hat pro Spiel einen Engpass und einen Überschuss – Handel lohnt sich.
 6. **Soldaten** werden aus der Bevölkerung rekrutiert; Fahrzeuge brauchen laufend Öl; Fahrzeuglimit je Werk.
 7. **Ziel:** Endlos (Stadtstufen Dorf → Weltstadt) oder Wettlauf auf 500 Einwohner; Niederlage nur militärisch.

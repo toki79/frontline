@@ -17,17 +17,39 @@ export const CONSTRUCTION = {
   maxWorkers: 4,        // so viele Arbeiter können gleichzeitig an einer Baustelle arbeiten
   roadWork: 1.2,        // Sekunden Arbeit pro Straßenfeld
   roadSpeed: 0.55,      // Bewegungskosten auf Straßen (kleiner = schneller)
-  roadBonus: 1.5,       // Förderbonus für Minen/Steinbruch/Holzfäller/Raffinerie mit Straße zum Rathaus
   roadRadius: 12,       // Straßen dürfen so weit von eigenen Gebäuden entfernt liegen
   startWorkers: 4,
   forestWood: 120,      // Holz pro Waldfeld; leer gefällter Wald wird zu Steppe
   demolishRefund: 0.3,  // Erstattung beim Abriss fertiger Gebäude (Baustellen: voll)
-};   // Reichweite von Industrielärm in Feldern (noise = Abzug an Wohnqualität)
+  // Zufahrt: Gebäude arbeiten nur, wenn sie an das Straßennetz des Rathauses angeschlossen sind
+  // (oder direkt ans Rathaus grenzen). Beim Setzen einer Baustelle wird die Straße automatisch geplant.
+};
+// ---------- Dichte Bebauung ----------
+export const DENSITY = {
+  farmFieldR: 2,        // Bauernhof bewirtschaftet freie Steppe in diesem Umkreis
+  farmFields: 14,       // so viele freie Ackerfelder braucht ein Hof für vollen Ertrag
+  crowdPenalty: 0.45,   // Wohnhaus komplett umbaut (alle Nachbarfelder belegt) = −45 % Wohnqualität
+  fireTime: 10,         // Sekunden, die ein Gebäude brennt
+  fireDps: 0.04,        // Brandschaden je Sekunde (Anteil der Lebenspunkte)
+  fireSpread: 0.06,     // Wahrscheinlichkeit je Sekunde, dass ein Brand auf ein angrenzendes Gebäude überspringt
+};
+// ---------- Lager ----------
+export const STORAGE = {
+  base: 800,            // Lagerplatz je Rohstoff im Rathaus
+  depot: 1000,          // zusätzlicher Lagerplatz je Lagerhaus
+  res: ['food','wood','stone','metal','oil'],
+};
 // ---------- Volkswirtschaft ----------
 export const ECON = {
   target: 500,          // Einwohner zum Sieg
   foodPerHead: 0.02,    // Nahrung pro Einwohner und Sekunde
-  taxPerHead: 0.07,     // Geld pro Einwohner und Sekunde
+  taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
+  // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
+  upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
+           university:1.2, droneshop:1.0, depot:0.15, sentry:0.1, turret:0.25, flak:0.25},
+  wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
+  adminPerHead2: 0.000015, // Stadtverwaltung: wächst mit dem Quadrat der Einwohner (1000 EW ≈ 15 $/s, 2000 EW ≈ 60 $/s)
+  brokeFactor: 0.5,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil
   growBase: 0.2,        // Grundwachstum (Einwohner/s)
   growRate: 0.002,      // zusätzliches Wachstum je Einwohner
   minPop: 10,           // so viele Einwohner bleiben immer (keine Rekrutierung darunter)
@@ -61,7 +83,7 @@ export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.
 export const FEAT = {NONE:0, WIRE:1, TRENCH:2};
 // Straße: wird geplant (gezogen) und von Bauarbeitern gebaut
 export const FEATURES = {
-  road:   {id:0, name:'Straße', cost:{stone:4}, desc:'Schneller unterwegs; verbindet Förderstätten mit dem Rathaus (+50 % Förderung)', line:true, road:true},
+  road:   {id:0, name:'Straße', cost:{stone:2}, desc:'Zufahrt: Gebäude arbeiten nur mit Anschluss ans Straßennetz. Einheiten sind auf Straßen fast doppelt so schnell.', line:true, road:true},
   wire:   {id:1, name:'Stacheldraht',  cost:{money:15}, desc:'Bremst Infanterie stark, Fahrzeuge walzen ihn platt', line:true},
   trench: {id:2, name:'Schützengraben',cost:{money:30}, desc:'Infanterie darin: 60 % Deckung · bremst Fahrzeuge stark', line:true},
 };
@@ -99,15 +121,16 @@ export const BUILDINGS = {
   farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
   lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
   quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein, nur direkt an Felsen'},
+  depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
   mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
   refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
   barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:200, wood:40, stone:20}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
-  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:600, metal:80, stone:80}, time:14, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
+  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:1800, metal:180, stone:160}, time:20, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
   kontor:  {name:'Handelskontor', w:2,h:2, hp:600, power:-10, cost:{money:400, wood:60}, time:9, req:[], noise:0.15, sight:4, export:4,
             desc:'Exportiert Überschüsse automatisch gegen Geld'},
-  university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:600, metal:40, stone:80}, time:14, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
-  droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:400, metal:40, stone:40}, time:9, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
+  university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:900, metal:60, stone:120}, time:16, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
+  droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:1300, metal:120, stone:100}, time:14, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
   // --- Verteidigung (def:true): direkt auf der Karte platzieren, Stellungen brauchen danach Bauzeit ---
   wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:20, stone:10},  time:0, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},
   sentry:  {name:'Selbstschuss\u00ADanlage', w:1,h:1, hp:420, power:-5, cost:{money:150, stone:10}, time:6, req:[], def:true, noise:0.05, sight:6, desc:'Automatisches MG gegen Infanterie und Drohnen',
@@ -146,8 +169,8 @@ export const EXPORT = {order:['oil','metal','stone','wood','food'], reserve:{oil
 export const LOT = {food:100, metal:50, oil:100};
 // Universität: Stufe 1 = gebaut, Stufe 2/3 durch Forschung in der Universität
 export const RESEARCH = {
-  res2:{name:'Forschung Stufe 2', level:2, cost:{money:1000, metal:100}, time:60, desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
-  res3:{name:'Forschung Stufe 3', level:3, cost:{money:1600, metal:200, oil:100}, time:90, desc:'Schaltet die Reaper-Drohne frei'},
+  res2:{name:'Forschung Stufe 2', level:2, cost:{money:1500, metal:150}, time:180, desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
+  res3:{name:'Forschung Stufe 3', level:3, cost:{money:2400, metal:250, oil:150}, time:300, desc:'Schaltet die Reaper-Drohne frei'},
 };
 export const TECH_UNLOCKS = {1:'Drohnenwerkstatt, Spionagedrohne', 2:'FPV-Kamikazedrohne, Raketenwerfer', 3:'Reaper-Drohne'};
 export const DEF = t => UNITS[t] || BUILDINGS[t] || FEATURES[t] || RESEARCH[t];

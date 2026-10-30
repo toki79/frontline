@@ -1,9 +1,9 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, FEATURES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
-import { canPlaceRoad, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
+import { autoAccess, canPlaceRoad, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -36,10 +36,10 @@ export function cancelItem(pid,type){
   return false;
 }
 export function updateProduction(pid,dt){
-  const p=G.players[pid], f=p.use>p.power?0.5:1;
+  const p=G.players[pid], f=(p.use>p.power?0.5:1)*(p.broke?ECON.brokeFactor:1);
   for(const qn of ['hq','barracks','factory','droneshop','research']){
     const q=p.q[qn]; if(!q.length) continue;
-    const producer=findBuilding(pid, qn==='research'?'university':qn); if(!producer) continue;
+    const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;   // ohne Zufahrt ruht die Produktion
     const it=q[0]; it.t+=dt*f;
     if(it.t>=it.time){
       if(qn==='research'){ const L=RESEARCH[it.type].level; q.shift(); p.tech=Math.max(p.tech,L);
@@ -87,5 +87,7 @@ export function placeDefense(pid,type,x,y){
 export function placeSite(pid,type,tx,ty){
   if(!BUILDINGS[type]||BUILDINGS[type].def||!canPlace(pid,type,tx,ty)||missingReq(pid,type).length||!canAfford(pid,type)) return null;
   pay(pid,type,1);
-  return placeBuilding(pid,type,tx,ty,false,true);
+  const b=placeBuilding(pid,type,tx,ty,false,true);
+  b.access=autoAccess(pid,b);   // Zufahrt gleich mitplanen (>0 Felder, 0 schon da, -1 kein Weg, -2 zu wenig Stein)
+  return b;
 }

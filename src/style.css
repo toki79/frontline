@@ -18,6 +18,8 @@ button:disabled{opacity:.4;cursor:default}
 .res .scarce b{text-decoration:underline wavy #ff7b6b 1.5px;text-underline-offset:3px}
 .res .rich b{text-decoration:underline #9fd88a 1.5px;text-underline-offset:3px}
 #rMoney{color:#e9d27a}
+#rMoney.broke{color:#ff7b6b}
+.res .full b{color:#ffb060}
 .tb{margin-left:auto;display:flex;gap:6px}
 .tb button{padding:6px 10px;font-size:13px;white-space:nowrap}
 #popbar{pointer-events:auto;position:absolute;left:calc(6px + var(--sal));top:calc(var(--toph,calc(36px + var(--sat))) + 2px);font-size:11.5px;display:flex;flex-direction:column;gap:3px;background:#0d0f0acc;padding:4px 7px;border-radius:6px}

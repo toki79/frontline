@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -25,7 +25,7 @@ export function tipFor(k){
   if(d.tech) L.push(`🎓 Benötigt Universität Stufe ${d.tech}.`);
   if(k==='kontor') L.push(`Verkauft laufend bis ${BUILDINGS.kontor.export} Einheiten/s, aber nur was über der Reserve liegt (🛢 ${EXPORT.reserve.oil}, ⛏ ${EXPORT.reserve.metal}, 🌾 ${EXPORT.reserve.food}). Preise: 🛢 ${f1(EXPORT.price.oil)} $, ⛏ ${f1(EXPORT.price.metal)} $, 🌾 ${f1(EXPORT.price.food)} $ je Einheit – weniger als beim Handel mit Kastrova, dafür ohne Marktsättigung.`);
   if(k==='university') L.push(`Stufe 1: ${TECH_UNLOCKS[1]} · Stufe 2: ${TECH_UNLOCKS[2]} · Stufe 3: ${TECH_UNLOCKS[3]}. Erforschtes Wissen bleibt auch erhalten, wenn die Universität zerstört wird.`);
-  if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. Mine, Steinbruch, Holzfäller oder Raffinerie mit Straßenverbindung zum Rathaus fördern +${Math.round((CONSTRUCTION.roadBonus-1)*100)} %. Tipp: Gebäude auswählen → 🛣 Straße legt den Weg automatisch an.`);
+  if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. <b>Zufahrt:</b> Jedes Gebäude (außer Stellungen) arbeitet nur, wenn es ans Straßennetz des Rathauses angeschlossen ist oder direkt ans Rathaus grenzt. Beim Bauen wird die Zufahrt automatisch geplant; sonst Gebäude auswählen → 🛣 Straße.`);
   else if(isDefType(k)) L.push(`Wird direkt auf der Karte gebaut (bis ${DEF_RADIUS} Felder vor der Stadt)${d.line?', auch durch Ziehen über mehrere Felder':''}.`);
   if(FEATURES[k]){ if(k==='trench') L.push('Infanterie im Graben erhält 60 % Deckung. Fahrzeuge kommen nur sehr langsam hindurch. Unzerstörbar.');
     if(k==='wire') L.push('Infanterie kommt nur sehr langsam durch. Panzer walzen ihn platt, Granaten und Raketen zerreißen ihn.'); }
@@ -33,13 +33,16 @@ export function tipFor(k){
   else if(BUILDINGS[k]){
     if(d.def&&d.time) L.push(`Nach dem Platzieren ${d.time} s Aufbau, erst dann einsatzbereit.`);
     if(d.power) L.push(d.power>0?`Strom: erzeugt +${d.power} ⚡`:`Strom: verbraucht ${-d.power} ⚡`);
-    if(d.cap) L.push(`Wohnraum: +${d.cap} Einwohner. <b>Ruhig bauen:</b> Industrie im Umkreis von ${NOISE_R} Feldern senkt die Wohnqualität, dann ziehen Bewohner langsamer ein. Beim Platzieren zeigen die Farben grün/gelb/orange die Qualität.`);
+    if(d.cap) L.push(`Wohnraum: +${d.cap} Einwohner. <b>Ruhig bauen:</b> Industrie im Umkreis von ${NOISE_R} Feldern und zugebaute Nachbarfelder (enge Bebauung) senken die Wohnqualität, dann ziehen Bewohner langsamer ein. Beim Platzieren zeigen die Farben grün/gelb/orange die Qualität.`);
     if(d.noise) L.push(`<span style="color:#ffb38a">Lärm: senkt die Wohnqualität von Häusern im Umkreis von ${NOISE_R} Feldern (direkt daneben −${Math.round(d.noise*100)} %).</span>`);
     if(d.food) L.push(`Nahrung: +${f1(d.food)} 🌾 pro Sekunde (ernährt ${Math.round(d.food/ECON.foodPerHead)} Einwohner)`);
     if(d.metal) L.push(`Metall: +${f1(d.metal)} ⛏ pro Sekunde, solange das angrenzende Erz reicht`);
     if(d.wood) L.push(`Holz: +${f1(d.wood)} 🪵 pro Sekunde. Fällt den Wald im Umkreis von 3 Feldern nach und nach (ein Waldfeld = ${CONSTRUCTION.forestWood} Holz).`);
     if(d.stone) L.push(`Stein: +${f1(d.stone)} 🪨 pro Sekunde, solange die angrenzenden Felsen reichen.`);
-    if(d.wood||d.stone||d.metal||d.refine) L.push(`🛣 Mit Straße zum Rathaus +${Math.round((CONSTRUCTION.roadBonus-1)*100)} % Förderung.`);
+    if(!d.def) L.push('🛣 Arbeitet nur mit Zufahrt (Straße zum Rathaus) – wird beim Bauen automatisch geplant. Lass Platz drumherum!');
+    if(ECON.upkeep[k]) L.push(`Unterhalt: ${f1(ECON.upkeep[k])} $/s`);
+    if(k==='farm') L.push(`🌾 Bewirtschaftet freie Steppe im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Ackerfelder = voller Ertrag. Zugebaute Felder senken den Ertrag.`);
+    if(k==='depot') L.push(`Lagerplatz: Rathaus ${STORAGE.base}, je Lagerhaus +${STORAGE.depot} für Nahrung, Holz, Stein, Metall und Öl. Was nicht ins Lager passt, geht verloren.`);
     if(d.needsOre) L.push('Muss direkt an graue Erzfelsen grenzen.');
     if(d.needsRock) L.push('Muss direkt an helle Felsbrocken grenzen.');
     if(d.needsForest) L.push('Braucht Wald in der Nähe (mind. 3 Waldfelder).');
@@ -66,7 +69,7 @@ export function tipFor(k){
   return L.join('<br>');
 }
 export function regionNote(res){ const pr=G.profile[0]; return pr.scarce===res?`<br><span style="color:#ff9a8a">⚠ Engpass eurer Region: ${REGION.scarce[res]}.</span>`:pr.rich===res?`<br><span style="color:#9fd88a">★ Stärke eurer Region: ${REGION.rich[res]}.</span>`:''; }
-export const HUD_TIPS = {
+export const HUD_TIPS: Record<string, ()=>string> = {
   money:()=>{const p=G.players[0],r: any=p.rate||{money:0,export:0,expBy:{}};
     const ex=r.export>0.05?`<br>+${f1(r.export)} $/s aus dem Handelskontor (${Object.entries(r.expBy).map(([k,v])=>f1(v)+' '+RES[k].icon+'/s').join(', ')})`:'';
     return `<b>$ Geld: ${fmt(p.res.money)}</b><br>+${f1(r.money)} $/s Steuern von ${Math.floor(p.pop)} Einwohnern – mehr Einwohner = mehr Geld.${ex}<br><span class="dim">Weitere Quellen: Handel mit Kastrova (zahlt viel für ihren Engpass), Milizmarkt, Beute. Ein Handelskontor exportiert Überschüsse dauerhaft.</span>`;},
@@ -82,6 +85,13 @@ export const HUD_TIPS = {
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
   stance:()=>G.war?'<b>⚔ Krieg mit Kastrova</b><br>Einheiten greifen sich gegenseitig an. Zerstörte Gebäude bringen dem Angreifer Beute. Frieden über 🤝 anbieten.':'<b>Frieden mit Kastrova</b><br>Niemand schießt. Kastrova kann aber Forderungen stellen oder den Krieg erklären, wenn ihr zu schnell wachst oder schwach seid.',
 };
+// Lagerplatz an alle Rohstoff-Tipps anhängen, Unterhalt an den Geld-Tipp
+for(const r of STORAGE.res){ const f=HUD_TIPS[r]; if(!f) continue;
+  HUD_TIPS[r]=()=>{ const p=G.players[0], full=p.res[r]>=p.store-1;
+    return f()+`<br>${full?'<span style="color:#ffb060">':'<span class="dim">'}Lager: ${fmt(p.res[r])} / ${fmt(p.store)}${full?' – voll, Überschuss geht verloren! Lagerhaus bauen oder per Handelskontor verkaufen.':''}</span>`; }; }
+{ const f=HUD_TIPS.money; HUD_TIPS.money=()=>{ const p=G.players[0], r: any=p.rate||{};
+  const tot=(r.upkeep||0)+(r.wages||0)+(r.admin||0);
+  return f()+`<br><b>Ausgaben −${f1(tot)} $/s:</b> Unterhalt der Gebäude ${f1(r.upkeep||0)} · Sold ${f1(r.wages||0)} · Stadtverwaltung ${f1(r.admin||0)} (wächst mit der Stadtgröße).`+(p.broke?'<br><span style="color:#ff9a8a">Kasse leer: Betriebe und Ausbildung laufen nur halb so schnell!</span>':''); }; }
 export const tipEl=$('#tip'); let tipTimer=null, tipAnchor=null;
 export function showTip(html,anchor,ms?){
   tipEl.innerHTML=html; tipEl.style.display='block'; tipAnchor=anchor;

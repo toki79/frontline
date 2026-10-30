@@ -1,6 +1,6 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
 import { FEAT, LEASH, MAP_H, MAP_W } from '../data/config';
-import { applyDamage, distTo, findTarget, fire, homeTurf, splash } from '../sim/combat';
+import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
 import { hostile, nearestPassable, passable, tileCost } from '../sim/world';
@@ -75,6 +75,7 @@ export function updateUnit(u,dt){
 export function arrived(u){ if(u.mode==='move'||u.mode==='amove'){ u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
 export function updateBuilding(b,dt){
   // Selbstreparatur, wenn längere Zeit kein Beschuss
+  if(b.fire>0){ updateFire(b,dt); if(b.dead) return; }
   if(b.site) return;   // Baustelle: Zustand wächst mit dem Baufortschritt
   if(b.owner<2&&b.hp<b.maxHp&&G.t-(b.lastHit||-99)>12) b.hp=Math.min(b.maxHp,b.hp+b.maxHp*0.012*dt);
   const w=b.def.weapon; if(!w) return;

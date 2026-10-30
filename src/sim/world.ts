@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NOISE_R, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -90,6 +90,9 @@ export function housingQuality(pid,tx,ty,w,h){
   for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid||!b.def.noise) continue;
     const d=rectDist(b,tx,ty,w,h); if(d>NOISE_R) continue;
     pen+=b.def.noise*(d<=1?1:d<=2?0.7:0.35); if(!src.includes(b.def.name)) src.push(b.def.name); }
+  // Enge Bebauung: belegte Nachbarfelder (Straßen zählen nicht)
+  const ring=ringTiles(tx,ty,w,h); let occ=0; for(const i of ring) if(G.occ[i]) occ++;
+  if(ring.length&&occ){ pen+=DENSITY.crowdPenalty*occ/ring.length; src.push('enge Bebauung'); }
   return {q:Math.max(0.3,1-pen),src};
 }
 export function refreshQuality(){
@@ -117,8 +120,11 @@ export function knownBuilding(b){ return !G.fog||seesFor0(b.owner)||b.seen; }
 export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===type);}
 /** Anzahl Gebäude; inclSites=true zählt auch Baustellen mit */
 export function countBuildings(pid,type?,inclSites=false){let n=0;for(const b of G.buildings) if(!b.dead&&(inclSites||!b.site)&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
-export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;
-  for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;}}
+/** Strom, Wohnraum und Lagerplatz. Nur fertige Gebäude mit Zufahrt zählen. */
+export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;p.store=STORAGE.base;
+  for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;
+    if(!(b.type==='hq'||b.def.def||pid===2||b.connected)) continue;
+    const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;if(b.type==='depot')p.store+=STORAGE.depot;}}
 export function freeTileAround(b,cls){
   const cand=[];
   for(let r=1;r<=4;r++){

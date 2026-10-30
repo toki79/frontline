@@ -3,9 +3,11 @@ import { describe, it, expect } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
-import { findBuilding, countBuildings, tileCost } from '../src/sim/world';
+import { findBuilding, countBuildings, tileCost, spawnAt } from '../src/sim/world';
+import { destroy } from '../src/sim/combat';
+import { STORAGE } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
-import { canPlaceRoad, demolish, orderRoadTo, planRoad } from '../src/sim/build';
+import { canPlaceRoad, demolish, planRoad } from '../src/sim/build';
 import { idx } from '../src/core/util';
 import { on } from '../src/core/events';
 
@@ -76,20 +78,61 @@ describe('Simulation', () => {
     expect(G.players[0].res.stone).toBeGreaterThan(st);
   });
 
-  it('Straße: geplant, gebaut, schneller und mit Förderbonus', () => {
+  it('Zufahrt: Straße wird automatisch geplant, ohne Anschluss arbeitet nichts', () => {
     newGame('mittel');
     const q = siteNearHq('quarry');
-    runUntil(() => !q.site, 120);
-    expect(q.connected).toBeFalsy();
-    G.players[0].res.stone = 500;
-    const n = orderRoadTo(0, q);
-    expect(n).toBeGreaterThan(0);
-    expect(runUntil(() => !!q.connected, 120)).toBe(true);
+    expect(q.access).toBeGreaterThanOrEqual(0);
+    expect(runUntil(() => !q.site && !!q.connected, 150)).toBe(true);
     const i = G.road.findIndex(r => r === 2);
-    expect(tileCost(i, 'veh')).toBeLessThan(1);
-    // geplante Straßen nur in Stadtnähe
+    if (i >= 0) expect(tileCost(i, 'veh')).toBeLessThan(1);
+    // Anschluss kappen: Steinbruch fördert nicht mehr
+    for (let k = 0; k < G.road.length; k++) G.road[k] = 0;
+    G.roadDirty = true; update(0.05);
+    const touchesHq = q.connected;
+    const st = G.players[0].res.stone; run(10);
+    if (!touchesHq) expect(G.players[0].res.stone).toBeLessThanOrEqual(st + 0.01);
     expect(canPlaceRoad(0, 40, 10)).toBe(false);
     expect(planRoad(0, 40, 10)).toBe(false);
+  });
+
+  it('Unterhalt kostet Geld, leere Kasse bremst', () => {
+    newGame('mittel');
+    const p = G.players[0];
+    for (let k = 0; k < 6; k++) spawnAt(0, 'inf', 10 + k * 0.3, 50);
+    p.res.money = 1; p.pop = 10;
+    run(2);
+    expect(p.broke).toBe(true);
+    expect(p.res.money).toBeLessThan(0.5);
+  });
+
+  it('Lager: mehr als der Lagerplatz geht verloren', () => {
+    newGame('mittel');
+    const p = G.players[0]; p.res.wood = 5000;
+    update(0.05);
+    expect(p.res.wood).toBe(STORAGE.base);
+  });
+
+  it('Bauernhof: zugebaute Äcker senken den Ertrag', () => {
+    newGame('mittel');
+    const f = siteNearHq('farm'); G.players[0].res.money = 9000; G.players[0].res.wood = 800;
+    runUntil(() => !f.site, 90); update(0.05);
+    const before = f.fields;
+    // ringsum Häuser setzen
+    for (let y = f.ty - 3; y <= f.ty + f.h + 1; y++) for (let x = f.tx - 3; x <= f.tx + f.w + 1; x++) if (canPlace(0, 'house', x, y)) placeSite(0, 'house', x, y);
+    G.roadDirty = true; update(0.05);
+    expect(f.fields).toBeLessThan(before);
+    expect(f.fieldF).toBeLessThan(1);
+  });
+
+  it('Feuer springt auf angrenzende Gebäude über', () => {
+    newGame('mittel');
+    G.players[0].res.money = 9000; G.players[0].res.wood = 800;
+    const a = siteNearHq('house');
+    let b = null;
+    for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (!b && canPlace(0, 'house', a.tx + dx, a.ty + dy)) b = placeSite(0, 'house', a.tx + dx, a.ty + dy);
+    expect(b).toBeTruthy();
+    destroy(a, null);
+    expect(b.fire).toBeGreaterThan(0);
   });
 
   it('Abriss einer Baustelle erstattet die Kosten', () => {

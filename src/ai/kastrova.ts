@@ -1,14 +1,14 @@
 import { dist, idx, inMap } from '../core/util';
-import { AI_MIX, BUILDINGS, DEF, ECON, NOISE_R, RES, UNITS } from '../data/config';
+import { AI_MIX, BUILDINGS, DEF, ECON, NOISE_R, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
 import { showOffer } from '../sim/offers';
 import { orderMove } from '../sim/orders';
 import { available, canPlace, canPlaceDef, enqueue, placeDefense, placeSite } from '../sim/production';
-import { demolish, orderRoadTo } from '../sim/build';
+import { demolish, orderRoadTo, previewFields, roadReach } from '../sim/build';
 import { G } from '../sim/state';
-import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, setWar, updateRel } from '../sim/world';
+import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -53,13 +53,13 @@ export function aiThink(){
   // Bauarbeiter: mit der Stadt wächst der Trupp
   const workers=myU.filter(u=>u.def.worker).length, wantW=Math.min(10,3+Math.floor(p.pop/80));
   if(workers<wantW&&!p.q.hq.length&&canAfford(pid,'worker')&&p.res.money>200) enqueue(pid,'worker');
-  // Straßen zu Förderstätten (Holz, Stein, Erz, Öl)
+  // Zufahrten nachholen; Gebäude ohne möglichen Weg werden abgerissen
   ai.roadT=(ai.roadT||0)-D.think;
-  if(ai.roadT<=0&&G.t>60){ ai.roadT=20;
-    const plannedOpen=G.road.some((r,i)=>r===1&&G.roadOwner[i]===2);
-    if(!plannedOpen) for(const b of myB){ if(b.site||b.connected||!(b.def.wood||b.def.stone||b.def.metal||b.def.refine)) continue;
-      if(p.res.stone<120) break;
-      if(orderRoadTo(pid,b)>0) break; } }
+  if(ai.roadT<=0){ ai.roadT=8;
+    for(const b of myB){ if(b.connected||b.def.def||b.type==='hq') continue;
+      const r=orderRoadTo(pid,b);
+      if(r===-1){ b.noRoute=(b.noRoute||0)+1; if(b.noRoute>=3) demolish(pid,b); }
+      if(r===-2) break; } }
   aiDefense(pid);
   // --- Forschung ---
   if(findBuilding(pid,'university')&&!p.q.research.length){ const r=p.tech<2?'res2':p.tech<3?'res3':null;
@@ -173,31 +173,33 @@ export function aiPickBuilding(p,armyN,need,lead){
   const has=t=>G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.type===t&&!b.empty).length;
   for(const b of G.buildings) if(!b.dead&&b.owner===pid&&b.empty&&!b.site&&(b.type==='lumber'||b.type==='quarry')) demolish(pid,b);
   // Baustoffe zuerst: ohne Holz und Stein entsteht nichts
+  if(STORAGE.res.some(r=>p.res[r]>(p.store||STORAGE.base)*0.85)&&has('depot')<4&&p.pop>60) return 'depot';
   if(!has('lumber')&&ok('lumber')) return 'lumber';
   if(!has('quarry')&&ok('quarry')&&G.t>15) return 'quarry';
   if(p.res.wood<70&&has('lumber')<3&&ok('lumber')) return 'lumber';
   if(p.res.stone<70&&has('quarry')<2&&ok('quarry')) return 'quarry';
-  const pick=aiPickMain(p,need,has);
+  const pick=aiPickMain(p,need,has,ok);
   if(pick){ const c: any=BUILDINGS[pick].cost;
     if((c.wood||0)>p.res.wood&&has('lumber')<4&&ok('lumber')) return 'lumber';
     if((c.stone||0)>p.res.stone&&has('quarry')<3&&ok('quarry')) return 'quarry'; }
   return pick;
 }
-function aiPickMain(p,need,has){
+function aiPickMain(p,need,has,ok){
   const pid=1;
   if(p.use+12>p.power) return 'power';
   if(p.foodRate<0.3||need==='food') return 'farm';
   if(p.pop>=p.cap-6) return 'house';
   if(!has('barracks')) return 'barracks';
   if(p.pop>=p.cap-20&&p.res.money>400) return 'house';
-  if(!has('mine')||(need==='metal')) { if(aiCanReachOre(pid)) return 'mine'; }
+  if((!has('mine')||(need==='metal'))&&ok('mine')) { if(aiCanReachOre(pid)) return 'mine'; }
   if(!has('refinery')) return 'refinery';
   if(p.foodRate<1.2) return 'farm';
-  if(!has('factory')&&p.pop>70) return 'factory';
-  if(has('factory')&&!has('university')&&p.pop>90&&p.res.money>900) return 'university';
-  if(has('factory')&&!has('droneshop')&&p.tech>=1&&p.pop>110&&p.res.money>700) return 'droneshop';
+  const rich=t=>p.res.money>BUILDINGS[t].cost.money+250;   // teure Gebäude erst, wenn das Geld da ist (sonst blockieren sie den Aufbau)
+  if(!has('factory')&&p.pop>90&&rich('factory')) return 'factory';
+  if(has('factory')&&!has('university')&&p.pop>110&&rich('university')) return 'university';
+  if(has('factory')&&!has('droneshop')&&p.tech>=1&&p.pop>140&&rich('droneshop')) return 'droneshop';
   if(p.pop>=p.cap-25) return 'house';
-  if(p.res.money>3500&&has('factory')<2&&p.pop>200) return 'factory';
+  if(p.res.money>4500&&has('factory')<2&&p.pop>300) return 'factory';
   if(p.foodRate<2.5) return 'farm';
   if(!has('kontor')&&p.pop>180&&(p.res.oil>500||p.res.food>900||p.res.metal>500)) return 'kontor';
   if(has('lumber')<2&&p.pop>120) return 'lumber';
@@ -230,18 +232,24 @@ export function aiPlace(pid,type){
   const d=BUILDINGS[type], own=G.buildings.filter(b=>!b.dead&&b.owner===pid); if(!own.length) return false;
   const hq=findBuilding(pid,'hq')||own[0];
   let x0=99,y0=99,x1=0,y1=0; for(const b of own){x0=Math.min(x0,b.tx);y0=Math.min(y0,b.ty);x1=Math.max(x1,b.tx+b.w);y1=Math.max(y1,b.ty+b.h);}
-  const cand=[];
+  const cand=[], reach=roadReach(pid);
   for(let y=y0-7;y<=y1+6;y++)for(let x=x0-7;x<=x1+6;x++){
     if(!canPlace(pid,type,x,y)) continue;
+    if(!d.def&&rectDist(hq,x,y,d.w,d.h)>0&&!ringTiles(x,y,d.w,d.h).some(i=>reach[i])) continue;   // muss eine Zufahrt bekommen können
     let ok=true; for(let yy=y-1;yy<=y+d.h&&ok;yy++)for(let xx=x-1;xx<=x+d.w;xx++){if(inMap(xx,yy)&&G.occ[idx(xx,yy)]){ok=false;break;}}
     if(!ok) continue;
     let s=dist(x+d.w/2,y+d.h/2,hq.x,hq.y);
     if(type==='turret') s=dist(x,y,hq.x+(32-hq.x)*0.3,hq.y+(32-hq.y)*0.3);
     if(type==='farm'||type==='house') s+=dist(x,y,hq.x-(32-hq.x)*0.3,hq.y-(32-hq.y)*0.3)*0.5; // eher hinten
     if(type==='house') s+=(1-housingQuality(pid,x,y,d.w,d.h).q)*30;                           // ruhig wohnen
+    if(type==='farm') s-=previewFields(x,y,d.w,d.h)*1.2;                                       // genug freie Äcker
     if(d.noise) for(const h of own) if(h.def.cap&&rectDist(h,x,y,d.w,d.h)<=NOISE_R) s+=6;        // Industrie weg von Häusern
     cand.push({x,y,s:s+Math.random()*2});
   }
   if(!cand.length) return false;
-  cand.sort((a,b)=>a.s-b.s); return !!placeSite(pid,type,cand[0].x,cand[0].y);
+  cand.sort((a,b)=>a.s-b.s);
+  for(const c of cand.slice(0,4)){ const b=placeSite(pid,type,c.x,c.y); if(!b) continue;
+    if(b.access===-1){ demolish(pid,b); continue; }   // keine Zufahrt möglich → anderen Platz versuchen
+    return true; }
+  return false;
 }

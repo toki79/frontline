@@ -1,9 +1,9 @@
 import { dist, fmt, idx, inMap } from '../core/util';
-import { DAMAGE, ECON, FEAT, RES, canHit } from '../data/config';
+import { DAMAGE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
-import { coverAt, hostile, recalcPower, updateRel } from '../sim/world';
+import { coverAt, hostile, recalcPower, rectDist, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { msg } from '../core/events';
 
@@ -112,6 +112,7 @@ export function destroy(e,src){
     for(let i=0;i<6;i++) fxAdd({k:'boom',x:e.x+(Math.random()-.5)*e.w,y:e.y+(Math.random()-.5)*e.h,r:0.6+Math.random()*0.8,life:0.7+Math.random()*0.5,delay:i*0.12});
     G.scorch.push({x:e.x,y:e.y,r:Math.max(e.w,e.h)*0.7,t:G.t});
     recalcPower(e.owner);
+    for(const n of touching(e)) ignite(n);   // Feuer springt auf direkt angrenzende Gebäude über
     // Bewohner fliehen, wenn Wohnraum zerstört wird
     if(e.def.cap&&e.owner<2){ const V=G.players[e.owner], lost=Math.floor(Math.min(Math.max(0,V.pop-ECON.minPop),e.def.cap*0.5));
       if(lost>0){ V.pop-=lost; if(e.owner===0) msg(`−${lost} Einwohner sind geflohen.`,'#ff8a7a'); else if(src&&src.owner===0) msg(`Kastrova verliert ${lost} Einwohner.`,'#9fd88a'); } }
@@ -127,6 +128,23 @@ export function destroy(e,src){
     if(src&&src.owner===0&&e.owner!==0) G.stats.kills++;
   }
   G.sel=G.sel.filter(s=>!s.dead);
+}
+// ---------- Feuer ----------
+const burns = b => !b.dead && !b.def.def && b.type!=='bunker';
+/** Gebäude, die direkt angrenzen (ohne freies Feld dazwischen) */
+export function touching(b){ return G.buildings.filter(o=>o!==b&&!o.dead&&burns(o)&&rectDist(o,b.tx,b.ty,b.w,b.h)===0); }
+export function ignite(b){
+  if(!burns(b)) return;
+  if(!(b.fire>0)&&b.owner===0&&G.t-(G.fireMsg||-99)>15){ G.fireMsg=G.t; msg(`🔥 Feuer! ${b.def.name} brennt – dicht bebaute Viertel brennen schnell nieder.`,'#ff8a7a'); }
+  b.fire=Math.max(b.fire||0,DENSITY.fireTime);
+}
+export function updateFire(b,dt){
+  b.fire-=dt; b.lastHit=G.t;
+  b.hp-=b.maxHp*DENSITY.fireDps*dt;
+  if(Math.random()<dt*6) fxAdd({k:'flame',x:b.tx+Math.random()*b.w,y:b.ty+Math.random()*b.h,r:0.25+Math.random()*0.2,life:0.7});
+  if(Math.random()<dt*2) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.6,y:b.y+(Math.random()-.5)*b.h*0.6,r:0.4,life:1.6,col:1});
+  if(Math.random()<dt*DENSITY.fireSpread) for(const n of touching(b)) if(!(n.fire>0)&&Math.random()<0.5) ignite(n);
+  if(b.hp<=0) destroy(b,null);
 }
 export function checkVictory(){
   if(G.over) return;

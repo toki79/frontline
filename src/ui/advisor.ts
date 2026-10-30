@@ -35,13 +35,18 @@ export function advise(){
   if(!has('lumber')&&p.res.wood<150) T.push({p:p.res.wood<60?78:48,txt:'<b>Holz wird knapp</b> und es gibt keinen Holzfäller. Baue ihn am Waldrand (Wald wird gelb markiert).',act:B('lumber')});
   else if(p.res.wood<50&&has('lumber')<3&&G.t>120) T.push({p:42,txt:'<b>Holzmangel:</b> Wohnhäuser und Bauernhöfe brauchen Holz. Ein weiterer Holzfäller oder eine Straße zum vorhandenen hilft.',act:B('lumber')});
   if(!has('quarry')&&p.res.stone<120&&G.t>25) T.push({p:p.res.stone<50?74:44,txt:'<b>Kein Steinbruch:</b> Stein brauchst du für Straßen, Kraftwerk, Industrie und Stellungen. Baue ihn direkt an den hellen Felsbrocken.',act:B('quarry')});
-  { const unl=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&!b.connected&&!b.empty&&(b.def.wood||b.def.stone||b.def.metal||b.def.refine));
-    const open=G.road.some((r,i)=>r===1&&G.roadOwner[i]===1);
-    if(unl&&!open&&p.res.stone>=60&&G.t>90) T.push({p:26,txt:`<b>${unl.def.name} ohne Straße.</b> Eine Straße zum Rathaus bringt +50 % Förderung und schnellere Wege.`,act:{label:'🛣 Straße anlegen',fn:()=>{G.sel=[unl];cmd('road');}}}); }
+  { const unl=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&!b.connected&&!b.def.def&&b.type!=='hq');
+    const planned=unl&&G.road.some((r,i)=>r===1&&G.roadOwner[i]===1);
+    if(unl&&!planned) T.push({p:64,txt:`<b>${unl.def.name} hat keine Zufahrt</b> und arbeitet deshalb nicht. Gebäude brauchen eine Straße zum Rathaus.`,act:{label:'🛣 Straße anlegen',fn:()=>{G.sel=[unl];cmd('road');}}}); }
+  if(p.broke) T.push({p:82,txt:'<b>Die Kasse ist leer!</b> Unterhalt, Sold und Verwaltung übersteigen die Einnahmen – Betriebe laufen nur halb so schnell. Weniger Truppen, Überflüssiges abreißen, mehr Einwohner oder Handel.',act:{label:'🤝 Handeln',fn:openDiplo}});
+  { const full=['food','wood','stone','metal','oil'].filter(r=>p.res[r]>=p.store-1);
+    if(full.length) T.push({p:37,txt:`<b>Lager voll:</b> ${full.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} (${fmt(p.store)}). Was nicht hineinpasst, geht verloren. Ein Lagerhaus schafft Platz, ein Handelskontor macht Überschuss zu Geld.`,act:has('kontor')?B('depot'):B('kontor')}); }
+  { const f=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&b.type==='farm'&&(b.fieldF??1)<0.6);
+    if(f) T.push({p:39,txt:`<b>Bauernhof mit zu wenig Äckern</b> (Ertrag ${Math.round((f.fieldF??1)*100)} %). Ein Hof braucht freie Steppe um sich herum – nicht zubauen, oder neuen Hof im Freien bauen.`,act:B('farm')}); }
   if(p.foodRate<0&&p.res.food>0) T.push({p:p.res.food/-p.foodRate<90?85:p.res.food/-p.foodRate<240?45:22,txt:`<b>Nahrung sinkt</b> (${f1(p.foodRate)}/s) – in ca. ${Math.round(p.res.food/-p.foodRate)} s ist der Vorrat leer. Ein Bauernhof ernährt 125 Einwohner.`,act:B('farm')});
   if(p.use>p.power) T.push({p:80,txt:'<b>Strommangel:</b> Bauen, Wachstum und Verteidigung laufen nur halb so schnell.',act:B('power')});
   if(p.pop>=p.cap-3) T.push({p:70,txt:'<b>Wohnraum voll</b> – die Stadt wächst nicht mehr. Ein Wohnhaus bringt Platz für 50 Einwohner.',act:B('house')});
-  if(p.growQ<0.8&&p.pop<p.cap-3) T.push({p:p.growQ<0.6?60:42,txt:`<b>Lärm bremst das Wachstum:</b> Die freien Wohnungen liegen neben Industrie (Wohnqualität ${Math.round(p.growQ*100)} %). Baue Wohnhäuser abseits von Kraftwerk, Mine, Raffinerie und Fahrzeugwerk.`,act:B('house')});
+  if(p.growQ<0.8&&p.pop<p.cap-3) T.push({p:p.growQ<0.6?60:42,txt:`<b>Schlechte Wohnlage bremst das Wachstum</b> (Wohnqualität ${Math.round(p.growQ*100)} %): Lärm von Industrie oder enge Bebauung. Baue Wohnhäuser mit Freiraum drumherum, abseits von Kraftwerk, Mine, Raffinerie und Fahrzeugwerk.`,act:B('house')});
   else if(p.pop>=p.cap-15&&!busy) T.push({p:35,txt:'Der <b>Wohnraum</b> wird bald knapp – plane das nächste Wohnhaus.',act:B('house')});
   if(p.power-p.use<15&&p.use<=p.power&&!busy) T.push({p:33,txt:'<b>Strom</b> wird knapp – das nächste Wohnhaus oder die nächste Mine könnte zu Mangel führen.',act:B('power')});
   if(p.rate&&p.rate.mines>0&&p.rate.mines===p.rate.minesEmpty) T.push({p:55,txt:'Deine <b>Mine ist erschöpft</b>. Baue eine neue direkt an anderen grauen Erzfelsen.',act:B('mine')});
