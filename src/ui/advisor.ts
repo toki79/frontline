@@ -19,7 +19,9 @@ export const settings={tips:true};
 export function setTipsOpt(on){ settings.tips=on; try{localStorage.setItem('frontlinie.tips',on?'1':'0');}catch(e){} $$('.optTips').forEach(c=>c.checked=on); updateAdvisor(); }
 export const advEl=$('#advisor'); let advCur=null;
 export function advise(){
-  const p=G.players[0], A=G.players[1], ai=G.ai, has=t=>countBuildings(0,t), busy=p.q.building.length||p.ready;
+  const p=G.players[0], A=G.players[1], ai=G.ai, has=t=>countBuildings(0,t,true);
+  const sites=G.buildings.filter(b=>!b.dead&&b.owner===0&&b.site), busy=sites.length>=2;
+  const workers=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.worker).length;
   const army=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon).length;
   const B=k=>({label:BUILDINGS[k].name+' bauen',fn:()=>{setTab('bau');$('#panel').classList.remove('min');buildClick(k);}});
   const T=[];
@@ -27,7 +29,15 @@ export function advise(){
   if(G.war){ let near=0; for(const u of G.units){ if(u.dead||u.owner===0||!hostile(0,u.owner)) continue; for(const b of G.buildings) if(!b.dead&&b.owner===0&&distTo(u,b)<6){near++;break;} }
     if(near) T.push({p:100,txt:`<b>${near} feindliche Einheiten in der Stadt!</b> Wähle deine Truppen (◎ Alle) und tippe den Gegner an.`,act:{label:'◎ Alle wählen',fn:()=>cmd('all')}}); }
   if(p.res.food<=0) T.push({p:95,txt:'<b>Hungersnot!</b> Die Bevölkerung schrumpft. Baue einen Bauernhof oder kaufe Nahrung am Milizmarkt.',act:busy?{label:'🤝 Markt',fn:openDiplo}:B('farm')});
-  if(p.ready) T.push({p:90,txt:`<b>${BUILDINGS[p.ready].name}</b> ist fertig und wartet aufs Platzieren.`,act:{label:'Platzieren',fn:()=>{setTab('bau');G.placing=p.ready;refreshCmds();}}});
+  const trainW={label:'Bauarbeiter ausbilden',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('worker');}};
+  if(!workers) T.push({p:sites.length?92:58,txt:`<b>Keine Bauarbeiter!</b> Ohne sie entsteht kein Gebäude und keine Straße. Bilde am Rathaus neue aus (Reiter Truppen).`,act:trainW});
+  else if(sites.length>workers&&G.t>30) T.push({p:36,txt:`<b>${sites.length} Baustellen, aber nur ${workers} Bauarbeiter.</b> Mehr Arbeiter bauen schneller (bis zu 4 je Baustelle).`,act:trainW});
+  if(!has('lumber')&&p.res.wood<150) T.push({p:p.res.wood<60?78:48,txt:'<b>Holz wird knapp</b> und es gibt keinen Holzfäller. Baue ihn am Waldrand (Wald wird gelb markiert).',act:B('lumber')});
+  else if(p.res.wood<50&&has('lumber')<3&&G.t>120) T.push({p:42,txt:'<b>Holzmangel:</b> Wohnhäuser und Bauernhöfe brauchen Holz. Ein weiterer Holzfäller oder eine Straße zum vorhandenen hilft.',act:B('lumber')});
+  if(!has('quarry')&&p.res.stone<120&&G.t>25) T.push({p:p.res.stone<50?74:44,txt:'<b>Kein Steinbruch:</b> Stein brauchst du für Straßen, Kraftwerk, Industrie und Stellungen. Baue ihn direkt an den hellen Felsbrocken.',act:B('quarry')});
+  { const unl=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&!b.connected&&!b.empty&&(b.def.wood||b.def.stone||b.def.metal||b.def.refine));
+    const open=G.road.some((r,i)=>r===1&&G.roadOwner[i]===1);
+    if(unl&&!open&&p.res.stone>=60&&G.t>90) T.push({p:26,txt:`<b>${unl.def.name} ohne Straße.</b> Eine Straße zum Rathaus bringt +50 % Förderung und schnellere Wege.`,act:{label:'🛣 Straße anlegen',fn:()=>{G.sel=[unl];cmd('road');}}}); }
   if(p.foodRate<0&&p.res.food>0) T.push({p:p.res.food/-p.foodRate<90?85:p.res.food/-p.foodRate<240?45:22,txt:`<b>Nahrung sinkt</b> (${f1(p.foodRate)}/s) – in ca. ${Math.round(p.res.food/-p.foodRate)} s ist der Vorrat leer. Ein Bauernhof ernährt 125 Einwohner.`,act:B('farm')});
   if(p.use>p.power) T.push({p:80,txt:'<b>Strommangel:</b> Bauen, Wachstum und Verteidigung laufen nur halb so schnell.',act:B('power')});
   if(p.pop>=p.cap-3) T.push({p:70,txt:'<b>Wohnraum voll</b> – die Stadt wächst nicht mehr. Ein Wohnhaus bringt Platz für 50 Einwohner.',act:B('house')});
@@ -52,7 +62,7 @@ export function advise(){
   if(G.t<70) T.push({p:31,txt:`<b>Eure Region:</b> ${REGION.rich[G.profile[0].rich]}, aber ${REGION.scarce[G.profile[0].scarce]}. Kastrova hat den umgekehrten Engpass – handelt mit dem, was die andere Seite braucht.`});
   if(!countBuildings(0,'kontor')&&(p.res.oil>600||p.res.food>1000||p.res.metal>600)) T.push({p:34,txt:`<b>Überschuss im Lager</b> (🛢 ${fmt(p.res.oil)} · 🌾 ${fmt(p.res.food)} · ⛏ ${fmt(p.res.metal)}). Ein Handelskontor exportiert ihn laufend gegen Geld.`,act:B('kontor')});
   if(p.res.oil>300&&marketOpen(0)) T.push({p:20,txt:`<b>${fmt(p.res.oil)} Öl</b> auf Lager. Am Milizmarkt bekommst du Geld dafür.`,act:{label:'🤝 Markt',fn:openDiplo}});
-  if(!busy&&G.t>20&&p.res.money>=300) T.push({p:28,txt:'Das <b>Rathaus ist untätig</b>. Jeder Bauauftrag bringt deine Stadt voran.',act:{label:'Gebäude',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
+  if(!sites.length&&G.t>20&&p.res.money>=300) T.push({p:28,txt:'<b>Keine Baustelle offen.</b> Deine Bauarbeiter warten – jeder Bauauftrag bringt die Stadt voran.',act:{label:'Gebäude',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
   if(G.mode==='race'&&p.pop>=ECON.target*0.85) T.push({p:15,txt:`Nur noch <b>${Math.ceil(ECON.target-p.pop)} Einwohner</b> bis zum Sieg! Kastrova wird jetzt alles versuchen, euch aufzuhalten.`});
   T.sort((a,b)=>b.p-a.p);
   if(T[0]) T[0].u=T[0].p>=75;

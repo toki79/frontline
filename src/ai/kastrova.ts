@@ -5,7 +5,8 @@ import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
 import { showOffer } from '../sim/offers';
 import { orderMove } from '../sim/orders';
-import { available, canPlace, canPlaceDef, cancelItem, doPlace, enqueue, placeDefense } from '../sim/production';
+import { available, canPlace, canPlaceDef, enqueue, placeDefense, placeSite } from '../sim/production';
+import { demolish, orderRoadTo } from '../sim/build';
 import { G } from '../sim/state';
 import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
@@ -42,12 +43,23 @@ export function aiThink(){
   if(lead&&!ai.warnLead){ai.warnLead=true;msg('Geheimdienst: Kastrova sieht euer Wachstum mit Sorge und rüstet auf.','#d6b45a');}
 
   // --- Gebäude ---
-  if(p.ready){
-    if(aiPlace(pid,p.ready)) ai.placeFail=0; else if(++ai.placeFail>6){cancelItem(pid,p.ready);ai.placeFail=0;}
-  } else if(!p.q.building.length&&findBuilding(pid,'hq')){
+  // Baustellen beauftragen (höchstens zwei gleichzeitig offen)
+  const sites=G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.site).length;
+  ai.noSpot=ai.noSpot||{};
+  if(sites<2&&findBuilding(pid,'hq')){
     const next=aiPickBuilding(p,army.length,need,lead);
-    if(next&&available(pid,next)&&canAfford(pid,next)) enqueue(pid,next);
+    if(next&&available(pid,next)&&canAfford(pid,next)){ if(!aiPlace(pid,next)) ai.noSpot[next]=G.t; }
   }
+  // Bauarbeiter: mit der Stadt wächst der Trupp
+  const workers=myU.filter(u=>u.def.worker).length, wantW=Math.min(10,3+Math.floor(p.pop/80));
+  if(workers<wantW&&!p.q.hq.length&&canAfford(pid,'worker')&&p.res.money>200) enqueue(pid,'worker');
+  // Straßen zu Förderstätten (Holz, Stein, Erz, Öl)
+  ai.roadT=(ai.roadT||0)-D.think;
+  if(ai.roadT<=0&&G.t>60){ ai.roadT=20;
+    const plannedOpen=G.road.some((r,i)=>r===1&&G.roadOwner[i]===2);
+    if(!plannedOpen) for(const b of myB){ if(b.site||b.connected||!(b.def.wood||b.def.stone||b.def.metal||b.def.refine)) continue;
+      if(p.res.stone<120) break;
+      if(orderRoadTo(pid,b)>0) break; } }
   aiDefense(pid);
   // --- Forschung ---
   if(findBuilding(pid,'university')&&!p.q.research.length){ const r=p.tech<2?'res2':p.tech<3?'res3':null;
@@ -156,7 +168,23 @@ export function aiDefense(pid){
   }
 }
 export function aiPickBuilding(p,armyN,need,lead){
-  const pid=1, has=t=>countBuildings(pid,t);
+  const pid=1, ai=G.ai, ok=t=>G.t-((ai.noSpot||{})[t]??-999)>60;
+  // erschöpfte Förderstätten zählen nicht (und werden abgerissen, um Platz zu schaffen)
+  const has=t=>G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.type===t&&!b.empty).length;
+  for(const b of G.buildings) if(!b.dead&&b.owner===pid&&b.empty&&!b.site&&(b.type==='lumber'||b.type==='quarry')) demolish(pid,b);
+  // Baustoffe zuerst: ohne Holz und Stein entsteht nichts
+  if(!has('lumber')&&ok('lumber')) return 'lumber';
+  if(!has('quarry')&&ok('quarry')&&G.t>15) return 'quarry';
+  if(p.res.wood<70&&has('lumber')<3&&ok('lumber')) return 'lumber';
+  if(p.res.stone<70&&has('quarry')<2&&ok('quarry')) return 'quarry';
+  const pick=aiPickMain(p,need,has);
+  if(pick){ const c: any=BUILDINGS[pick].cost;
+    if((c.wood||0)>p.res.wood&&has('lumber')<4&&ok('lumber')) return 'lumber';
+    if((c.stone||0)>p.res.stone&&has('quarry')<3&&ok('quarry')) return 'quarry'; }
+  return pick;
+}
+function aiPickMain(p,need,has){
+  const pid=1;
   if(p.use+12>p.power) return 'power';
   if(p.foodRate<0.3||need==='food') return 'farm';
   if(p.pop>=p.cap-6) return 'house';
@@ -172,7 +200,8 @@ export function aiPickBuilding(p,armyN,need,lead){
   if(p.res.money>3500&&has('factory')<2&&p.pop>200) return 'factory';
   if(p.foodRate<2.5) return 'farm';
   if(!has('kontor')&&p.pop>180&&(p.res.oil>500||p.res.food>900||p.res.metal>500)) return 'kontor';
-  if(G.mode!=='race'||p.cap<ECON.target+20) return 'house';
+  if(has('lumber')<2&&p.pop>120) return 'lumber';
+  if((G.mode!=='race'||p.cap<ECON.target+20)&&p.pop>p.cap-80) return 'house';
   return null;
 }
 export function aiCanReachOre(pid){ for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;
@@ -214,5 +243,5 @@ export function aiPlace(pid,type){
     cand.push({x,y,s:s+Math.random()*2});
   }
   if(!cand.length) return false;
-  cand.sort((a,b)=>a.s-b.s); return doPlace(pid,type,cand[0].x,cand[0].y);
+  cand.sort((a,b)=>a.s-b.s); return !!placeSite(pid,type,cand[0].x,cand[0].y);
 }

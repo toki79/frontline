@@ -5,6 +5,7 @@ import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
 import { hostile, nearestPassable, passable, tileCost } from '../sim/world';
 import { msg } from '../core/events';
+import { updateWorker } from '../sim/build';
 
 /* =====================================================================
    Einheiten-Update
@@ -41,6 +42,7 @@ export function updateUnit(u,dt){
     }
   }
   if(d.harvester) updateHarvest(u,dt);
+  if(d.worker) updateWorker(u,dt);
   if(u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15&&d.cls!=='air'&&(u.healChk=(u.healChk||0)-dt)<=0){ u.healChk=1; u.home=homeTurf(u); }
   if(u.home&&u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.015*dt);   // Versorgung zu Hause
   if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt
@@ -73,6 +75,7 @@ export function updateUnit(u,dt){
 export function arrived(u){ if(u.mode==='move'||u.mode==='amove'){ u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
 export function updateBuilding(b,dt){
   // Selbstreparatur, wenn längere Zeit kein Beschuss
+  if(b.site) return;   // Baustelle: Zustand wächst mit dem Baufortschritt
   if(b.owner<2&&b.hp<b.maxHp&&G.t-(b.lastHit||-99)>12) b.hp=Math.min(b.maxHp,b.hp+b.maxHp*0.012*dt);
   const w=b.def.weapon; if(!w) return;
   if(b.readyT&&G.t<b.readyT) return;   // im Bau
@@ -86,7 +89,7 @@ export function updateBuilding(b,dt){
 }
 /* ---------- Tanklaster ---------- */
 export function dockOf(r){const p=nearestPassable(r.tx+1,r.ty+r.h,'veh',4);return p?{x:p.x+0.5,y:p.y+0.5}:{x:r.x,y:r.ty+r.h+0.5};}
-export function nearestRefinery(u){let best=null,bd=1e9;for(const b of G.buildings){if(b.dead||b.owner!==u.owner||b.type!=='refinery')continue;const d=dist(u.x,u.y,b.x,b.y);if(d<bd){bd=d;best=b;}}return best;}
+export function nearestRefinery(u){let best=null,bd=1e9;for(const b of G.buildings){if(b.dead||b.site||b.owner!==u.owner||b.type!=='refinery')continue;const d=dist(u.x,u.y,b.x,b.y);if(d<bd){bd=d;best=b;}}return best;}
 export function oilNear(u,r){let best=-1,bd=1e9;for(let y=Math.floor(u.y-r);y<=u.y+r;y++)for(let x=Math.floor(u.x-r);x<=u.x+r;x++){if(!inMap(x,y))continue;const i=idx(x,y);if(G.oil[i]<=0)continue;const d=dist(u.x,u.y,x+0.5,y+0.5);if(d<=r+0.5&&d<bd){bd=d;best=i;}}return best;}
 export function findOil(u){
   const ref=nearestRefinery(u); let best=-1,bs=1e9;

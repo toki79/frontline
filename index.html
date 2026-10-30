@@ -11,6 +11,8 @@
   <div class="res">
     <span id="rMoney" data-tip="money">$0</span>
     <span data-tip="food">🌾<b id="rFood">0</b><small id="rFoodRate"></small></span>
+    <span data-tip="wood">🪵<b id="rWood">0</b></span>
+    <span data-tip="stone">🪨<b id="rStone">0</b></span>
     <span data-tip="metal">⛏<b id="rMetal">0</b></span>
     <span data-tip="oil">🛢<b id="rOil">0</b></span>
   </div>
@@ -23,7 +25,7 @@
 <div id="log"></div>
 <canvas id="mini" width="124" height="124"></canvas>
 <div id="panel">
-  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info / Abbrechen</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
+  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
   <div id="items"></div>
 </div>
 <div id="cmds">
@@ -32,6 +34,8 @@
   <button data-c="stop">■<small>Stopp</small></button>
   <button data-c="all">◎<small>Alle</small></button>
   <button data-c="desel">✕<small>Abwählen</small></button>
+  <button data-c="road" class="ctx">🛣<small>Straße</small></button>
+  <button data-c="demolish" class="ctx">🗑<small>Abriss</small></button>
 </div>
 <div id="stack">
   <div id="advisor" class="hidden"><span class="ai">💡</span><span class="at" id="advText"></span><span class="ab"><button id="advX" title="Tipps ausblenden">✕</button><button id="advAct"></button></span></div>
@@ -41,7 +45,7 @@
 
 <div id="start" class="overlay"><div class="card">
   <h1>FRONTLINIE</h1>
-  <div class="sub">Das Grenztal von Belgor · Prototyp v0.2</div>
+  <div class="sub">Das Grenztal von Belgor · Version 0.10</div>
   <p>Die <b style="color:#6fa2ea">Republik Aldoria</b> und die <b style="color:#e0756b">Föderation Kastrova</b> bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wenn Nahrung oder Metall knapp werden oder eine Seite zu stark wird, greifen die Waffen. Mitten im Fluss hält die neutrale <b style="color:#d6b45a">Grenzmiliz</b> die Insel und betreibt einen Markt.</p>
   <p><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
   <div class="sub" style="margin-top:12px">Schwierigkeit</div>
@@ -52,6 +56,7 @@
   <button class="big" id="bStart">Neues Spiel starten</button>
   <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
   <div class="help">
+    <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Straßen zu Förderstätten bringen +50 % Förderung.<br>
     <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
     <b>Krieg:</b> Wer ein Gebäude zerstört oder einen Tanklaster abschießt, erbeutet einen Teil der Vorräte des Gegners.<br>
     <b>Touch:</b> Tippen = auswählen/Befehl (Boden = bewegen, Feind = angreifen, Ölfeld = fördern) · Wischen = Karte verschieben · Zwei Finger = Zoom · <b>▢ Rahmen</b> = mehrere wählen · Doppeltipp = alle dieses Typs<br>
@@ -80,6 +85,8 @@
     <h4>Obere Leiste</h4>
     <dt>$</dt><dd>Geld. Kommt als Steuer von den Einwohnern (je mehr Einwohner, desto mehr). Für Gebäude und Truppen.</dd>
     <dt>🌾 460 +4,5</dt><dd>Nahrung auf Lager und Bilanz pro Sekunde (grün = Überschuss, rot = Vorrat schrumpft). Bauernhöfe erzeugen, Einwohner verbrauchen.</dd>
+    <dt>🪵</dt><dd>Holz. Vom Holzfäller, der am Waldrand stehen muss und den Wald nach und nach abholzt. Für Wohnhäuser, Höfe und Kontor.</dd>
+    <dt>🪨</dt><dd>Stein. Vom Steinbruch, der direkt an hellen Felsbrocken stehen muss. Für Straßen, Kraftwerk, Industrie und Stellungen.</dd>
     <dt>⛏</dt><dd>Metall. Nur aus Minen, die direkt an graue Erzfelsen gebaut werden. Nötig für Panzer, Fahrzeugwerk und MK-Stellungen.</dd>
     <dt>🛢</dt><dd>Öl. Tanklaster pumpen es aus schwarzen Ölfeldern zur Raffinerie. Treibstoff für Fahrzeuge, am Milizmarkt verkaufbar.</dd>
     <dt>Unterstrichen</dt><dd>Rot gewellt = Engpass eurer Region, grün = Stärke eurer Region. Jede Stadt hat einen anderen Engpass – handelt über 🤝 mit dem, was die andere Seite braucht.</dd>
@@ -94,7 +101,10 @@
     <dt><span class="sw" style="background:#e8c84a"></span></dt><dd>Ladung eines Tanklasters.</dd>
     <dt>Blauer Balken am Haus</dt><dd>Belegung eines Wohnhauses. Grauer Dunst = Industrielärm in der Nähe, dort ziehen Bewohner langsamer ein.</dd>
     <dt>Schwarze Flecken</dt><dd>Ölfelder · <b>Graue Felsen</b> = Erz · Wald = Deckung für Infanterie · Schlamm bremst Fahrzeuge · Ortschaften = Deckung.</dd>
-    <dt>Grüne Felder</dt><dd>Beim Platzieren: hier darf gebaut werden. Gelbe Rahmen = Erz (für Minen).</dd>
+    <dt>Grüne Felder</dt><dd>Beim Platzieren: hier darf gebaut werden. Gelbe Rahmen = Erz, Felsen oder Wald, an die das Gebäude grenzen muss.</dd>
+    <dt>Baustelle</dt><dd>Gerüst mit gelbem Fortschrittsbalken. Bauarbeiter (gelber Helm) bauen sie fertig – bis zu 4 gleichzeitig. Erst danach liefert das Gebäude Strom, Wohnraum oder Waren. Arbeiter auswählen und Baustelle antippen = dorthin schicken.</dd>
+    <dt>Straßen</dt><dd>Gestrichelt = geplant, Schotter = gebaut. Auf Straßen sind alle fast doppelt so schnell. Ist eine Mine, ein Steinbruch, Holzfäller oder eine Raffinerie per Straße mit dem Rathaus verbunden, fördert sie 50 % mehr. Gebäude wählen → 🛣 Straße legt den Weg automatisch an.</dd>
+    <dt>🗑 Abriss</dt><dd>Eigenes Gebäude wählen → Abriss (zweimal tippen). Baustellen werden voll erstattet, fertige Gebäude zu 30 %.</dd>
     <h4>Verteidigung &amp; Krieg</h4>
     <dt>Verteidigung</dt><dd>Mauern, Stacheldraht und Gräben antippen oder über die Karte ziehen. Stellungen brauchen nach dem Platzieren einige Sekunden Aufbau (gestrichelter Rahmen).</dd>
     <dt>Heimvorteil</dt><dd>Einheiten nahe der eigenen Stadt nehmen 30 % weniger Schaden und werden dort versorgt (heilen nach 15 s ohne Beschuss). Gebäude reparieren sich nach 12 s ohne Beschuss. Verteidigungsanlagen sind besonders robust.</dd>
@@ -105,7 +115,7 @@
     <dt>Fahrzeuge</dt><dd>Max. 4 Kampffahrzeuge je Fahrzeugwerk, sie verbrauchen laufend Öl. Soldaten essen weiter mit.</dd>
     <h4>Bauleiste</h4>
     <dt>$300 ⛏80 👥5</dt><dd>Kosten: Geld, Metall, Öl und Einwohner (Soldaten werden aus der Bevölkerung rekrutiert).</dd>
-    <dt>Gelber Balken</dt><dd>Baufortschritt · Zahl oben rechts = Anzahl in der Warteschlange · „PLATZIEREN“ = fertig, antippen und auf die Karte setzen.</dd>
+    <dt>Gelber Balken</dt><dd>Ausbildungs- bzw. Forschungsfortschritt · Zahl oben rechts = Anzahl in der Warteschlange. Gebäude werden sofort als Baustelle gesetzt.</dd>
   </dl>
   <label class="chk"><input type="checkbox" class="optTips" checked> 💡 Spieltipps anzeigen</label>
   <button class="big" id="bHelpClose">Zurück ins Spiel</button>

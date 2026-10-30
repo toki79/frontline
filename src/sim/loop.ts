@@ -6,6 +6,7 @@ import { updateProduction } from '../sim/production';
 import { G } from '../sim/state';
 import { separate, updateBuilding, updateProjectiles, updateUnit } from '../sim/units';
 import { recalcPower, updateVision } from '../sim/world';
+import { updateRoadNet } from '../sim/build';
 
 /* =====================================================================
    Hauptschleife
@@ -15,6 +16,7 @@ export function update(dt){
   for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(p.id<2) updateEconomy(p.id,dt); if(G.over) return;}
   G.ai.thinkT-=dt; if(G.ai.thinkT<=0){G.ai.thinkT=G.diff.think; aiThink();}
   G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink();}
+  if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}
   for(const k in G.market) G.market[k]=Math.max(0,G.market[k]-MARKET_RECOVER*dt);
   for(const u of G.units) if(!u.dead) updateUnit(u,dt);

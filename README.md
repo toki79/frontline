@@ -34,8 +34,9 @@ src/
     world.ts            Gelände, Einheiten/Gebäude anlegen, Sicht/Nebel, Wohnqualität, Beziehungen
     pathfinding.ts      A*-Wegfindung auf dem Feldraster
     orders.ts           Befehle (bewegen, angreifen, fördern …)
-    production.ts       Bauaufträge, Platzierung, Verteidigungsanlagen
-    economy.ts          Steuern, Nahrung, Metall, Raffinerie, Export, Wachstum, Stadtstufen
+    production.ts       Ausbildung/Forschung, Baustellen setzen, Platzierregeln, Verteidigungsanlagen
+    build.ts            Baustellen, Bauarbeiter, Straßen (Planung, Netz, Förderbonus), Abriss
+    economy.ts          Steuern, Nahrung, Holz, Stein, Metall, Raffinerie, Export, Wachstum, Stadtstufen
     combat.ts           Zielwahl, Feuern, Schaden, Flächenschaden, Beute, Spielende
     units.ts            Bewegung, Tanklaster, Drohnen-Akku, Projektile, Effekte
     market.ts           Milizmarkt (Sättigung) und Handel mit Kastrova (Bedarfspreise)

@@ -1,5 +1,5 @@
 import { dist, hash, idx, inMap, lerp, makeNoise } from '../core/util';
-import { MAP_H, MAP_W, T } from '../data/config';
+import { CONSTRUCTION, MAP_H, MAP_W, T } from '../data/config';
 import { G } from '../sim/state';
 import { placeBuilding, recalcPower, spawnAt } from '../sim/world';
 
@@ -62,14 +62,26 @@ export function genMap(){
     if(pr.rich==='metal') field(G.ore,2.5,46.5,1.4,900,0.9,side);
     field(G.ore,25.5,38.5,1.8,pr.scarce==='metal'?800:1200,0.9,side); field(G.ore,4.5,31.5,1.6,1000,0.9,side);
   }
+  // Wäldchen am Stadtrand (für den ersten Holzfäller) – auf beiden Seiten gleich
+  for(let y=58;y<64;y++)for(let x=10;x<17;x++){ if(dist(x+0.5,y+0.5,13.5,61)>2.6||!inMap(x,y)) continue;
+    if(terr[idx(x,y)]===T.GRASS&&G.oil[idx(x,y)]<=0&&G.ore[idx(x,y)]<=0&&hash(x,y)<0.9) sym(x,y,(a,b)=>terr[idx(a,b)]=T.FOREST); }
+  // Felsen (Stein) – in Stadtnähe, an der Front und auf freiem Feld
+  for(const side of [0,1]){
+    field(G.rock,2.5,57.5,1.5,1400,0.85,side);
+    field(G.rock,19.5,52.5,1.3,1200,0.8,side);
+    field(G.rock,13.5,36.5,1.6,1600,0.85,side);
+  }
+  for(let i=0;i<G.rock.length;i++) if(G.rock[i]>0){ G.oil[i]=0; G.ore[i]=0; }
+  for(let i=0;i<terr.length;i++) G.wood[i]=terr[i]===T.FOREST?CONSTRUCTION.forestWood:0;
 }
 export function setupStart(){
   placeBuilding(0,'hq',6,51,true);
   placeBuilding(1,'hq',55,10,true);
   placeBuilding(2,'bunker',31,31,true);
-  for(const pid of [0,1]){ const p=G.players[pid]; p.res={money:2500,food:200,metal:60,oil:0}; p.pop=30; }
-  G.players[2].res={money:1500,food:400,metal:200,oil:0};
+  for(const pid of [0,1]){ const p=G.players[pid]; p.res={money:2500,food:200,wood:250,stone:150,metal:60,oil:0}; p.pop=30; }
+  G.players[2].res={money:1500,food:400,wood:0,stone:0,metal:200,oil:0};
   for(let i=0;i<2;i++){ spawnAt(0,'inf',12+i,50+i); spawnAt(1,'inf',51-i,13-i); }
+  for(let i=0;i<CONSTRUCTION.startWorkers;i++){ spawnAt(0,'worker',7+i*0.6,54.6); spawnAt(1,'worker',56.4-i*0.6,9.4); }
   [[29,33],[34,30],[30,29],[33,34],[29,30]].forEach(([x,y])=>spawnAt(2,'militia',x+0.5,y+0.5));
   for(const p of G.players) recalcPower(p.id);
 }

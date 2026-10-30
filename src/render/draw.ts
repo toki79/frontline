@@ -17,6 +17,16 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
       c.fillStyle=type==='militia'?'#5a4a2c':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
+  } else if(type==='worker'){
+    // Bauarbeiter: gelber Helm, beim Arbeiten schwingt der Hammer (hpf<0 = arbeitet)
+    const work=hpf<0, t=G?G.t:0;
+    c.rotate(ang);
+    c.fillStyle='rgba(0,0,0,.28)'; c.beginPath(); c.arc(1.5,1.5,3.4,0,7); c.fill();
+    if(work){ const sw=Math.sin(t*14+x)*0.9; c.save(); c.rotate(sw); c.strokeStyle='#6b4a2a'; c.lineWidth=1.4; c.beginPath(); c.moveTo(0,1); c.lineTo(7,1); c.stroke();
+      c.fillStyle='#5a5a55'; c.fillRect(6,-1,2.5,4); c.restore(); }
+    else { c.strokeStyle='#6b4a2a'; c.lineWidth=1.2; c.beginPath(); c.moveTo(-1,3); c.lineTo(5,4); c.stroke(); }
+    c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; c.beginPath(); c.arc(0,0,3.8,0,7); c.fill(); c.stroke();
+    c.fillStyle='#f2c230'; c.strokeStyle='#8a6a10'; c.beginPath(); c.arc(0,0,2.5,0,7); c.fill(); c.stroke();
   } else if(type==='ifv'||type==='mbt'){
     const big=type==='mbt', L=big?24:20, Wd=big?16:13;
     c.rotate(ang);
@@ -107,6 +117,25 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       box(W-22,5,16,10,col,dark);
       if(extra) { c.fillStyle='rgba(0,0,0,.45)'; c.fillRect(1,1,W-2,H-2); }
       break;
+    case 'lumber':
+      box(4,H-20,W*0.5,16,'#7a5a38','#4a3420'); c.fillStyle='#5a3e24'; c.fillRect(4,H-20,W*0.5,4);   // Hütte
+      box(W*0.5-6,H-16,6,6,col,dark);
+      for(let i=0;i<3;i++)for(let j=0;j<3-i;j++){ const lx=W*0.58+j*7+i*3.5, ly=H-9-i*5.5;               // Stammstapel
+        c.fillStyle='#8b6238'; c.beginPath(); c.arc(lx,ly,3.3,0,7); c.fill(); c.fillStyle='#c9a26a'; c.beginPath(); c.arc(lx,ly,1.8,0,7); c.fill(); }
+      c.fillStyle='#365429'; c.beginPath(); c.arc(W*0.3,H*0.28,8,0,7); c.fill(); c.fillStyle='#4b6e36'; c.beginPath(); c.arc(W*0.27,H*0.24,3.5,0,7); c.fill();
+      c.fillStyle='#6b4a2a'; c.beginPath(); c.arc(W*0.72,H*0.28,4,0,7); c.fill(); c.fillStyle='#b08a5a'; c.beginPath(); c.arc(W*0.72,H*0.28,2.5,0,7); c.fill();   // Baumstumpf
+      if(extra) { c.fillStyle='rgba(0,0,0,.4)'; c.fillRect(1,1,W-2,H-2); }
+      break;
+    case 'quarry':
+      c.fillStyle='#a49a84'; c.fillRect(3,3,W-6,H-6);
+      c.fillStyle='#857b66'; c.beginPath(); c.moveTo(6,6); c.lineTo(W-10,8); c.lineTo(W-14,H*0.55); c.lineTo(10,H*0.5); c.closePath(); c.fill();   // Abbruchkante
+      c.fillStyle='#6d6553'; c.beginPath(); c.moveTo(12,12); c.lineTo(W-18,13); c.lineTo(W-20,H*0.45); c.lineTo(15,H*0.42); c.closePath(); c.fill();
+      for(const [bx,by] of [[W-20,H-14],[W-12,H-10],[W-16,H-20]]){ c.fillStyle='#c8c2b2'; c.fillRect(bx,by,7,6); c.strokeStyle='#7a7466'; c.strokeRect(bx+0.5,by+0.5,6,5); }   // Quader
+      c.strokeStyle='#3a3a34'; c.lineWidth=2; c.beginPath(); c.moveTo(8,H-6); c.lineTo(8,H-24); c.lineTo(22,H-24); c.stroke();   // Kran
+      c.lineWidth=1; c.beginPath(); c.moveTo(20,H-24); c.lineTo(20,H-16+Math.sin(tt*1.5)*3); c.stroke();
+      box(10,H-12,12,8,col,dark);
+      if(extra) { c.fillStyle='rgba(0,0,0,.4)'; c.fillRect(1,1,W-2,H-2); }
+      break;
     case 'power':
       for(const [cx,cy,r] of [[W*0.3,H*0.36,12],[W*0.68,H*0.62,11]]){c.fillStyle='rgba(0,0,0,.3)';c.beginPath();c.arc(cx+2,cy+2,r,0,7);c.fill();
         c.fillStyle='#bdbcb2';c.beginPath();c.arc(cx,cy,r,0,7);c.fill();c.fillStyle='#5a5952';c.beginPath();c.arc(cx,cy,r*0.58,0,7);c.fill();}
@@ -195,6 +224,40 @@ export function drawFeature(c,f,px,py,dirs,S){
       for(let i=0;i<=n;i++){ const t=i/n*L, x=cx+ux*t, y=cy+uy*t; c.moveTo(x+3.2,y); c.arc(x,y,3.2,0,Math.PI*2); } c.stroke(); }
     c.fillStyle='#3a3a34'; c.fillRect(cx-1,cy-5,2,10);
   }
+  c.restore();
+}
+/** Straße: Schotterband zu gleichartigen Nachbarn; geplante Straßen nur gestrichelt.
+ *  pass 0 = Bankett, 1 = Schotter (erst alle Bankette, dann alle Decken – sonst entstehen Nähte); -1 = beides */
+export function drawRoad(c,px,py,dirs,S,planned,pass=-1){
+  const m=S/2, cx=px+m, cy=py+m;
+  c.save(); c.lineCap='round';
+  const path=()=>{ c.beginPath(); if(!dirs.length){ c.moveTo(cx-m*0.6,cy); c.lineTo(cx+m*0.6,cy); } for(const [dx,dy] of dirs){ c.moveTo(cx,cy); c.lineTo(cx+dx*m,cy+dy*m); } };
+  if(planned){
+    path(); c.strokeStyle='rgba(60,50,30,.35)'; c.lineWidth=S*0.5; c.stroke();                                   // abgesteckte Trasse
+    c.lineCap='butt'; path(); c.strokeStyle='#f0d870'; c.lineWidth=S*0.08; c.setLineDash([S*0.16,S*0.12]); c.stroke(); c.setLineDash([]);
+    c.fillStyle='#f0d870'; c.fillRect(cx-1.5,cy-1.5,3,3);                                                         // Pflock
+  } else {
+    if(pass!==1){ path(); c.strokeStyle='#5e5442'; c.lineWidth=S*0.62; c.stroke(); }     // Bankett
+    if(pass!==0){ path(); c.strokeStyle='#9a8f78'; c.lineWidth=S*0.48; c.stroke();      // Schotter
+      path(); c.strokeStyle='rgba(255,255,255,.10)'; c.lineWidth=S*0.06; c.stroke(); }
+  }
+  c.restore();
+}
+/** Baustelle: Fundament, das Gebäude wächst von unten nach oben, Gerüst darüber */
+export function drawSite(c,b,col,dark){
+  const px=b.tx*TILE, py=b.ty*TILE, W=b.w*TILE, H=b.h*TILE, k=b.progress||0;
+  c.save();
+  c.fillStyle='#6b5a3e'; c.fillRect(px+1,py+1,W-2,H-2);
+  c.strokeStyle='#4a3d28'; c.lineWidth=1; c.setLineDash([4,3]); c.strokeRect(px+2.5,py+2.5,W-5,H-5); c.setLineDash([]);
+  if(k>0.02){ c.save(); c.beginPath(); c.rect(px,py+H*(1-k),W,H*k+2); c.clip(); c.globalAlpha=0.85; drawBuildingShape(c,b.type,col,dark,px,py,b.w,b.h,b.tur); c.restore(); }
+  // Gerüst
+  c.strokeStyle='#c8a060'; c.lineWidth=1.2;
+  for(let x=4;x<W-2;x+=10){ c.beginPath(); c.moveTo(px+x,py+3); c.lineTo(px+x,py+H-3); c.stroke(); }
+  for(let y=6;y<H-2;y+=9){ c.beginPath(); c.moveTo(px+3,py+y); c.lineTo(px+W-3,py+y); c.stroke(); }
+  c.strokeStyle='rgba(200,160,96,.6)'; c.beginPath(); c.moveTo(px+3,py+3); c.lineTo(px+W-3,py+H-3); c.stroke();
+  // Material & Fortschritt
+  c.fillStyle='#8b6238'; c.fillRect(px+W-12,py+H-8,9,5); c.fillStyle='#b8b2a2'; c.fillRect(px+4,py+H-8,7,5);
+  c.fillStyle='#000a'; c.fillRect(px+3,py+H-4,W-6,3); c.fillStyle='#e8c84a'; c.fillRect(px+3,py+H-4,(W-6)*k,3);
   c.restore();
 }
 export function hpBar(c,x,y,w,f){c.fillStyle='#000b';c.fillRect(x-1,y-1,w+2,5);c.fillStyle=f>0.6?'#6fd05a':f>0.3?'#e3c23e':'#e0503a';c.fillRect(x,y,w*Math.max(0,f),3);}

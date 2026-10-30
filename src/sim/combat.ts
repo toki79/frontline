@@ -1,5 +1,5 @@
 import { dist, fmt, idx, inMap } from '../core/util';
-import { DAMAGE, ECON, FEAT, RES, canHit, isDefType } from '../data/config';
+import { DAMAGE, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -85,12 +85,12 @@ export function onAttacked(t,src){
 // Beute: Wer zerstört, erbeutet einen Teil der Vorräte
 export function loot(e,src){
   if(!src) return; const ko=src.owner, vo=e.owner; if(ko===vo) return;
-  if(e.kind==='building'&&e.def.def) return;
+  if(e.kind==='building'&&(e.def.def||e.site)) return;
   const V=G.players[vo], K=G.players[ko], got: Record<string,number>={};
   if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7); }
   else {
     const share=e.type==='hq'?0.4:0.15, cap=e.type==='hq'?900:250;
-    for(const k of ['money','food','metal','oil']){ let a=Math.floor(Math.min((V.res[k]||0)*share,cap));
+    for(const k of ['money','food','wood','stone','metal','oil']){ let a=Math.floor(Math.min((V.res[k]||0)*share,cap));
       if(e.type==='farm'&&k==='food') a=Math.floor(Math.min(V.res.food*0.3,350));
       if(e.type==='mine'&&k==='metal') a=Math.floor(Math.min(V.res.metal*0.3,250));
       if(e.type==='refinery'&&k==='oil') a=Math.floor(Math.min(V.res.oil*0.35,300));
@@ -105,7 +105,7 @@ export function loot(e,src){
   fxAdd({k:'loot',x:e.x,y:e.y,txt,col:ko===0?'#9fd88a':'#ff9a8a',life:2.2});
 }
 export function destroy(e,src){
-  if(e.dead) return; e.dead=true; if(e.kind==='building') G.qDirty=true;
+  if(e.dead) return; e.dead=true; if(e.kind==='building'){ G.qDirty=true; G.roadDirty=true; }
   loot(e,src);
   if(e.kind==='building'){
     for(let y=e.ty;y<e.ty+e.h;y++)for(let x=e.tx;x<e.tx+e.w;x++) if(G.occ[idx(x,y)]===e.id) G.occ[idx(x,y)]=0;
@@ -115,10 +115,9 @@ export function destroy(e,src){
     // Bewohner fliehen, wenn Wohnraum zerstört wird
     if(e.def.cap&&e.owner<2){ const V=G.players[e.owner], lost=Math.floor(Math.min(Math.max(0,V.pop-ECON.minPop),e.def.cap*0.5));
       if(lost>0){ V.pop-=lost; if(e.owner===0) msg(`−${lost} Einwohner sind geflohen.`,'#ff8a7a'); else if(src&&src.owner===0) msg(`Kastrova verliert ${lost} Einwohner.`,'#9fd88a'); } }
-    if(e.owner===0&&e.type!=='wall') msg('Gebäude verloren: '+e.def.name,'#ff8a7a');
+    if(e.owner===0&&e.type!=='wall') msg((e.site?'Baustelle verloren: ':'Gebäude verloren: ')+e.def.name,'#ff8a7a');
     if(e.owner===1&&src&&src.owner===0&&e.type!=='wall') msg('Feindliches Gebäude zerstört: '+e.def.name,'#9fd88a');
     if(e.type==='bunker') msg('Der Milizbunker ist gefallen – der Markt ist geschlossen.','#d6b45a');
-    if(G.placing&&!isDefType(G.placing)&&G.players[0].ready===null) G.placing=null;
     checkVictory();
   } else {
     const big=e.def.cls==='veh'; if(e.def.cls==='air') fxAdd({k:'boom',x:e.x,y:e.y,r:0.3,life:0.3});

@@ -6,7 +6,7 @@ export interface Entity {
 }
 export interface Player {
   id: number; name: string; short: string; col: string; dark: string;
-  res: { money: number; food: number; metal: number; oil: number };
+  res: { money: number; food: number; wood: number; stone: number; metal: number; oil: number };
   pop: number; cap: number; tech: number; q: Record<string, any[]>;
   [k: string]: any;
 }

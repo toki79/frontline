@@ -16,9 +16,10 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
   G = {
     t:0, fog, mode, diffKey, diff:DIFFICULTY[diffKey], rng:mulberry32(seed), nextId:1,
     vis:new Uint8Array(MAP_W*MAP_H), visT:0, feat:new Uint8Array(MAP_W*MAP_H), terr:new Uint8Array(MAP_W*MAP_H), oil:new Float32Array(MAP_W*MAP_H), ore:new Float32Array(MAP_W*MAP_H), occ:new Int32Array(MAP_W*MAP_H),
+    wood:new Float32Array(MAP_W*MAP_H), rock:new Float32Array(MAP_W*MAP_H), road:new Uint8Array(MAP_W*MAP_H), roadOwner:new Uint8Array(MAP_W*MAP_H), roadDirty:true, terrChanged:[],
     units:[], buildings:[], projectiles:[], fx:[], scorch:[],
-    players: FACTIONS.map((f,i)=>({id:i, ...f, res:{money:0,food:0,metal:0,oil:0}, pop:0, cap:0, foodRate:0, power:0, use:0, ready:null,
-              q:{building:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
+    players: FACTIONS.map((f,i)=>({id:i, ...f, res:{money:0,food:0,wood:0,stone:0,metal:0,oil:0}, pop:0, cap:0, foodRate:0, power:0, use:0,
+              q:{hq:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
     rel:[['-','neutral','neutral'],['neutral','-','neutral'],['neutral','neutral','-']],
     war:false, aiAtt:0, offer:null,
     militiaAlly:-1, militiaWar:[false,false], attitude:[0,0], mercCooldown:0, market:{sellOil:0,buyFood:0,buyMetal:0},
@@ -37,5 +38,5 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
   const pr=G.profile;
   msg(`Unsere Region: ${REGION.rich[pr[0].rich]}, aber ${REGION.scarce[pr[0].scarce]}.`,'#7fb0ea');
   msg(`Geheimdienst: Kastrova hat ${REGION.rich[pr[1].rich]}, aber ${REGION.scarce[pr[1].scarce]}. Handel lohnt sich.`,'#d6b45a');
-  msg('Kommandant, die Stadt wartet. Baue Bauernhof, Wohnhäuser und ein Kraftwerk.', '#d2bd62');
+  msg('Kommandant, die Stadt wartet. Baue Holzfäller und Steinbruch, dann Bauernhof, Wohnhäuser und ein Kraftwerk – deine Bauarbeiter errichten alles vor Ort.', '#d2bd62');
 }

@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { BUILDINGS, FEAT, MAP_H, MAP_W, NOISE_R, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NOISE_R, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -42,6 +42,7 @@ export function tileCost(i,cls){
   let c=TERRAIN[G.terr[i]].cost[cls]; const f=G.feat[i];
   if(f===FEAT.WIRE) c*=cls==='inf'?3.5:1.1;
   else if(f===FEAT.TRENCH) c*=cls==='inf'?1.4:3.2;
+  if(G.road[i]===2) c=Math.min(c,1)*CONSTRUCTION.roadSpeed;   // fertige Straße
   return c;
 }
 export function coverAt(x,y){ const tx=Math.floor(x),ty=Math.floor(y); if(!inMap(tx,ty)) return 0; const i=idx(tx,ty); return G.feat[i]===FEAT.TRENCH?0.6:TERRAIN[G.terr[i]].cover; }
@@ -63,16 +64,20 @@ export function makeUnit(pid,type,x,y){
 }
 export function spawnAt(pid,type,x,y){ const u=makeUnit(pid,type,x,y); if(UNITS[type].harvester) u.hs='seek'; return u; }
 export function ringTiles(tx,ty,w,h){const out=[];for(let y=ty-1;y<=ty+h;y++)for(let x=tx-1;x<=tx+w;x++){if((x===tx-1||x===tx+w||y===ty-1||y===ty+h)&&inMap(x,y))out.push(idx(x,y));}return out;}
-export function placeBuilding(pid,type,tx,ty,initial){
+/** Gebäude setzen. site=true: als Baustelle, die erst von Bauarbeitern fertiggestellt wird. */
+export function placeBuilding(pid,type,tx,ty,initial,site=false){
   const d=BUILDINGS[type];
   const b: Entity={id:G.nextId++, kind:'building', type, def:d, owner:pid, tx, ty, w:d.w, h:d.h, x:tx+d.w/2, y:ty+d.h/2,
     hp:d.hp, maxHp:d.hp, armor:d.def?'fort':'building', tur:pid===1?Math.PI*0.75:-Math.PI*0.25, cd:0, scanT:0, target:null, born:initial?-9:G.t, empty:false};
   if(d.needsOre) b.oreTiles=ringTiles(tx,ty,d.w,d.h).filter(i=>G.ore[i]>0);
-  G.buildings.push(b); G.qDirty=true;
+  if(d.needsRock) b.rockTiles=ringTiles(tx,ty,d.w,d.h).filter(i=>G.rock[i]>0);
+  if(site){ b.site=true; b.progress=0; b.hp=d.hp*0.1; b.lastHit=G.t; }
+  G.buildings.push(b); G.qDirty=true; G.roadDirty=true;
   for(let y=ty;y<ty+d.h;y++)for(let x=tx;x<tx+d.w;x++) G.occ[idx(x,y)]=b.id;
   for(const u of G.units){ if(u.dead) continue; const tx2=Math.floor(u.x),ty2=Math.floor(u.y);
     if(inMap(tx2,ty2)&&G.occ[idx(tx2,ty2)]){const p=nearestPassable(tx2,ty2,u.def.cls); if(p){u.x=p.x+0.5;u.y=p.y+0.5;u.path=null;}} }
   recalcPower(pid);
+  if(site) return b;
   if(d.spawn && !initial) spawnUnit(pid,d.spawn,b);
   if(type==='university'){ const p=G.players[pid]; if(p.tech<1){ p.tech=1; if(pid===0) msg(`🎓 Universität Stufe 1: ${TECH_UNLOCKS[1]} freigeschaltet.`,'#9fd88a'); } }
   if(d.def&&d.time&&!initial){ b.readyT=G.t+d.time; b.hp=d.hp*0.25; b.lastHit=G.t-20; }   // Stellung wird erst aufgebaut
@@ -82,13 +87,13 @@ export function placeBuilding(pid,type,tx,ty,initial){
 export function rectDist(b,tx,ty,w,h){const dx=Math.max(b.tx-(tx+w),tx-(b.tx+b.w),0),dy=Math.max(b.ty-(ty+h),ty-(b.ty+b.h),0);return Math.max(dx,dy);}
 export function housingQuality(pid,tx,ty,w,h){
   let pen=0; const src=[];
-  for(const b of G.buildings){ if(b.dead||b.owner!==pid||!b.def.noise) continue;
+  for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid||!b.def.noise) continue;
     const d=rectDist(b,tx,ty,w,h); if(d>NOISE_R) continue;
     pen+=b.def.noise*(d<=1?1:d<=2?0.7:0.35); if(!src.includes(b.def.name)) src.push(b.def.name); }
   return {q:Math.max(0.3,1-pen),src};
 }
 export function refreshQuality(){
-  for(const b of G.buildings){ if(b.dead||!b.def.cap) continue; const r=housingQuality(b.owner,b.tx,b.ty,b.w,b.h); b.quality=r.q; b.noiseSrc=r.src; }
+  for(const b of G.buildings){ if(b.dead||b.site||!b.def.cap) continue; const r=housingQuality(b.owner,b.tx,b.ty,b.w,b.h); b.quality=r.q; b.noiseSrc=r.src; }
   G.qDirty=false;
 }
 // ---------- Nebel des Krieges (nur für den Spieler; die KI sieht alles) ----------
@@ -108,10 +113,12 @@ export function tileVis(x,y){ if(!G.fog) return 2; const tx=Math.floor(x),ty=Mat
 export function inSightRect(b){ for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.vis[idx(x,y)]===2) return true; return false; }
 export function visibleUnit(u){ return !G.fog||seesFor0(u.owner)||tileVis(u.x,u.y)===2; }
 export function knownBuilding(b){ return !G.fog||seesFor0(b.owner)||b.seen; }
-export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&b.owner===pid&&b.type===type);}
-export function countBuildings(pid,type?){let n=0;for(const b of G.buildings) if(!b.dead&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
+/** Fertiges Gebäude eines Typs (Baustellen zählen nicht) */
+export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===type);}
+/** Anzahl Gebäude; inclSites=true zählt auch Baustellen mit */
+export function countBuildings(pid,type?,inclSites=false){let n=0;for(const b of G.buildings) if(!b.dead&&(inclSites||!b.site)&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
 export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;
-  for(const b of G.buildings){if(b.dead||b.owner!==pid)continue;const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;}}
+  for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;}}
 export function freeTileAround(b,cls){
   const cand=[];
   for(let r=1;r<=4;r++){

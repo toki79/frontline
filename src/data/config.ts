@@ -1,18 +1,28 @@
-import { splash } from '../sim/combat';
 
 /* =====================================================================
-   FRONTLINIE v0.2 – Aufbau, Bevölkerung, bedarfsgesteuerte KI
+   FRONTLINIE – alle Spielwerte an einem Ort
    ---------------------------------------------------------------------
-   Inhalte stehen in den Datentabellen hier oben:
-   UNITS / BUILDINGS (Kosten in Geld, Metall, Öl und Einwohnern),
-   TERRAIN, DAMAGE, DIFFICULTY, ECON. Neue Einheit = neuer Eintrag
-   (+ Zeichnung in drawUnitShape / drawBuildingShape).
+   UNITS / BUILDINGS (Kosten in Geld, Holz, Stein, Metall, Öl, Einwohnern),
+   TERRAIN, DAMAGE, DIFFICULTY, ECON, CONSTRUCTION. Neue Einheit = neuer
+   Eintrag (+ Zeichnung in render/draw.ts).
    ===================================================================== */
 export const TILE = 32, MAP_W = 64, MAP_H = 64, BUILD_RADIUS = 5, LEASH = 6;
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
 export const VEH_PER_FACTORY = 4;     // Kampffahrzeuge je Fahrzeugwerk
 export const DRONES_PER_SHOP = 6;     // Drohnen je Drohnenwerkstatt
-export const NOISE_R = 4;   // Reichweite von Industrielärm in Feldern (noise = Abzug an Wohnqualität)
+export const NOISE_R = 4;
+// ---------- Bauen ----------
+export const CONSTRUCTION = {
+  workTime: 1.6,        // Bauzeit = time × workTime bei EINEM Arbeiter (mehr Arbeiter = schneller)
+  maxWorkers: 4,        // so viele Arbeiter können gleichzeitig an einer Baustelle arbeiten
+  roadWork: 1.2,        // Sekunden Arbeit pro Straßenfeld
+  roadSpeed: 0.55,      // Bewegungskosten auf Straßen (kleiner = schneller)
+  roadBonus: 1.5,       // Förderbonus für Minen/Steinbruch/Holzfäller/Raffinerie mit Straße zum Rathaus
+  roadRadius: 12,       // Straßen dürfen so weit von eigenen Gebäuden entfernt liegen
+  startWorkers: 4,
+  forestWood: 120,      // Holz pro Waldfeld; leer gefällter Wald wird zu Steppe
+  demolishRefund: 0.3,  // Erstattung beim Abriss fertiger Gebäude (Baustellen: voll)
+};   // Reichweite von Industrielärm in Feldern (noise = Abzug an Wohnqualität)
 // ---------- Volkswirtschaft ----------
 export const ECON = {
   target: 500,          // Einwohner zum Sieg
@@ -23,7 +33,7 @@ export const ECON = {
   minPop: 10,           // so viele Einwohner bleiben immer (keine Rekrutierung darunter)
   ranks: <[number,string][]>[[0,'Dorf'],[100,'Kleinstadt'],[250,'Stadt'],[500,'Großstadt'],[1000,'Metropole'],[2000,'Weltstadt']],
 };
-export const RES = {money:{icon:'$',name:'Geld'}, food:{icon:'🌾',name:'Nahrung'}, metal:{icon:'⛏',name:'Metall'}, oil:{icon:'🛢',name:'Öl'}, pop:{icon:'👥',name:'Einwohner'},
+export const RES = {money:{icon:'$',name:'Geld'}, food:{icon:'🌾',name:'Nahrung'}, wood:{icon:'🪵',name:'Holz'}, stone:{icon:'🪨',name:'Stein'}, metal:{icon:'⛏',name:'Metall'}, oil:{icon:'🛢',name:'Öl'}, pop:{icon:'👥',name:'Einwohner'},
   vehcap:{icon:'🛠',name:`Fahrzeuglimit (${VEH_PER_FACTORY} je Fahrzeugwerk)`}, dronecap:{icon:'🛠',name:`Drohnenlimit (${DRONES_PER_SHOP} je Werkstatt)`}};
 // ---------- Gelände ----------
 export const TERRAIN = [
@@ -49,12 +59,16 @@ export const DAMAGE = {
 export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.airOnly) return air; return (DAMAGE[w.type][t.armor]||0)>0; };
 // ---------- Geländeausbau (Graben, Stacheldraht) ----------
 export const FEAT = {NONE:0, WIRE:1, TRENCH:2};
+// Straße: wird geplant (gezogen) und von Bauarbeitern gebaut
 export const FEATURES = {
+  road:   {id:0, name:'Straße', cost:{stone:4}, desc:'Schneller unterwegs; verbindet Förderstätten mit dem Rathaus (+50 % Förderung)', line:true, road:true},
   wire:   {id:1, name:'Stacheldraht',  cost:{money:15}, desc:'Bremst Infanterie stark, Fahrzeuge walzen ihn platt', line:true},
   trench: {id:2, name:'Schützengraben',cost:{money:30}, desc:'Infanterie darin: 60 % Deckung · bremst Fahrzeuge stark', line:true},
 };
 // ---------- Einheiten ----------
 export const UNITS = {
+  worker:{name:'Bauarbeiter', cls:'inf', cost:{money:60, pop:1}, time:5, hp:40, armor:'none', speed:1.45, sight:4, size:0.3,
+          worker:true, prod:'hq', req:[], desc:'Baut Gebäude und Straßen – mehr Arbeiter, schnellerer Bau'},
   inf:   {name:'Schützentrupp', cls:'inf', cost:{money:100, pop:5}, time:4, hp:90, armor:'none', speed:1.25, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:9, range:4, rof:0.9}, prod:'barracks', req:[], desc:'Günstig, stark in Wald und Ortschaften'},
   at:    {name:'Panzerabwehr', cls:'inf', cost:{money:200, metal:20, pop:5}, time:6, hp:80, armor:'none', speed:1.15, sight:6, size:0.4,
@@ -80,25 +94,27 @@ export const UNITS = {
 // ---------- Gebäude ----------
 // cap = Wohnraum, food/metal = Produktion pro Sekunde, needsOre = muss an Erz grenzen
 export const BUILDINGS = {
-  hq:      {name:'Rathaus',       w:3,h:3, hp:1800, power:30,  cost:{}, time:0, buildable:false, cap:40, food:0.5, sight:8, desc:'Baut Gebäude, 40 Wohnraum'},
-  house:   {name:'Wohnhaus',      w:2,h:2, hp:450,  power:-10, cost:{money:250}, time:5, req:[], cap:50, sight:3, desc:'+50 Wohnraum'},
-  farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:300}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
-  power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:300}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
-  mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:450}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
-  refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:900}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
-  barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:300}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
-  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:800, metal:80}, time:14, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
-  kontor:  {name:'Handelskontor', w:2,h:2, hp:600, power:-10, cost:{money:600}, time:9, req:[], noise:0.15, sight:4, export:4,
+  hq:      {name:'Rathaus',       w:3,h:3, hp:1800, power:30,  cost:{}, time:0, buildable:false, cap:40, food:0.5, sight:8, desc:'Bildet Bauarbeiter aus, 40 Wohnraum'},
+  house:   {name:'Wohnhaus',      w:2,h:2, hp:450,  power:-10, cost:{money:150, wood:40}, time:5, req:[], cap:50, sight:3, desc:'+50 Wohnraum'},
+  farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
+  lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
+  quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein, nur direkt an Felsen'},
+  power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
+  mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
+  refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
+  barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:200, wood:40, stone:20}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
+  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:600, metal:80, stone:80}, time:14, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
+  kontor:  {name:'Handelskontor', w:2,h:2, hp:600, power:-10, cost:{money:400, wood:60}, time:9, req:[], noise:0.15, sight:4, export:4,
             desc:'Exportiert Überschüsse automatisch gegen Geld'},
-  university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:800, metal:40}, time:14, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
-  droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:500, metal:40}, time:9, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
+  university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:600, metal:40, stone:80}, time:14, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
+  droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:400, metal:40, stone:40}, time:9, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
   // --- Verteidigung (def:true): direkt auf der Karte platzieren, Stellungen brauchen danach Bauzeit ---
-  wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:40},  time:0, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},
-  sentry:  {name:'Selbstschuss\u00ADanlage', w:1,h:1, hp:420, power:-5, cost:{money:180}, time:6, req:[], def:true, noise:0.05, sight:6, desc:'Automatisches MG gegen Infanterie und Drohnen',
+  wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:20, stone:10},  time:0, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},
+  sentry:  {name:'Selbstschuss\u00ADanlage', w:1,h:1, hp:420, power:-5, cost:{money:150, stone:10}, time:6, req:[], def:true, noise:0.05, sight:6, desc:'Automatisches MG gegen Infanterie und Drohnen',
             weapon:{type:'bullet', dmg:10, range:4.5, rof:0.35}},
-  turret:  {name:'MK-Stellung',   w:1,h:1, hp:750,  power:-15, cost:{money:350, metal:30}, time:8, req:['barracks'], def:true, noise:0.1, sight:7, desc:'Maschinenkanone gegen Fahrzeuge, Infanterie und Drohnen',
+  turret:  {name:'MK-Stellung',   w:1,h:1, hp:750,  power:-15, cost:{money:300, metal:30, stone:20}, time:8, req:['barracks'], def:true, noise:0.1, sight:7, desc:'Maschinenkanone gegen Fahrzeuge, Infanterie und Drohnen',
             weapon:{type:'autocannon', dmg:17, range:6, rof:0.55}},
-  flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:300, metal:25}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, desc:'Holt Drohnen vom Himmel (nur Luftziele)',
+  flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:250, metal:25, stone:20}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, desc:'Holt Drohnen vom Himmel (nur Luftziele)',
             weapon:{type:'flak', dmg:24, range:8, rof:0.4, airOnly:true}},
   bunker:  {name:'Milizbunker',   w:2,h:2, hp:1400, power:0,   cost:{}, time:0, buildable:false, sight:7,
             weapon:{type:'bullet', dmg:13, range:5.5, rof:0.5}},
@@ -126,7 +142,7 @@ export const REGION = {
 // Handel zwischen den Städten: Grundwert je Einheit, Losgröße
 export const BASEVAL = {food:2.2, metal:4.5, oil:1.6};
 // Handelskontor: verkauft nur, was über der Reserve liegt; Exportpreis je Einheit
-export const EXPORT = {order:['oil','metal','food'], reserve:{oil:300, metal:250, food:400}, price:{oil:1.1, metal:2.8, food:1.4}};
+export const EXPORT = {order:['oil','metal','stone','wood','food'], reserve:{oil:300, metal:250, stone:300, wood:300, food:400}, price:{oil:1.1, metal:2.8, stone:1.0, wood:0.8, food:1.4}};
 export const LOT = {food:100, metal:50, oil:100};
 // Universität: Stufe 1 = gebaut, Stufe 2/3 durch Forschung in der Universität
 export const RESEARCH = {
@@ -136,3 +152,5 @@ export const RESEARCH = {
 export const TECH_UNLOCKS = {1:'Drohnenwerkstatt, Spionagedrohne', 2:'FPV-Kamikazedrohne, Raketenwerfer', 3:'Reaper-Drohne'};
 export const DEF = t => UNITS[t] || BUILDINGS[t] || FEATURES[t] || RESEARCH[t];
 export const isDefType = t => !!(FEATURES[t] || (BUILDINGS[t]&&BUILDINGS[t].def));
+/** Gebäude, die als Baustelle entstehen und von Arbeitern gebaut werden */
+export const isSiteType = t => !!(BUILDINGS[t] && !BUILDINGS[t].def && BUILDINGS[t].buildable!==false);

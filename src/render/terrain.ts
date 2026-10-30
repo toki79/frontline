@@ -50,3 +50,13 @@ export function renderTerrain(){
   for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){const t=G.terr[idx(x,y)]; mg.fillStyle=t===T.BRIDGE?'#a08a64':TERRAIN[t].col[0]; mg.fillRect(x,y,1,1);}
   G.miniBg=m;
 }
+/** Einzelnes Feld neu zeichnen (z. B. abgeholzter Wald → Steppe) */
+export function repaintTile(i){
+  if(!G.terrCanvas) return;
+  const x=i%MAP_W, y=(i/MAP_W)|0, t=G.terr[i], d=TERRAIN[t], px=x*TILE, py=y*TILE, g=G.terrCanvas.getContext('2d');
+  g.fillStyle=d.col[Math.floor(hash(x,y)*d.col.length)]; g.fillRect(px,py,TILE,TILE);
+  if(t===T.GRASS){ for(let k=0;k<4;k++){const hx=hash(x*7+k,y*3), hy=hash(y*5+k,x*11); g.fillStyle=k%2?'#7e8c52':'#62703c'; g.fillRect(px+hx*28,py+hy*28,3,2);}
+    // Baumstümpfe erinnern an den Wald
+    for(let k=0;k<2;k++){ const hx=hash(x*3+k,y*7), hy=hash(y*13+k,x*5); g.fillStyle='#5a4028'; g.beginPath(); g.arc(px+6+hx*20,py+6+hy*20,2.4,0,7); g.fill(); g.fillStyle='#a8865a'; g.beginPath(); g.arc(px+6+hx*20,py+6+hy*20,1.3,0,7); g.fill(); } }
+  if(G.miniBg){ const mg=G.miniBg.getContext('2d'); mg.fillStyle=d.col[0]; mg.fillRect(x,y,1,1); }
+}
