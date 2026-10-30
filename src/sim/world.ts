@@ -109,7 +109,7 @@ export function inSightRect(b){ for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b
 export function visibleUnit(u){ return !G.fog||seesFor0(u.owner)||tileVis(u.x,u.y)===2; }
 export function knownBuilding(b){ return !G.fog||seesFor0(b.owner)||b.seen; }
 export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&b.owner===pid&&b.type===type);}
-export function countBuildings(pid,type){let n=0;for(const b of G.buildings) if(!b.dead&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
+export function countBuildings(pid,type?){let n=0;for(const b of G.buildings) if(!b.dead&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
 export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;
   for(const b of G.buildings){if(b.dead||b.owner!==pid)continue;const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;}}
 export function freeTileAround(b,cls){
