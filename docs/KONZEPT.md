@@ -10,8 +10,11 @@
    Metall (Mine an Erz), Öl (Raffinerie mit Kapazität, Tanklaster).
 3. **Bauen vor Ort:** Gebäude werden als Baustelle gesetzt und sofort bezahlt; **Bauarbeiter** (am Rathaus ausgebildet)
    laufen hin und bauen – bis zu 4 je Baustelle. Erst fertige Gebäude liefern Strom, Wohnraum oder Waren.
-4. **Straßen & Zufahrt:** Jedes Gebäude arbeitet nur mit Straßenanschluss zum Rathaus (oder direkt daneben); die Zufahrt
-   wird beim Setzen der Baustelle automatisch geplant. Auf Straßen sind Einheiten fast doppelt so schnell.
+4. **Straßen & Transport:** Betriebe liefern zur nächsten Sammelstelle (Rathaus/Lagerhaus); je länger der Weg, desto
+   weniger kommt an. Straßen (geplant kostenlos, Stein beim Bau) verkürzen den Weg stark – vor allem auf weiten Strecken.
+   Baustellen kosten beim Setzen nur Geld, Holz/Stein/Metall holen die Arbeiter beim Bauen; fehlt es, wartet die Baustelle.
+   **Ungleiche Verteilung:** Jede Stadt hat zwei Rohstoffe reichlich, zwei kaum (Wälder, Felsen, Erz, Öl, grüne Wiesen);
+   Kastrova genau umgekehrt. Höfe auf Wiese bringen vollen Ertrag, auf Steppe 40 %. Umkämpfte Vorkommen in den Ecken.
    **Knappheit statt Überfluss:** Unterhalt je Gebäude, Sold, Stadtverwaltung (wächst quadratisch mit der Einwohnerzahl),
    begrenzte Lager (Lagerhaus), teure Rüstungsbetriebe, lange Forschung.
    **Dichte Bebauung hat Nachteile:** Höfe brauchen freie Äcker, enge Wohnviertel senken die Wohnqualität, Feuer springt über.

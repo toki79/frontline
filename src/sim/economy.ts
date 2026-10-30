@@ -2,7 +2,7 @@ import { ECON, EXPORT, MAP_H, MAP_W, STORAGE, T } from '../data/config';
 import { endGame } from '../sim/combat';
 import { G } from '../sim/state';
 import { refreshQuality } from '../sim/world';
-import { clearForest, works } from '../sim/build';
+import { clearForest, hauls, works } from '../sim/build';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -22,10 +22,9 @@ export function updateEconomy(pid,dt){
   let upkeep=0, noAccess=0;
   for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid) continue;
     upkeep+=ECON.upkeep[b.type]||0;
-    if(!works(b)){ noAccess++; continue; }          // ohne Zufahrt arbeitet nichts
-    const rb=bf;
-    if(b.def.wood||b.def.stone||b.def.metal||b.def.refine) linked++;
-    if(b.def.refine&&b.crude>0){ const a=Math.min(b.crude,b.def.refine*rb*dt*(powOk?1:0.5)); b.crude-=a; p.res.oil+=a*mul; oilProd+=a*mul/dt; }
+    const rb=bf*(b.eff??1);                         // Transportweg zur Sammelstelle
+    if(hauls(b)&&(b.eff??1)<0.7) noAccess++;   // Betriebe mit weitem Transportweg
+    if(b.def.refine&&b.crude>0){ const a=Math.min(b.crude,b.def.refine*bf*dt*(powOk?1:0.5)); b.crude-=a; p.res.oil+=a*mul; oilProd+=a*mul/dt; }
     if(b.def.wood){   // Holzfäller: fällt den Wald Feld für Feld
       if(!b.forest||!b.forest.length||G.wood[b.forest[0]]<=0) b.forest=forestNear(b);
       if(b.forest.length){ const i=b.forest[0], a=Math.min(G.wood[i],b.def.wood*rb*dt); G.wood[i]-=a; p.res.wood+=a*mul; woodProd+=a*mul/dt; b.empty=false;
@@ -36,7 +35,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; } else if(!b.empty){ b.empty=true; if(pid===0) msg('Ein Steinbruch ist erschöpft – baue einen neuen an anderen Felsen.','#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:0.7)*(b.type==='farm'?G.profile[pid].fert*(b.fieldF??1):1)*(b.type==='hq'?1:bf);
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1):1)*(b.type==='hq'?1:bf);
     if(b.def.metal){ let got=0;
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
       mines++; if(b.empty) minesEmpty++;

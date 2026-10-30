@@ -43,7 +43,7 @@ export function renderDiplo(){
     h+=`<div class="party"><h3><span class="dot" style="background:${A.col}"></span>${A.name}<span class="badge b-${cls}">${lab}</span></h3>
       <div class="lead">${A.leader} · ${fmt(A.pop)} Einwohner</div><div class="quote">${quote(1)}</div>
       <div class="barl"><span>Haltung gegenüber Aldoria</span><span>${Math.round(G.aiAtt)}</span></div>${attBar(G.aiAtt)}
-      <div class="barl" style="margin-top:6px"><span>Region: ${REGION.rich[G.profile[1].rich]} · Engpass: ${RES[G.profile[1].scarce].name}</span></div>
+      <div class="barl" style="margin-top:6px"><span>Reich an: ${G.profile[1].rich.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} · Engpass: ${G.profile[1].scarce.map(r=>RES[r].icon+' '+RES[r].name).join(', ')}</span></div>
       <h4>Handel mit Kastrova</h4>`;
     if(G.war) h+='<div class="barl"><span>Im Krieg wird nicht gehandelt.</span></div>';
     else { const qs=aiQuotes();

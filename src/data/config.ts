@@ -13,21 +13,30 @@ export const DRONES_PER_SHOP = 6;     // Drohnen je Drohnenwerkstatt
 export const NOISE_R = 4;
 // ---------- Bauen ----------
 export const CONSTRUCTION = {
-  workTime: 1.6,        // Bauzeit = time × workTime bei EINEM Arbeiter (mehr Arbeiter = schneller)
-  maxWorkers: 4,        // so viele Arbeiter können gleichzeitig an einer Baustelle arbeiten
-  roadWork: 1.2,        // Sekunden Arbeit pro Straßenfeld
+  workTime: 4.5,        // Bauzeit = time × workTime bei EINEM Arbeiter (mehr Arbeiter = schneller)
+  maxWorkers: 3,        // so viele Arbeiter können gleichzeitig an einer Baustelle arbeiten
+  roadWork: 3,          // Sekunden Arbeit pro Straßenfeld (Stein wird beim Bau verbraucht)
   roadSpeed: 0.55,      // Bewegungskosten auf Straßen (kleiner = schneller)
   roadRadius: 12,       // Straßen dürfen so weit von eigenen Gebäuden entfernt liegen
-  startWorkers: 4,
+  startWorkers: 3,
   forestWood: 120,      // Holz pro Waldfeld; leer gefällter Wald wird zu Steppe
   demolishRefund: 0.3,  // Erstattung beim Abriss fertiger Gebäude (Baustellen: voll)
-  // Zufahrt: Gebäude arbeiten nur, wenn sie an das Straßennetz des Rathauses angeschlossen sind
-  // (oder direkt ans Rathaus grenzen). Beim Setzen einer Baustelle wird die Straße automatisch geplant.
+  // Baustellen: Geld wird beim Setzen bezahlt, Holz/Stein/Metall erst beim Bauen aus dem Lager geholt.
+};
+// ---------- Transport ----------
+// Betriebe liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an.
+// Leistung = 1 / (1 + max(0, Weg − free) / half). Straßen zählen nur mit roadCost je Feld.
+export const HAUL = {
+  free: 3,              // so viele Weg-Felder kosten nichts
+  half: 10,             // weitere Felder, bei denen die Leistung auf die Hälfte fällt
+  roadCost: 0.2,        // ein Straßenfeld zählt so viel wie 0,2 Felder Gelände
+  min: 0.25,            // schlechteste Leistung
 };
 // ---------- Dichte Bebauung ----------
 export const DENSITY = {
   farmFieldR: 2,        // Bauernhof bewirtschaftet freie Steppe in diesem Umkreis
   farmFields: 14,       // so viele freie Ackerfelder braucht ein Hof für vollen Ertrag
+  steppeYield: 0.4,     // ein Acker auf karger Steppe bringt nur 40 % eines Ackers auf grüner Wiese
   crowdPenalty: 0.45,   // Wohnhaus komplett umbaut (alle Nachbarfelder belegt) = −45 % Wohnqualität
   fireTime: 10,         // Sekunden, die ein Gebäude brennt
   fireDps: 0.04,        // Brandschaden je Sekunde (Anteil der Lebenspunkte)
@@ -65,8 +74,11 @@ export const TERRAIN = [
   {key:'town',   name:'Ortschaft', col:['#86826f','#7f7b69'],           cost:{inf:1,  veh:1.4}, cover:0.45, build:false},
   {key:'water',  name:'Fluss',     col:['#3b6176','#395d71'],           cost:{inf:Infinity,veh:Infinity}, cover:0, build:false},
   {key:'bridge', name:'Brücke',    col:['#6f6252'],                     cost:{inf:1,  veh:1},   cover:0,    build:false},
+  {key:'meadow', name:'Wiese',     col:['#5d8a3a','#61903d','#588536'], cost:{inf:1,  veh:1},   cover:0,    build:true},
 ];
-export const T = {GRASS:0, FOREST:1, MUD:2, TOWN:3, WATER:4, BRIDGE:5};
+export const T = {GRASS:0, FOREST:1, MUD:2, TOWN:3, WATER:4, BRIDGE:5, MEADOW:6};
+/** freie, bebaubare Ebene (Steppe oder Wiese) */
+export const isPlain = t => t===T.GRASS || t===T.MEADOW;
 // ---------- Schaden: Waffentyp gegen Panzerung ----------
 // air = tieffliegende Drohnen, airHigh = hochfliegende (nur Flugabwehr, schwach Maschinenkanone); 0 heißt: kann dieses Ziel gar nicht bekämpfen
 export const DAMAGE = {
@@ -89,7 +101,7 @@ export const FEATURES = {
 };
 // ---------- Einheiten ----------
 export const UNITS = {
-  worker:{name:'Bauarbeiter', cls:'inf', cost:{money:60, pop:1}, time:5, hp:40, armor:'none', speed:1.45, sight:4, size:0.3,
+  worker:{name:'Bauarbeiter', cls:'inf', cost:{money:90, pop:1}, time:8, hp:40, armor:'none', speed:1.45, sight:4, size:0.3,
           worker:true, prod:'hq', req:[], desc:'Baut Gebäude und Straßen – mehr Arbeiter, schnellerer Bau'},
   inf:   {name:'Schützentrupp', cls:'inf', cost:{money:100, pop:5}, time:4, hp:90, armor:'none', speed:1.25, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:9, range:4, rof:0.9}, prod:'barracks', req:[], desc:'Günstig, stark in Wald und Ortschaften'},
@@ -157,16 +169,17 @@ export const DIFFICULTY = {
 };
 export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','drone','ifv','at','mlrs','reaper','drone','mbt'];
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
+// Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt. Der fünfte ist normal.
 export const REGION = {
-  scarce:  {food:'karge Böden – Bauernhöfe liefern nur gut die Hälfte', metal:'kaum Erz in Stadtnähe', oil:'keine Ölfelder in Stadtnähe'},
-  rich:    {food:'fruchtbare Böden – Bauernhöfe liefern 40 % mehr',   metal:'reiche Erzvorkommen',    oil:'reiche Ölfelder'},
-  fertScarce:0.55, fertRich:1.4,
+  res:     ['food','wood','stone','metal','oil'],
+  scarce:  {food:'kaum grüne Wiesen (Höfe auf karger Steppe)', wood:'kaum Wald in Stadtnähe', stone:'keine Felsen in Stadtnähe', metal:'kaum Erz in Stadtnähe', oil:'keine Ölfelder in Stadtnähe'},
+  rich:    {food:'fruchtbare grüne Wiesen', wood:'dichte Wälder', stone:'viele Felsen', metal:'reiche Erzvorkommen', oil:'reiche Ölfelder'},
 };
 // Handel zwischen den Städten: Grundwert je Einheit, Losgröße
-export const BASEVAL = {food:2.2, metal:4.5, oil:1.6};
+export const BASEVAL = {food:2.2, wood:1.6, stone:1.8, metal:4.5, oil:1.6};
 // Handelskontor: verkauft nur, was über der Reserve liegt; Exportpreis je Einheit
 export const EXPORT = {order:['oil','metal','stone','wood','food'], reserve:{oil:300, metal:250, stone:300, wood:300, food:400}, price:{oil:1.1, metal:2.8, stone:1.0, wood:0.8, food:1.4}};
-export const LOT = {food:100, metal:50, oil:100};
+export const LOT = {food:100, wood:100, stone:80, metal:50, oil:100};
 // Universität: Stufe 1 = gebaut, Stufe 2/3 durch Forschung in der Universität
 export const RESEARCH = {
   res2:{name:'Forschung Stufe 2', level:2, cost:{money:1500, metal:150}, time:180, desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},

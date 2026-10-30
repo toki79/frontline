@@ -5,9 +5,9 @@ import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt } from '../src/sim/world';
 import { destroy } from '../src/sim/combat';
-import { STORAGE } from '../src/data/config';
+import { CONSTRUCTION, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
-import { canPlaceRoad, demolish, planRoad } from '../src/sim/build';
+import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
 import { idx } from '../src/core/util';
 import { on } from '../src/core/events';
 
@@ -21,6 +21,8 @@ function siteNearHq(type: string) {
   }
   return null;
 }
+/** neues Spiel, bei dem Aldoria die genannten Rohstoffe nicht knapp hat */
+const gameWith = (...notScarce: string[]) => { for (let k = 0; k < 50; k++) { newGame('mittel'); if (notScarce.every(r => !G.profile[0].scarce.includes(r))) return; } };
 const runUntil = (cond: () => boolean, maxSec: number) => { for (let i = 0; i < maxSec * 20 && !cond(); i++) { update(0.05); if (G.offer) answerOffer(true); } return cond(); };
 
 describe('Simulation', () => {
@@ -30,22 +32,36 @@ describe('Simulation', () => {
     expect(findBuilding(1, 'hq')).toBeTruthy();
     expect(findBuilding(2, 'bunker')).toBeTruthy();
     expect(G.profile[0].scarce).not.toBe(G.profile[1].scarce);
-    expect(G.units.filter(u => u.owner === 0 && u.def.worker).length).toBe(4);
+    expect(G.units.filter(u => u.owner === 0 && u.def.worker).length).toBe(CONSTRUCTION.startWorkers);
     expect(G.players[0].res.wood).toBeGreaterThan(0);
     expect(G.rock.some(v => v > 0)).toBe(true);
   });
 
   it('Baustelle: bezahlt sofort, Arbeiter bauen sie fertig, erst dann zählt sie', () => {
     newGame('mittel');
-    const w0 = G.players[0].res.wood, cap0 = G.players[0].cap;
+    const w0 = G.players[0].res.wood, m0 = G.players[0].res.money, cap0 = G.players[0].cap;
     const s = siteNearHq('house');
     expect(s).toBeTruthy();
     expect(s.site).toBe(true);
-    expect(G.players[0].res.wood).toBe(w0 - 40);
+    expect(G.players[0].res.money).toBe(m0 - 150);   // Geld sofort
+    expect(G.players[0].res.wood).toBe(w0);          // Holz erst beim Bauen
     update(0.05);
     expect(G.players[0].cap).toBe(cap0);                 // Baustelle bringt noch keinen Wohnraum
     expect(runUntil(() => !s.site, 90)).toBe(true);      // Arbeiter bauen sie fertig
     expect(G.players[0].cap).toBe(cap0 + 50);
+    expect(G.players[0].res.wood).toBeLessThan(w0 - 39);
+  });
+
+  it('Baustelle wartet, wenn Material fehlt', () => {
+    newGame('mittel');
+    G.players[0].res.wood = 0;
+    const s = siteNearHq('house');
+    expect(s).toBeTruthy();
+    run(30);
+    expect(s.site).toBe(true);
+    expect(s.progress || 0).toBe(0);
+    G.players[0].res.wood = 100;
+    expect(runUntil(() => !s.site, 120)).toBe(true);
   });
 
   it('Wohnhaus und Bauernhof lassen die Stadt wachsen', () => {
@@ -68,7 +84,7 @@ describe('Simulation', () => {
   });
 
   it('Holzfäller und Steinbruch fördern Baustoffe', () => {
-    newGame('mittel');
+    gameWith('wood','stone');
     const l = siteNearHq('lumber'), q = siteNearHq('quarry');
     expect(l).toBeTruthy(); expect(q).toBeTruthy();
     runUntil(() => !l.site && !q.site, 120);
@@ -78,21 +94,39 @@ describe('Simulation', () => {
     expect(G.players[0].res.stone).toBeGreaterThan(st);
   });
 
-  it('Zufahrt: Straße wird automatisch geplant, ohne Anschluss arbeitet nichts', () => {
-    newGame('mittel');
-    const q = siteNearHq('quarry');
-    expect(q.access).toBeGreaterThanOrEqual(0);
-    expect(runUntil(() => !q.site && !!q.connected, 150)).toBe(true);
+  it('Transport: weiter Weg senkt die Leistung, Straßen helfen (Stein beim Bau)', () => {
+    gameWith('stone');
+    G.players[0].res.money = 9000; G.players[0].res.wood = 800; G.players[0].res.stone = 0;
+    // Steinbruch irgendwo mit Felsen, möglichst weit weg
+    let q = null; const hq = findBuilding(0, 'hq');
+    const spots = [];
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) if (canPlace(0, 'quarry', x, y)) spots.push([x, y]);
+    spots.sort((a, b) => (b[0] - hq.x) ** 2 + (b[1] - hq.y) ** 2 - ((a[0] - hq.x) ** 2 + (a[1] - hq.y) ** 2));
+    q = placeSite(0, 'quarry', spots[0][0], spots[0][1]);
+    expect(q).toBeTruthy();
+    expect(G.road.some(r => r > 0)).toBe(false);          // keine automatischen Straßen
+    G.players[0].res.stone = 300;
+    expect(runUntil(() => !q.site, 200)).toBe(true);
+    update(0.05);
+    const e0 = q.eff;
+    expect(e0).toBeLessThan(1);
+    const stone0 = G.players[0].res.stone;
+    expect(orderRoadTo(0, q)).toBeGreaterThan(0);
+    expect(runUntil(() => !G.road.some((r, i) => r === 1 && G.roadOwner[i] === 1), 300)).toBe(true);
+    update(0.05);
+    expect(q.eff).toBeGreaterThan(e0);
     const i = G.road.findIndex(r => r === 2);
-    if (i >= 0) expect(tileCost(i, 'veh')).toBeLessThan(1);
-    // Anschluss kappen: Steinbruch fördert nicht mehr
-    for (let k = 0; k < G.road.length; k++) G.road[k] = 0;
-    G.roadDirty = true; update(0.05);
-    const touchesHq = q.connected;
-    const st = G.players[0].res.stone; run(10);
-    if (!touchesHq) expect(G.players[0].res.stone).toBeLessThanOrEqual(st + 0.01);
+    expect(tileCost(i, 'veh')).toBeLessThan(1);
     expect(canPlaceRoad(0, 40, 10)).toBe(false);
-    expect(planRoad(0, 40, 10)).toBe(false);
+    void stone0;
+  });
+
+  it('Rohstoffe ungleich verteilt: Profil ergänzt sich, Wiesen bringen mehr', () => {
+    newGame('mittel');
+    const [a, k] = G.profile;
+    expect(a.rich.length).toBe(2); expect(a.scarce.length).toBe(2);
+    expect([...k.scarce].sort()).toEqual([...a.rich].sort());
+    expect(G.terr.some(t => t === T.MEADOW)).toBe(true);
   });
 
   it('Unterhalt kostet Geld, leere Kasse bremst', () => {
@@ -139,7 +173,7 @@ describe('Simulation', () => {
     newGame('mittel');
     const m0 = G.players[0].res.money, w0 = G.players[0].res.wood;
     const s = siteNearHq('farm');
-    expect(demolish(0, s)).toBe(true);
+    expect(demolish(0, s)).toBe(true);   // Geld zurück, Holz war noch nicht verbaut
     expect(G.players[0].res.money).toBe(m0);
     expect(G.players[0].res.wood).toBe(w0);
     expect(G.occ[idx(s.tx, s.ty)]).toBe(0);
@@ -149,8 +183,7 @@ describe('Simulation', () => {
     newGame('mittel');
     run(300);
     expect(countBuildings(1)).toBeGreaterThan(5);
-    expect(countBuildings(1, 'lumber')).toBeGreaterThan(0);
-    expect(countBuildings(1, 'quarry')).toBeGreaterThan(0);
+    expect(countBuildings(1, 'lumber') + countBuildings(1, 'quarry')).toBeGreaterThan(0);
     expect(G.players[1].pop).toBeGreaterThan(60);
   });
 

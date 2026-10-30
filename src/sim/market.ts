@@ -1,6 +1,6 @@
 import { clamp } from '../core/util';
-import { BASEVAL, LOT } from '../data/config';
-import { G } from '../sim/state';
+import { BASEVAL, LOT, REGION } from '../data/config';
+import { G, isRich, isScarce } from '../sim/state';
 import { countBuildings, findBuilding } from '../sim/world';
 
 /* =====================================================================
@@ -12,6 +12,8 @@ export const TRADES = {
   sellOil:  {label:'Öl verkaufen',   sell:true, give:{oil:100},   get:{money:150}, step:0.18, min:0.2},
   buyFood:  {label:'Nahrung kaufen', give:{money:220}, get:{food:100}, step:0.18},
   buyMetal: {label:'Metall kaufen',  give:{money:280}, get:{metal:60}, step:0.18},
+  buyWood:  {label:'Holz kaufen',    give:{money:180}, get:{wood:100}, step:0.18},
+  buyStone: {label:'Stein kaufen',   give:{money:200}, get:{stone:80}, step:0.18},
 };
 export const MARKET_RECOVER = 1/30;   // Sättigung sinkt um 1 Stufe pro 30 s
 export function marketOpen(pid){return !!findBuilding(2,'bunker')&&!G.militiaWar[pid];}
@@ -33,18 +35,21 @@ export function trade(pid,key){
 }
 // Wie dringend braucht eine Stadt einen Rohstoff? (>0 = Bedarf, <0 = Überschuss)
 export function needLevel(pid,res){
-  const p=G.players[pid], pr=G.profile[pid]; let n=0;
+  const p=G.players[pid]; let n=0;
   if(res==='food'){ if(p.foodRate<0) n+=1; if(p.res.food<200) n+=0.6; if(p.res.food>700&&p.foodRate>0.8) n-=1; }
   if(res==='metal'){ const ok=G.buildings.some(b=>!b.dead&&b.owner===pid&&b.type==='mine'&&!b.empty); if(!ok) n+=0.8; if(p.res.metal<120) n+=0.6; if(p.res.metal>450&&ok) n-=1; }
   if(res==='oil'){ const tr=G.units.some(u=>!u.dead&&u.owner===pid&&u.def.harvester); if(!tr) n+=0.4; if(p.res.oil<100) n+=0.5; if(p.res.oil>450) n-=1;
     if(!countBuildings(pid,'factory')) n-=0.8; }   // ohne Fahrzeugwerk wird Öl kaum gebraucht
-  if(pr.scarce===res) n+=0.6; if(pr.rich===res) n-=0.6;
+  if(res==='wood'||res==='stone'){ const src=res==='wood'?'lumber':'quarry', ok=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===src&&!b.empty);
+    if(!ok) n+=0.7; if(p.res[res]<120) n+=0.6; if(p.res[res]>(p.store||800)*0.7&&ok) n-=1;
+    if(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.site&&b.waitMat===res)) n+=0.6; }
+  if(isScarce(pid,res)) n+=0.6; if(isRich(pid,res)) n-=0.6;
   return clamp(n,-1.5,2.5);
 }
 // Kastrovas Anfragen am Markt: kauft, was knapp ist (teuer bei Not), verkauft Überschuss (günstiger, je größer er ist)
 export function aiQuotes(){
   const out=[], A=G.players[1], att=1+clamp(G.aiAtt,-50,50)/500;
-  for(const r of ['food','metal','oil']){ const n=needLevel(1,r), base=BASEVAL[r]*LOT[r];
+  for(const r of REGION.res){ const n=needLevel(1,r), base=BASEVAL[r]*LOT[r];
     if(n>=0.6) out.push({side:'buy',res:r,amt:LOT[r],n,urgent:n>=1.5,price:Math.max(5,Math.round(base*(0.9+0.55*n)*att/5)*5)});
     else if(n<=-0.5&&A.res[r]>=LOT[r]*2) out.push({side:'sell',res:r,amt:LOT[r],n,price:Math.max(5,Math.round(base*(1.25+0.25*n)/att/5)*5)});
   }

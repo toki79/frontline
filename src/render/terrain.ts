@@ -12,6 +12,8 @@ export function renderTerrain(){
     const t=G.terr[idx(x,y)], d=TERRAIN[t], h=hash(x,y), px=x*TILE, py=y*TILE;
     g.fillStyle=d.col[Math.floor(h*d.col.length)]; g.fillRect(px,py,TILE,TILE);
     if(t===T.GRASS){ for(let i=0;i<4;i++){const hx=hash(x*7+i,y*3), hy=hash(y*5+i,x*11); g.fillStyle=i%2?'#7e8c52':'#62703c'; g.fillRect(px+hx*28,py+hy*28,3,2);} }
+    if(t===T.MEADOW){ for(let i=0;i<6;i++){const hx=hash(x*7+i,y*3), hy=hash(y*5+i,x*11); g.fillStyle=i%3===0?'#7aa84a':i%3===1?'#4f7d30':'#6c9a42'; g.fillRect(px+hx*28,py+hy*28,3,3);}
+      for(let i=0;i<2;i++){const hx=hash(x*13+i,y*7), hy=hash(y*17+i,x*3); g.fillStyle=hash(x+i,y)<0.5?'#f2e27a':'#f4f0e8'; g.fillRect(px+2+hx*26,py+2+hy*26,2,2);} }
   }
   for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){
     const t=G.terr[idx(x,y)], px=x*TILE, py=y*TILE;

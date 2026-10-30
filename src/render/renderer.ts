@@ -3,7 +3,7 @@ import { hash, idx, inMap } from '../core/util';
 import { BUILDINGS, FACTIONS, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
-import { previewFields, roadReach, siteWorkers } from '../sim/build';
+import { haulEff, previewFields, siteLacks, siteWorkers } from '../sim/build';
 import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
@@ -126,20 +126,18 @@ export function render(){
       if(b.quality<0.95){ c.fillStyle=`rgba(80,78,70,${(1-b.quality)*0.55})`; c.fillRect(b.tx*TILE+1,b.ty*TILE+1,b.w*TILE-2,b.h*TILE-2); }
       if(b.owner===0){ const w=b.w*TILE-8; c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w,4); c.fillStyle='#7fb3ff'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w*(b.resid||0)/b.def.cap,4); }
     }
-    if(b.owner===0&&!b.site&&!b.connected&&!b.def.def&&b.type!=='hq'&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='🛣 keine Zufahrt'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#ff9a6a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
-    if(b.site&&b.owner===0&&!siteWorkers(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='wartet auf Arbeiter'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#e8c84a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
+    if(b.site&&b.owner===0&&siteLacks(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const m=siteLacks(b), t='wartet auf '+({wood:'Holz',stone:'Stein',metal:'Metall'}[m]); const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#ff9a6a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
+    else if(b.site&&b.owner===0&&!siteWorkers(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='wartet auf Arbeiter'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#e8c84a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
     if(b.owner===2||(s&&b.owner!==0)||(b.empty&&b.owner===0&&!b.site)){c.fillStyle='#000a';c.font='bold 10px sans-serif';const t=b.empty?'erschöpft':b.def.name;const tw=c.measureText(t).width;c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE+b.h*TILE+2,tw+6,13);c.fillStyle=G.players[b.owner].col;c.fillText(t,b.x*TILE-tw/2,b.ty*TILE+b.h*TILE+12);}
   }
   if(G.placing&&G.hover&&!isDefType(G.placing)){ const d=BUILDINGS[G.placing], tx=Math.floor(G.hover.x)-Math.floor((d.w-1)/2), ty=Math.floor(G.hover.y)-Math.floor((d.h-1)/2);
     const ok=canPlace(0,G.placing,tx,ty); c.globalAlpha=0.6; drawBuildingShape(c,G.placing,FACTIONS[0].col,FACTIONS[0].dark,tx*TILE,ty*TILE,d.w,d.h,0); c.globalAlpha=1;
-    if(ok){ // Vorschau: Wohnqualität bzw. Äcker und Zufahrt
-      if(!G.reachT||G.t-G.reachT>0.5||G.reachV!==G.road.length+G.buildings.length){ G.reach=roadReach(0); G.reachT=G.t; G.reachV=G.road.length+G.buildings.length; }
-      const hq=G.buildings.find(b=>b.owner===0&&b.type==='hq'&&!b.dead);
-      const acc=!!hq&&(Math.max(hq.tx-(tx+d.w),tx-(hq.tx+hq.w),hq.ty-(ty+d.h),ty-(hq.ty+hq.h),0)===0 || ringOf(tx,ty,d.w,d.h).some(i=>G.reach[i]));
+    if(ok){ // Vorschau: Wohnqualität, Äcker, Transportweg
       const parts=[]; let good=1;
       if(d.cap){ const q=housingQuality(0,tx,ty,d.w,d.h).q; parts.push('Wohnqualität '+Math.round(q*100)+' %'); good=Math.min(good,q>=0.9?1:q>=0.6?0.5:0); }
-      if(G.placing==='farm'){ const n=previewFields(tx,ty,d.w,d.h), f=Math.min(1,n/DENSITY.farmFields); parts.push('Äcker '+Math.round(f*100)+' %'); good=Math.min(good,f>=0.9?1:f>=0.6?0.5:0); }
-      if(!acc){ parts.push('keine Zufahrt!'); good=0; }
+      if(G.placing==='farm'){ const f=previewFields(tx,ty,d.w,d.h); parts.push('Äcker '+Math.round(f*100)+' %'); good=Math.min(good,f>=0.8?1:f>=0.5?0.5:0); }
+      if((d.wood||d.stone||d.metal||G.placing==='farm')&&G.haulMap){ let w=Infinity; for(const i of ringOf(tx,ty,d.w,d.h)) w=Math.min(w,G.haulMap[i]);
+        const e=haulEff(w); parts.push('Transport '+Math.round(e*100)+' %'); good=Math.min(good,e>=0.8?1:e>=0.5?0.5:0); }
       if(parts.length){ const t=parts.join(' · '); c.font='bold 11px sans-serif'; const tw=c.measureText(t).width;
         c.fillStyle='#000c'; c.fillRect(tx*TILE+d.w*TILE/2-tw/2-4,ty*TILE-18,tw+8,15); c.fillStyle=good>=1?'#9fd88a':good>=0.5?'#e8d27a':'#ff9a6a'; c.fillText(t,tx*TILE+d.w*TILE/2-tw/2,ty*TILE-7); } }
     c.fillStyle=ok?'rgba(80,255,80,.25)':'rgba(255,60,60,.35)'; c.fillRect(tx*TILE,ty*TILE,d.w*TILE,d.h*TILE); }

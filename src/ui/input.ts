@@ -5,12 +5,12 @@ import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
 import { orderAttack, orderHarvest, orderMove, orderReturn, orderStop } from '../sim/orders';
 import { placeDefense, placeSite } from '../sim/production';
-import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteWorkers } from '../sim/build';
+import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { hostile, knownBuilding, visibleUnit } from '../sim/world';
 import { $, cv, mini } from '../ui/dom';
-import { costHtml } from '../ui/format';
+import { costHtml, f1 } from '../ui/format';
 import { msg } from '../core/events';
 import { WEAPON_INFO } from '../ui/tooltips';
 
@@ -48,9 +48,8 @@ export function handleTap(w,right,shift){
     const d=BUILDINGS[G.placing], tx=Math.floor(w.x)-Math.floor((d.w-1)/2), ty=Math.floor(w.y)-Math.floor((d.h-1)/2);
     const site=placeSite(0,G.placing,tx,ty);
     if(site){ G.placing=null; if(!G.units.some(u=>!u.dead&&u.owner===0&&u.def.worker)) msg('Keine Bauarbeiter! Bilde im Reiter Truppen am Rathaus neue aus.','#ffb38a');
-      if(site.access>0) msg(`🛣 Zufahrt geplant: ${site.access} Straßenfeld${site.access===1?'':'er'}.`);
-      else if(site.access===-2) msg('⚠ Zu wenig Stein für die Zufahrt – ohne Straße wird das Gebäude nicht arbeiten. Später über 🛣 Straße nachholen.','#ff8a7a');
-      else if(site.access===-1) msg('⚠ Kein Weg für eine Zufahrtsstraße – das Gebäude wird nicht arbeiten. Lass Platz für Straßen!','#ff8a7a'); }
+      const c=BUILDINGS[site.type].cost, mats=['wood','stone','metal'].filter(m=>c[m]);
+      if(mats.length) msg(`🏗 Baustelle gesetzt. Material holen die Arbeiter beim Bauen: ${mats.map(m=>RES[m].icon+c[m]).join(' ')}${mats.some(m=>G.players[0].res[m]<c[m])?' – reicht noch nicht, die Baustelle wartet.':''}`); }
     else { const lack=lacking(0,G.placing);
       msg(lack.length?'Es fehlt: '+lack.map(r=>RES[r].name).join(', '):d.needsOre?'Die Mine muss direkt an graue Erzfelsen grenzen (gelb markiert) und nahe der Stadt liegen.':d.needsRock?'Der Steinbruch muss direkt an helle Felsbrocken grenzen (gelb markiert).':d.needsForest?'Der Holzfäller braucht Wald in der Nähe (gelb markiert, mind. 3 Waldfelder im Umkreis von 3).':'Hier kann nicht gebaut werden (nur auf freier Steppe, nicht auf Straßen, nahe der eigenen Stadt).','#ffb38a'); }
     refreshCmds(); return;
@@ -100,7 +99,7 @@ export function cmd(c){
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
   else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.placing=null;}
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
-    msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant (${n*DEF('road').cost.stone} 🪨) – die Bauarbeiter legen los.`:n===0?'Schon mit dem Rathaus verbunden bzw. Straße bereits geplant.':n===-2?'Zu wenig Stein für diese Straße.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
+    msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
   else if(c==='demolish'){ const b=selBuilding(); if(b){
     if(G.demolishArm!==b.id||G.t-(G.demolishT||-9)>3){ G.demolishArm=b.id; G.demolishT=G.t; msg(`Nochmal 🗑 tippen: ${b.def.name} ${b.site?'abbrechen (volle Erstattung)':'abreißen (30 % Erstattung)'}.`,'#ffb38a'); }
     else { G.demolishArm=null; if(demolish(0,b)) msg(`${b.def.name} ${b.site?'abgebrochen':'abgerissen'}.`); } } }
@@ -114,13 +113,13 @@ export function refreshCmds(){
   const sb=G&&selBuilding();
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
-  document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&!sb.connected));
+  document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&(sb.eff??1)<0.97));
   updateInfo();
 }
 export function updateInfo(){
   const el=$('#info'); if(!G){el.textContent='';return;}
   if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing); el.textContent=`${d.name} bauen: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ✕ Abwählen beendet`; return; }
-  if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – braucht 14 freie Felder Steppe drumherum für Äcker':' – auf grün markiertes Feld tippen')+' · Zufahrtsstraße wird automatisch geplant, Freiraum lassen';return;}
+  if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
   if(G.amoveMode){el.textContent='Angriffsbewegung: Ziel antippen';return;}
   if(G.boxMode){el.textContent='Rahmen aufziehen, um Einheiten zu wählen';return;}
   const s=G.sel.filter(e=>!e.dead); if(!s.length){el.textContent='';return;}
@@ -128,9 +127,9 @@ export function updateInfo(){
     let t=`${e.def.name} · Zustand ${Math.ceil(e.hp)}/${e.maxHp}`+(e.owner!==0?` · ${f.short} (${G.rel[0][e.owner]})`:'');
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;
     if(e.kind==='building'&&e.readyT&&G.t<e.readyT) t+=` · im Bau (${Math.ceil(e.readyT-G.t)} s)`;
-    if(e.kind==='building'&&e.site){ const n=siteWorkers(e); t=`🏗 Baustelle: ${e.def.name} · ${Math.floor((e.progress||0)*100)} % · ${n?n+' Arbeiter am Werk':'wartet auf Bauarbeiter'}`+(e.owner===0?' · Arbeiter wählen und Baustelle antippen schickt sie hin':''); el.textContent=t; return; }
+    if(e.kind==='building'&&e.site){ const n=siteWorkers(e), lk=siteLacks(e); t=`🏗 Baustelle: ${e.def.name} · ${Math.floor((e.progress||0)*100)} % · ${lk?'⚠ wartet auf '+RES[lk].name:n?n+' Arbeiter am Werk':'wartet auf Bauarbeiter'}`+(e.owner===0?' · Arbeiter wählen und Baustelle antippen schickt sie hin':''); el.textContent=t; return; }
     if(e.kind==='unit'&&e.def.worker) t+=e.working?' · arbeitet':e.job?' · auf dem Weg zur Arbeit':' · wartet auf Aufträge';
-    if(e.kind==='building'&&e.owner===0&&!e.def.def&&e.type!=='hq'&&!e.connected) t+=' · ⚠ KEINE ZUFAHRT – arbeitet nicht! 🛣 Straße tippen';
+    if(e.kind==='building'&&e.haul!==undefined&&(e.def.wood||e.def.stone||e.def.metal||e.type==='farm')) t+=` · Transportweg ${e.haul===Infinity?'–':f1(e.haul)} → Leistung ${Math.round((e.eff??1)*100)} %`+((e.eff??1)<0.97&&e.owner===0?' (🛣 Straße oder Lagerhaus in der Nähe hilft)':'');
     if(e.kind==='building'&&e.fire>0) t+=' · 🔥 brennt!';
     if(e.kind==='building'&&e.type==='farm'&&e.fields!==undefined) t+=` · Äcker ${e.fields}/${DENSITY.farmFields} (Ertrag ${Math.round((e.fieldF??1)*100)} %)`;
     if(e.kind==='building'&&e.type==='lumber') t+=e.empty?' · kein Wald mehr':'';

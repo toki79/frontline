@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -25,7 +25,7 @@ export function tipFor(k){
   if(d.tech) L.push(`🎓 Benötigt Universität Stufe ${d.tech}.`);
   if(k==='kontor') L.push(`Verkauft laufend bis ${BUILDINGS.kontor.export} Einheiten/s, aber nur was über der Reserve liegt (🛢 ${EXPORT.reserve.oil}, ⛏ ${EXPORT.reserve.metal}, 🌾 ${EXPORT.reserve.food}). Preise: 🛢 ${f1(EXPORT.price.oil)} $, ⛏ ${f1(EXPORT.price.metal)} $, 🌾 ${f1(EXPORT.price.food)} $ je Einheit – weniger als beim Handel mit Kastrova, dafür ohne Marktsättigung.`);
   if(k==='university') L.push(`Stufe 1: ${TECH_UNLOCKS[1]} · Stufe 2: ${TECH_UNLOCKS[2]} · Stufe 3: ${TECH_UNLOCKS[3]}. Erforschtes Wissen bleibt auch erhalten, wenn die Universität zerstört wird.`);
-  if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. <b>Zufahrt:</b> Jedes Gebäude (außer Stellungen) arbeitet nur, wenn es ans Straßennetz des Rathauses angeschlossen ist oder direkt ans Rathaus grenzt. Beim Bauen wird die Zufahrt automatisch geplant; sonst Gebäude auswählen → 🛣 Straße.`);
+  if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. Planen ist kostenlos, jedes Feld verbraucht beim Bau ${DEF('road').cost.stone} 🪨 Stein. <b>Transport:</b> Höfe, Holzfäller, Steinbrüche und Minen liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an – eine Straße zählt nur ${Math.round(HAUL.roadCost*100)} % des Weges, lohnt sich also besonders bei weiten Strecken. Gebäude wählen → 🛣 Straße plant den Weg.`);
   else if(isDefType(k)) L.push(`Wird direkt auf der Karte gebaut (bis ${DEF_RADIUS} Felder vor der Stadt)${d.line?', auch durch Ziehen über mehrere Felder':''}.`);
   if(FEATURES[k]){ if(k==='trench') L.push('Infanterie im Graben erhält 60 % Deckung. Fahrzeuge kommen nur sehr langsam hindurch. Unzerstörbar.');
     if(k==='wire') L.push('Infanterie kommt nur sehr langsam durch. Panzer walzen ihn platt, Granaten und Raketen zerreißen ihn.'); }
@@ -39,9 +39,11 @@ export function tipFor(k){
     if(d.metal) L.push(`Metall: +${f1(d.metal)} ⛏ pro Sekunde, solange das angrenzende Erz reicht`);
     if(d.wood) L.push(`Holz: +${f1(d.wood)} 🪵 pro Sekunde. Fällt den Wald im Umkreis von 3 Feldern nach und nach (ein Waldfeld = ${CONSTRUCTION.forestWood} Holz).`);
     if(d.stone) L.push(`Stein: +${f1(d.stone)} 🪨 pro Sekunde, solange die angrenzenden Felsen reichen.`);
-    if(!d.def) L.push('🛣 Arbeitet nur mit Zufahrt (Straße zum Rathaus) – wird beim Bauen automatisch geplant. Lass Platz drumherum!');
+    if(!d.def){ const m=['wood','stone','metal'].filter(r=>d.cost[r]); L.push(`🏗 Beim Setzen wird nur das Geld fällig${m.length?`; ${m.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} holen die Arbeiter beim Bauen aus dem Lager – fehlt es, wartet die Baustelle`:''}.`); }
+    if(d.wood||d.stone||d.metal||k==='farm') L.push(`🛣 Liefert zum Rathaus oder nächsten Lagerhaus: weiter Weg = weniger Ertrag. Straßen und Lagerhäuser in der Nähe helfen.`);
     if(ECON.upkeep[k]) L.push(`Unterhalt: ${f1(ECON.upkeep[k])} $/s`);
-    if(k==='farm') L.push(`🌾 Bewirtschaftet freie Steppe im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Ackerfelder = voller Ertrag. Zugebaute Felder senken den Ertrag.`);
+    if(k==='farm') L.push(`🌾 Bewirtschaftet freie Fläche im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Äcker auf <b>grüner Wiese</b> = voller Ertrag, auf karger Steppe nur ${Math.round(DENSITY.steppeYield*100)} %. Zugebaute Felder fehlen.`);
+    if(k==='depot') L.push('Sammelstelle: Betriebe in der Nähe liefern hierhin statt zum Rathaus (kürzere Transportwege).');
     if(k==='depot') L.push(`Lagerplatz: Rathaus ${STORAGE.base}, je Lagerhaus +${STORAGE.depot} für Nahrung, Holz, Stein, Metall und Öl. Was nicht ins Lager passt, geht verloren.`);
     if(d.needsOre) L.push('Muss direkt an graue Erzfelsen grenzen.');
     if(d.needsRock) L.push('Muss direkt an helle Felsbrocken grenzen.');
@@ -68,15 +70,15 @@ export function tipFor(k){
     else { const lack=lacking(0,k); if(lack.length) L.push(`<span style="color:#ffb38a">Es fehlt: ${lack.map(r=>RES[r].name).join(', ')}</span>`); } }
   return L.join('<br>');
 }
-export function regionNote(res){ const pr=G.profile[0]; return pr.scarce===res?`<br><span style="color:#ff9a8a">⚠ Engpass eurer Region: ${REGION.scarce[res]}.</span>`:pr.rich===res?`<br><span style="color:#9fd88a">★ Stärke eurer Region: ${REGION.rich[res]}.</span>`:''; }
+export function regionNote(res){ const pr=G.profile[0]; return pr.scarce.includes(res)?`<br><span style="color:#ff9a8a">⚠ Engpass eurer Region: ${REGION.scarce[res]}.</span>`:pr.rich.includes(res)?`<br><span style="color:#9fd88a">★ Stärke eurer Region: ${REGION.rich[res]}.</span>`:''; }
 export const HUD_TIPS: Record<string, ()=>string> = {
   money:()=>{const p=G.players[0],r: any=p.rate||{money:0,export:0,expBy:{}};
     const ex=r.export>0.05?`<br>+${f1(r.export)} $/s aus dem Handelskontor (${Object.entries(r.expBy).map(([k,v])=>f1(v)+' '+RES[k].icon+'/s').join(', ')})`:'';
     return `<b>$ Geld: ${fmt(p.res.money)}</b><br>+${f1(r.money)} $/s Steuern von ${Math.floor(p.pop)} Einwohnern – mehr Einwohner = mehr Geld.${ex}<br><span class="dim">Weitere Quellen: Handel mit Kastrova (zahlt viel für ihren Engpass), Milizmarkt, Beute. Ein Handelskontor exportiert Überschüsse dauerhaft.</span>`;},
   food:()=>{const p=G.players[0],r=p.rate||{foodProd:0,eat:0};const t=p.foodRate<0&&p.res.food>0?`<br><span style="color:#ff9a8a">Vorrat reicht noch ca. ${Math.round(p.res.food/-p.foodRate)} s.</span>`:'';
     return `<b>🌾 Nahrung: ${fmt(p.res.food)}</b><br>Erzeugung +${f1(r.foodProd)}/s (Bauernhöfe, Rathaus) − Verbrauch ${f1(r.eat)}/s (${Math.floor(p.pop)} Einwohner) = <b>${p.foodRate>=0?'+':''}${f1(p.foodRate)}/s</b>.${t}<br><span class="dim">Ein Bauernhof ernährt ${Math.round(2.5*G.profile[0].fert/ECON.foodPerHead)} Einwohner. Ohne Nahrung schrumpft die Stadt.</span>${regionNote('food')}`;},
-  wood:()=>{const p=G.players[0],r=p.rate||{wood:0},n=countBuildings(0,'lumber');return `<b>🪵 Holz: ${fmt(p.res.wood)}</b><br>+${f1(r.wood||0)}/s von ${n} Holzfäller${n===1?'':'n'}.<br><span class="dim">Holzfäller am Waldrand bauen – sie holzen den Wald nach und nach ab. Gebraucht für Wohnhäuser, Bauernhöfe, Kaserne, Mine, Steinbruch und Kontor. Mit Straße zum Rathaus +50 %.</span>`;},
-  stone:()=>{const p=G.players[0],r=p.rate||{stone:0},n=countBuildings(0,'quarry');return `<b>🪨 Stein: ${fmt(p.res.stone)}</b><br>+${f1(r.stone||0)}/s aus ${n} Steinbr${n===1?'uch':'üchen'}.<br><span class="dim">Steinbruch direkt an hellen Felsbrocken bauen. Gebraucht für Straßen (${DEF('road').cost.stone} je Feld), Kraftwerk, Raffinerie, Fahrzeugwerk, Universität und Stellungen. Mit Straße zum Rathaus +50 %.</span>`;},
+  wood:()=>{const p=G.players[0],r=p.rate||{wood:0},n=countBuildings(0,'lumber');return `<b>🪵 Holz: ${fmt(p.res.wood)}</b><br>+${f1(r.wood||0)}/s von ${n} Holzfäller${n===1?'':'n'}.<br><span class="dim">Holzfäller am Waldrand bauen – sie holzen den Wald nach und nach ab. Gebraucht für Wohnhäuser, Bauernhöfe, Kaserne, Mine, Steinbruch und Kontor. </span>${regionNote('wood')}`;},
+  stone:()=>{const p=G.players[0],r=p.rate||{stone:0},n=countBuildings(0,'quarry');return `<b>🪨 Stein: ${fmt(p.res.stone)}</b><br>+${f1(r.stone||0)}/s aus ${n} Steinbr${n===1?'uch':'üchen'}.<br><span class="dim">Steinbruch direkt an hellen Felsbrocken bauen. Gebraucht für Straßen (${DEF('road').cost.stone} je Feld), Kraftwerk, Raffinerie, Fahrzeugwerk, Universität und Stellungen. </span>${regionNote('stone')}`;},
   metal:()=>{const p=G.players[0],r=p.rate||{metal:0,mines:0,minesEmpty:0};return `<b>⛏ Metall: ${fmt(p.res.metal)}</b><br>Förderung +${f1(r.metal)}/s aus ${r.mines-r.minesEmpty} aktiven Minen${r.minesEmpty?` (${r.minesEmpty} erschöpft)`:''}.<br><span class="dim">Minen nur direkt an grauen Erzfelsen. Gebraucht für Panzer, Fahrzeugwerk, MK-Stellung, Panzerabwehr.</span>${regionNote('metal')}`;},
   oil:()=>{const p=G.players[0],n=G.units.filter(u=>u.owner===0&&u.def.harvester).length,rf=countBuildings(0,'refinery');return `<b>🛢 Öl: ${fmt(p.res.oil)}</b><br>+${f1(p.rate?p.rate.oil||0:0)}/s aus ${rf} Raffinerie${rf===1?'':'n'} (je max. 3/s) · ${n} Tanklaster. Mehr Laster als die Raffinerie verarbeiten kann, bringen nichts – dann warten sie. Öl braucht man für Fahrzeuge; Überschuss am Milizmarkt verkaufen (zurzeit 100 🛢 → $${tradeTerms(0,'sellOil').get.money}; jeder Verkauf drückt den Preis).<br><span class="dim">Raffinerie bauen → Tanklaster fördert automatisch.</span>${regionNote('oil')}`;},
   pop:()=>{const p=G.players[0];const why={hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];

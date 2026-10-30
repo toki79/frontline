@@ -1,11 +1,13 @@
-import { DEF, DRONES_PER_SHOP, ECON, UNITS, VEH_PER_FACTORY } from '../data/config';
+import { BUILDINGS, DEF, DRONES_PER_SHOP, ECON, UNITS, VEH_PER_FACTORY } from '../data/config';
 import { G } from '../sim/state';
 import { countBuildings } from '../sim/world';
 
 // ---------- Kosten ----------
 export const costOf=t=>DEF(t).cost||{};
 export function lacking(pid,type){
-  const p=G.players[pid], c=costOf(type), out=[];
+  const p=G.players[pid], c0=costOf(type), out=[];
+  // Gebäude (Baustellen): beim Setzen zählt nur das Geld – Material wird beim Bauen geholt
+  const c=BUILDINGS[type]&&!BUILDINGS[type].def&&BUILDINGS[type].buildable!==false?{money:c0.money||0}:c0;
   for(const k in c){ if(k==='pop'){ if(p.pop-c.pop<ECON.minPop) out.push('pop'); } else if((p.res[k]||0)<c[k]) out.push(k); }
   const d=DEF(type);
   if(d.combat&&combatVehicles(pid)>=VEH_PER_FACTORY*countBuildings(pid,'factory')) out.push('vehcap');

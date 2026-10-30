@@ -120,10 +120,9 @@ export function knownBuilding(b){ return !G.fog||seesFor0(b.owner)||b.seen; }
 export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===type);}
 /** Anzahl Gebäude; inclSites=true zählt auch Baustellen mit */
 export function countBuildings(pid,type?,inclSites=false){let n=0;for(const b of G.buildings) if(!b.dead&&(inclSites||!b.site)&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
-/** Strom, Wohnraum und Lagerplatz. Nur fertige Gebäude mit Zufahrt zählen. */
+/** Strom, Wohnraum und Lagerplatz (nur fertige Gebäude) */
 export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;p.store=STORAGE.base;
   for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;
-    if(!(b.type==='hq'||b.def.def||pid===2||b.connected)) continue;
     const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;if(b.type==='depot')p.store+=STORAGE.depot;}}
 export function freeTileAround(b,cls){
   const cand=[];

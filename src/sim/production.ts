@@ -1,9 +1,9 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, isPlain, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
-import { autoAccess, canPlaceRoad, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
+import { canPlaceRoad, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -71,7 +71,7 @@ export function canPlaceDef(pid,type,x,y){
   if(FEATURES[type]&&FEATURES[type].road) return canPlaceRoad(pid,x,y);
   if(!inMap(x,y)) return false; const i=idx(x,y), t=G.terr[i];
   if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]) return false;
-  if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&t!==T.GRASS&&t!==T.MUD) return false; }
+  if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&!isPlain(t)&&t!==T.MUD) return false; }
   else { if(!TERRAIN[t].build||G.feat[i]) return false; for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&Math.floor(u.x)===x&&Math.floor(u.y)===y&&u.owner!==pid) return false; }
   for(const b of G.buildings) if(!b.dead&&b.owner===pid&&!b.def.def&&rectDist(b,x,y,1,1)<=DEF_RADIUS) return true;
   return false;
@@ -86,8 +86,6 @@ export function placeDefense(pid,type,x,y){
 /** Baustelle beauftragen: Kosten werden sofort bezahlt, Bauarbeiter erledigen den Rest. */
 export function placeSite(pid,type,tx,ty){
   if(!BUILDINGS[type]||BUILDINGS[type].def||!canPlace(pid,type,tx,ty)||missingReq(pid,type).length||!canAfford(pid,type)) return null;
-  pay(pid,type,1);
-  const b=placeBuilding(pid,type,tx,ty,false,true);
-  b.access=autoAccess(pid,b);   // Zufahrt gleich mitplanen (>0 Felder, 0 schon da, -1 kein Weg, -2 zu wenig Stein)
-  return b;
+  G.players[pid].res.money-=BUILDINGS[type].cost.money||0;   // Holz, Stein, Metall holen die Arbeiter erst beim Bauen
+  return placeBuilding(pid,type,tx,ty,false,true);
 }

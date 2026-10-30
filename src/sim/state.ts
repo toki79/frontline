@@ -28,15 +28,20 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
     milThinkT:1, sel:[], placing:null, boxMode:false, amoveMode:false, over:false, paused:false,
     warnB:-99, warnU:-99, stats:{built:0, lost:0, kills:0, loot:0}, uiT:0, miniT:0, terrCanvas:null, miniBg:null,
   };
-  { const rs=['food','metal','oil'], b0=rs[Math.floor(G.rng()*3)], rest=rs.filter(r=>r!==b0), b1=rest[Math.floor(G.rng()*2)];
-    G.profile=[{scarce:b0,rich:b1},{scarce:b1,rich:b0},{scarce:null,rich:null}];
-    for(const pr of G.profile) pr.fert=pr.scarce==='food'?REGION.fertScarce:pr.rich==='food'?REGION.fertRich:1; }
+  { // zwei Rohstoffe reich, zwei knapp, einer normal – Kastrova genau umgekehrt
+    const rs=[...REGION.res]; for(let i=rs.length-1;i>0;i--){ const j=Math.floor(G.rng()*(i+1)); [rs[i],rs[j]]=[rs[j],rs[i]]; }
+    const rich=rs.slice(0,2), scarce=rs.slice(2,4);
+    G.profile=[{rich,scarce},{rich:scarce,scarce:rich},{rich:[],scarce:[]}]; }
   genMap();
   setupStart();
   updateRel();
   updateVision();
-  const pr=G.profile;
-  msg(`Unsere Region: ${REGION.rich[pr[0].rich]}, aber ${REGION.scarce[pr[0].scarce]}.`,'#7fb0ea');
-  msg(`Geheimdienst: Kastrova hat ${REGION.rich[pr[1].rich]}, aber ${REGION.scarce[pr[1].scarce]}. Handel lohnt sich.`,'#d6b45a');
-  msg('Kommandant, die Stadt wartet. Baue Holzfäller und Steinbruch, dann Bauernhof, Wohnhäuser und ein Kraftwerk – deine Bauarbeiter errichten alles vor Ort.', '#d2bd62');
+  msg(`Unsere Region: ${regionText(0)}.`,'#7fb0ea');
+  msg(`Geheimdienst: Kastrova hat ${regionText(1)}. Was uns fehlt, hat Kastrova – handeln oder holen.`,'#d6b45a');
+  msg('Kommandant, die Stadt wartet. Bauarbeiter errichten alles vor Ort – Holz und Stein holen sie beim Bauen aus dem Lager.', '#d2bd62');
+}
+export const isScarce=(pid,r)=>!!G&&G.profile[pid].scarce.includes(r);
+export const isRich=(pid,r)=>!!G&&G.profile[pid].rich.includes(r);
+export function regionText(pid){ const pr=G.profile[pid];
+  return `${pr.rich.map(r=>REGION.rich[r]).join(' und ')}, aber ${pr.scarce.map(r=>REGION.scarce[r]).join(' und ')}`;
 }
