@@ -1,0 +1,75 @@
+import { $$ } from './dom';
+import { fmt } from '../core/util';
+import { BUILDINGS, ECON, REGION, RES, T } from '../data/config';
+import { distTo } from '../sim/combat';
+import { aiQuotes, marketOpen, needLevel } from '../sim/market';
+import { G } from '../sim/state';
+import { countBuildings, hostile, visibleUnit } from '../sim/world';
+import { $ } from '../ui/dom';
+import { f1 } from '../ui/format';
+import { cmd, refreshCmds } from '../ui/input';
+import { openDiplo } from '../ui/menus';
+import { msg } from '../core/events';
+import { buildClick, setTab } from '../ui/panel';
+
+/* =====================================================================
+   Berater: meldet den wichtigsten Engpass
+   ===================================================================== */
+export const settings={tips:true};
+export function setTipsOpt(on){ settings.tips=on; try{localStorage.setItem('frontlinie.tips',on?'1':'0');}catch(e){} $$('.optTips').forEach(c=>c.checked=on); updateAdvisor(); }
+export const advEl=$('#advisor'); let advCur=null;
+export function advise(){
+  const p=G.players[0], A=G.players[1], ai=G.ai, has=t=>countBuildings(0,t), busy=p.q.building.length||p.ready;
+  const army=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon).length;
+  const B=k=>({label:BUILDINGS[k].name+' bauen',fn:()=>{setTab('bau');$('#panel').classList.remove('min');buildClick(k);}});
+  const T=[];
+  // Bedrohungen zuerst
+  if(G.war){ let near=0; for(const u of G.units){ if(u.dead||u.owner===0||!hostile(0,u.owner)) continue; for(const b of G.buildings) if(!b.dead&&b.owner===0&&distTo(u,b)<6){near++;break;} }
+    if(near) T.push({p:100,txt:`<b>${near} feindliche Einheiten in der Stadt!</b> Wähle deine Truppen (◎ Alle) und tippe den Gegner an.`,act:{label:'◎ Alle wählen',fn:()=>cmd('all')}}); }
+  if(p.res.food<=0) T.push({p:95,txt:'<b>Hungersnot!</b> Die Bevölkerung schrumpft. Baue einen Bauernhof oder kaufe Nahrung am Milizmarkt.',act:busy?{label:'🤝 Markt',fn:openDiplo}:B('farm')});
+  if(p.ready) T.push({p:90,txt:`<b>${BUILDINGS[p.ready].name}</b> ist fertig und wartet aufs Platzieren.`,act:{label:'Platzieren',fn:()=>{setTab('bau');G.placing=p.ready;refreshCmds();}}});
+  if(p.foodRate<0&&p.res.food>0) T.push({p:p.res.food/-p.foodRate<90?85:p.res.food/-p.foodRate<240?45:22,txt:`<b>Nahrung sinkt</b> (${f1(p.foodRate)}/s) – in ca. ${Math.round(p.res.food/-p.foodRate)} s ist der Vorrat leer. Ein Bauernhof ernährt 125 Einwohner.`,act:B('farm')});
+  if(p.use>p.power) T.push({p:80,txt:'<b>Strommangel:</b> Bauen, Wachstum und Verteidigung laufen nur halb so schnell.',act:B('power')});
+  if(p.pop>=p.cap-3) T.push({p:70,txt:'<b>Wohnraum voll</b> – die Stadt wächst nicht mehr. Ein Wohnhaus bringt Platz für 50 Einwohner.',act:B('house')});
+  if(p.growQ<0.8&&p.pop<p.cap-3) T.push({p:p.growQ<0.6?60:42,txt:`<b>Lärm bremst das Wachstum:</b> Die freien Wohnungen liegen neben Industrie (Wohnqualität ${Math.round(p.growQ*100)} %). Baue Wohnhäuser abseits von Kraftwerk, Mine, Raffinerie und Fahrzeugwerk.`,act:B('house')});
+  else if(p.pop>=p.cap-15&&!busy) T.push({p:35,txt:'Der <b>Wohnraum</b> wird bald knapp – plane das nächste Wohnhaus.',act:B('house')});
+  if(p.power-p.use<15&&p.use<=p.power&&!busy) T.push({p:33,txt:'<b>Strom</b> wird knapp – das nächste Wohnhaus oder die nächste Mine könnte zu Mangel führen.',act:B('power')});
+  if(p.rate&&p.rate.mines>0&&p.rate.mines===p.rate.minesEmpty) T.push({p:55,txt:'Deine <b>Mine ist erschöpft</b>. Baue eine neue direkt an anderen grauen Erzfelsen.',act:B('mine')});
+  if(!has('mine')&&G.t>90&&p.res.metal<120) T.push({p:45,txt:'<b>Kein Metall-Nachschub.</b> Ohne Metall keine Panzer, kein Fahrzeugwerk. Baue eine Mine direkt an den grauen Erzfelsen.',act:B('mine')});
+  if(G.attitude[1]>=30&&G.militiaAlly===-1&&G.attitude[1]>G.attitude[0]&&!G.militiaWar[0]) T.push({p:G.attitude[1]>=48?75:40,txt:`<b>Kastrova umwirbt die Miliz</b> (Ansehen ${Math.round(G.attitude[1])} gegen eures ${Math.round(G.attitude[0])}). Ab 60 verbündet sie sich mit Kastrova. Schick ein Geschenk.`,act:{label:'🤝 Diplomatie',fn:openDiplo}});
+  if(!G.war&&ai.lead&&army<6) T.push({p:50,txt:'<b>Kastrova wird misstrauisch</b>, weil ihr schneller wachst. Baue Verteidigung (Kaserne, MK-Stellung) oder besänftige mit Geschenken.',act:has('barracks')?B('turret'):B('barracks')});
+  if(!G.war&&(ai.ratio||0)>2.2&&G.t>120) T.push({p:38,txt:'<b>Kastrova ist militärisch deutlich stärker.</b> Rechne mit Forderungen. Ein paar eigene Truppen machen dich weniger erpressbar.',act:has('barracks')?{label:'Truppen',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');}}:B('barracks')});
+  if(!has('refinery')&&G.t>240&&!busy) T.push({p:30,txt:'<b>Kein Öl:</b> Ohne Raffinerie keine Fahrzeuge. Öl lässt sich außerdem am Markt gegen Geld tauschen.',act:B('refinery')});
+  if(!G.war){ const qs=aiQuotes(); const good=qs.find(q=>q.side==='buy'&&p.res[q.res]>=q.amt*2&&G.profile[0].scarce!==q.res);
+    if(good) T.push({p:good.urgent?40:24,txt:`<b>Kastrova sucht ${RES[good.res].name}</b> und zahlt $${good.price} für ${good.amt} ${RES[good.res].icon}. Ihr habt genug – Handel bringt Geld und Frieden.`,act:{label:'🤝 Handeln',fn:openDiplo}});
+    const sc=G.profile[0].scarce, offer=qs.find(q=>q.side==='sell'&&q.res===sc);
+    if(offer&&needLevel(0,sc)>=1.2) T.push({p:44,txt:`<b>Euer Engpass: ${RES[sc].name}.</b> Kastrova verkauft gerade ${offer.amt} ${RES[sc].icon} für $${offer.price}.`,act:{label:'🤝 Kaufen',fn:openDiplo}}); }
+  if(p.fuelShort) T.push({p:72,txt:'<b>Treibstoffmangel!</b> Eure Fahrzeuge fahren und schießen nur halb so schnell. Raffinerie und Tanklaster bauen oder Öl kaufen.',act:{label:'🤝 Markt',fn:openDiplo}});
+  { const ed=G.units.filter(u=>!u.dead&&u.def.cls==='air'&&hostile(0,u.owner)&&visibleUnit(u)).length, aa=G.buildings.filter(b=>!b.dead&&b.owner===0&&(b.type==='flak'||b.type==='sentry'||b.type==='turret')).length;
+    if(ed>=1&&aa<2) T.push({p:66,txt:`<b>${ed} feindliche Drohne${ed>1?'n':''}!</b> Panzer und Panzerabwehr treffen keine Drohnen. Baue Flugabwehr, Selbstschussanlagen oder MK-Stellungen.`,act:{label:'Flugabwehr',fn:()=>{setTab('vert');$('#panel').classList.remove('min');buildClick('flak');}}}); }
+  if(G.war){ const defs=G.buildings.filter(b=>!b.dead&&b.owner===0&&b.def.def&&b.def.weapon).length;
+    if(defs<2) T.push({p:52,txt:'<b>Krieg:</b> Verteidigung ist günstiger als Angriff. Gräben mit Infanterie, Stacheldraht davor und ein paar Selbstschussanlagen halten viel auf.',act:{label:'Verteidigung',fn:()=>{setTab('vert');$('#panel').classList.remove('min');}}}); }
+  if(G.t<70) T.push({p:31,txt:`<b>Eure Region:</b> ${REGION.rich[G.profile[0].rich]}, aber ${REGION.scarce[G.profile[0].scarce]}. Kastrova hat den umgekehrten Engpass – handelt mit dem, was die andere Seite braucht.`});
+  if(!countBuildings(0,'kontor')&&(p.res.oil>600||p.res.food>1000||p.res.metal>600)) T.push({p:34,txt:`<b>Überschuss im Lager</b> (🛢 ${fmt(p.res.oil)} · 🌾 ${fmt(p.res.food)} · ⛏ ${fmt(p.res.metal)}). Ein Handelskontor exportiert ihn laufend gegen Geld.`,act:B('kontor')});
+  if(p.res.oil>300&&marketOpen(0)) T.push({p:20,txt:`<b>${fmt(p.res.oil)} Öl</b> auf Lager. Am Milizmarkt bekommst du Geld dafür.`,act:{label:'🤝 Markt',fn:openDiplo}});
+  if(!busy&&G.t>20&&p.res.money>=300) T.push({p:28,txt:'Das <b>Rathaus ist untätig</b>. Jeder Bauauftrag bringt deine Stadt voran.',act:{label:'Gebäude',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
+  if(G.mode==='race'&&p.pop>=ECON.target*0.85) T.push({p:15,txt:`Nur noch <b>${Math.ceil(ECON.target-p.pop)} Einwohner</b> bis zum Sieg! Kastrova wird jetzt alles versuchen, euch aufzuhalten.`});
+  T.sort((a,b)=>b.p-a.p);
+  if(T[0]) T[0].u=T[0].p>=75;
+  return T[0]||null;
+}
+export function updateAdvisor(){
+  if(!G||!settings.tips||G.over){advEl.classList.add('hidden');return;}
+  const t=advise(); advCur=t;
+  if(!t){advEl.classList.add('hidden');return;}
+  advEl.classList.remove('hidden'); advEl.classList.toggle('urgent',!!t.u);
+  $('#advText').innerHTML=t.txt;
+  const b=$('#advAct'); b.style.display=t.act?'block':'none'; if(t.act) b.textContent=t.act.label;
+}
+
+export function init(){
+try{ const v=localStorage.getItem('frontlinie.tips'); if(v!==null) settings.tips=v==='1'; }catch(e){}
+$$('.optTips').forEach(c=>{c.checked=settings.tips;c.addEventListener('change',()=>setTipsOpt(c.checked));});
+$('#advAct').addEventListener('click',()=>{ if(advCur&&advCur.act&&G&&!G.over){ advCur.act.fn(); setTimeout(updateAdvisor,50);} });
+$('#advX').addEventListener('click',()=>{ setTipsOpt(false); msg('Spieltipps aus – wieder einschalten über ❓ oder Menü.'); });
+}

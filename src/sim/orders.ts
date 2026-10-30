@@ -1,0 +1,32 @@
+import { dist, idx, inMap } from '../core/util';
+import { MAP_W } from '../data/config';
+import { setPath } from '../sim/pathfinding';
+import { dockOf } from '../sim/units';
+import { nearestPassable, passable } from '../sim/world';
+
+/* =====================================================================
+   Befehle
+   ===================================================================== */
+export function formationSpots(gx,gy,n,cls){
+  const s=nearestPassable(gx,gy,cls); if(!s) return [];
+  const out=[], seen=new Set([idx(s.x,s.y)]), q=[s];
+  while(q.length&&out.length<n){ const c=q.shift(); out.push({x:c.x+0.5,y:c.y+0.5});
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){const x=c.x+dx,y=c.y+dy,i=idx(x,y);
+      if(inMap(x,y)&&!seen.has(i)&&passable(x,y,cls)){seen.add(i);q.push({x,y});}} }
+  return out;
+}
+export function orderMove(units,gx,gy,mode='move'){
+  if(!units.length) return;
+  const spots=formationSpots(gx,gy,units.length,'veh');
+  const rest=[...units].sort((a,b)=>dist(a.x,a.y,gx,gy)-dist(b.x,b.y,gx,gy));
+  rest.forEach((u,i)=>{ const s=spots[i]||spots[spots.length-1]||{x:gx,y:gy};
+    u.mode=mode; u.target=null; u.goal={x:s.x,y:s.y}; if(u.def.harvester&&mode!=='harvest') u.hs=null; setPath(u,s.x,s.y); u.repathT=1; });
+}
+export function orderAttack(units,t){
+  const armed=units.filter(u=>u.def.weapon), other=units.filter(u=>!u.def.weapon);
+  for(const u of armed){u.mode='attack';u.target=t;u.path=null;u.repathT=0;}
+  if(other.length) orderMove(other,t.x,t.y);
+}
+export function orderStop(units){for(const u of units){u.mode='idle';u.path=null;u.target=null;u.guard={x:u.x,y:u.y};if(u.def.harvester)u.hs=null;}}
+export function orderHarvest(trucks,tile){for(const u of trucks){u.mode='harvest';u.hs='toOil';u.oilTile=tile;u.target=null;setPath(u,tile%MAP_W+0.5,((tile/MAP_W)|0)+0.5);}}
+export function orderReturn(trucks,ref){for(const u of trucks){u.mode='harvest';u.ref=ref;const dk=dockOf(ref);setPath(u,dk.x,dk.y);u.hs='toRef';}}

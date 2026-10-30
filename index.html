@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Frontlinie – Echtzeit-Strategie</title>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="top">
+  <div class="res">
+    <span id="rMoney" data-tip="money">$0</span>
+    <span data-tip="food">🌾<b id="rFood">0</b><small id="rFoodRate"></small></span>
+    <span data-tip="metal">⛏<b id="rMetal">0</b></span>
+    <span data-tip="oil">🛢<b id="rOil">0</b></span>
+  </div>
+  <div class="tb"><button id="bHelp" title="Symbole &amp; Hilfe">❓</button><button id="bDiplo">🤝<span class="lbl"> Diplomatie</span></button><button id="bMenu">⏸<span class="lbl"> Menü</span></button></div>
+</div>
+<div id="popbar">
+  <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span></div>
+  <div class="pb" data-tip="popAi"><span class="nm">👥 Kastrova</span><b id="popAi">0</b><i><em id="popAiBar" style="background:#cc4a3c"></em></i><span id="stance" data-tip="stance"></span></div>
+</div>
+<div id="log"></div>
+<canvas id="mini" width="124" height="124"></canvas>
+<div id="panel">
+  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info / Abbrechen</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
+  <div id="items"></div>
+</div>
+<div id="cmds">
+  <button data-c="box">▢<small>Rahmen</small></button>
+  <button data-c="amove">⚔<small>Angriff</small></button>
+  <button data-c="stop">■<small>Stopp</small></button>
+  <button data-c="all">◎<small>Alle</small></button>
+  <button data-c="desel">✕<small>Abwählen</small></button>
+</div>
+<div id="stack">
+  <div id="advisor" class="hidden"><span class="ai">💡</span><span class="at" id="advText"></span><span class="ab"><button id="advX" title="Tipps ausblenden">✕</button><button id="advAct"></button></span></div>
+  <div id="info"></div>
+</div>
+<div id="tip"></div>
+
+<div id="start" class="overlay"><div class="card">
+  <h1>FRONTLINIE</h1>
+  <div class="sub">Das Grenztal von Belgor · Prototyp v0.2</div>
+  <p>Die <b style="color:#6fa2ea">Republik Aldoria</b> und die <b style="color:#e0756b">Föderation Kastrova</b> bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wenn Nahrung oder Metall knapp werden oder eine Seite zu stark wird, greifen die Waffen. Mitten im Fluss hält die neutrale <b style="color:#d6b45a">Grenzmiliz</b> die Insel und betreibt einen Markt.</p>
+  <p><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
+  <div class="sub" style="margin-top:12px">Schwierigkeit</div>
+  <div class="row" id="diffRow"><button data-d="leicht">Leicht</button><button data-d="mittel" class="on">Mittel</button><button data-d="schwer">Schwer</button></div>
+  <label class="chk"><input type="checkbox" class="optTips" checked> 💡 Spieltipps anzeigen (Berater meldet Engpässe)</label>
+  <label class="chk"><input type="checkbox" id="optRace"> 🏁 Wettlauf: Wer zuerst 500 Einwohner hat, gewinnt (sonst endlos)</label>
+  <label class="chk"><input type="checkbox" id="optFog" checked> 🌫 Nebel des Krieges (nur erkundete Gebiete sichtbar)</label>
+  <button class="big" id="bStart">Neues Spiel starten</button>
+  <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
+  <div class="help">
+    <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
+    <b>Krieg:</b> Wer ein Gebäude zerstört oder einen Tanklaster abschießt, erbeutet einen Teil der Vorräte des Gegners.<br>
+    <b>Touch:</b> Tippen = auswählen/Befehl (Boden = bewegen, Feind = angreifen, Ölfeld = fördern) · Wischen = Karte verschieben · Zwei Finger = Zoom · <b>▢ Rahmen</b> = mehrere wählen · Doppeltipp = alle dieses Typs<br>
+    <b>Maus:</b> Links = auswählen/befehlen, Links ziehen = Rahmen, Rechts = Befehl, Rechts ziehen = schieben, Rad = Zoom, Pfeiltasten, A = Angriffsbewegung, S = Stopp
+  </div>
+</div></div>
+
+<div id="diplo" class="overlay hidden"><div class="card">
+  <h2>🤝 Diplomatie &amp; Handel</h2>
+  <div class="sub">Das Spiel ist pausiert, solange dieses Fenster offen ist.</div>
+  <div id="reply"></div>
+  <div id="diploBody"></div>
+  <button class="big" id="bDiploClose">Zurück ins Spiel</button>
+</div></div>
+
+<div id="offer" class="overlay hidden"><div class="card">
+  <h2 id="offerTitle">Nachricht</h2>
+  <p id="offerText"></p>
+  <div class="row"><button id="offerYes" class="big" style="flex:1"></button><button id="offerNo" class="big" style="flex:1;background:#4a2a22;border-color:#8a4a3a"></button></div>
+</div></div>
+
+<div id="help" class="overlay hidden"><div class="card">
+  <h2>❓ Symbole &amp; Anzeigen</h2>
+  <div class="sub">Am Computer: mit der Maus über Anzeigen und Bauknöpfe fahren. Auf dem Handy: Anzeigen antippen, Bauknöpfe lange drücken.</div>
+  <dl class="leg">
+    <h4>Obere Leiste</h4>
+    <dt>$</dt><dd>Geld. Kommt als Steuer von den Einwohnern (je mehr Einwohner, desto mehr). Für Gebäude und Truppen.</dd>
+    <dt>🌾 460 +4,5</dt><dd>Nahrung auf Lager und Bilanz pro Sekunde (grün = Überschuss, rot = Vorrat schrumpft). Bauernhöfe erzeugen, Einwohner verbrauchen.</dd>
+    <dt>⛏</dt><dd>Metall. Nur aus Minen, die direkt an graue Erzfelsen gebaut werden. Nötig für Panzer, Fahrzeugwerk und MK-Stellungen.</dd>
+    <dt>🛢</dt><dd>Öl. Tanklaster pumpen es aus schwarzen Ölfeldern zur Raffinerie. Treibstoff für Fahrzeuge, am Milizmarkt verkaufbar.</dd>
+    <dt>Unterstrichen</dt><dd>Rot gewellt = Engpass eurer Region, grün = Stärke eurer Region. Jede Stadt hat einen anderen Engpass – handelt über 🤝 mit dem, was die andere Seite braucht.</dd>
+    <h4>Bevölkerung &amp; Strom</h4>
+    <dt>👥 52/140</dt><dd>Einwohner / Wohnraum. Wächst von selbst, solange Platz, Nahrung und Strom reichen. Der Balken zeigt den Weg zur nächsten Stadtstufe (Dorf → Kleinstadt 100 → Stadt 250 → Großstadt 500 → Metropole 1000 → Weltstadt 2000).</dd>
+    <dt>$ Geld</dt><dd>Steuern (0,07 $ pro Einwohner und Sekunde), Handel mit Kastrova, Milizmarkt, Beute und das Handelskontor, das Überschüsse über einer Reserve laufend exportiert.</dd>
+    <dt>👥 Kastrova</dt><dd>Einwohner des Gegners – er versucht dasselbe Ziel zu erreichen.</dd>
+    <dt>⚡ 75/130</dt><dd>Stromverbrauch / Stromerzeugung. Rot = Mangel: Produktion und Wachstum laufen nur halb so schnell → Kraftwerk bauen.</dd>
+    <dt>Frieden / Krieg</dt><dd>Beziehung zu Kastrova. Im Frieden schießt niemand.</dd>
+    <h4>Auf der Karte</h4>
+    <dt><span class="sw" style="background:#6fd05a"></span></dt><dd>Zustand (Lebenspunkte) über Einheiten und Gebäuden – grün, gelb, rot. „900/900“ in der Auswahlzeile heißt: 900 von 900 Lebenspunkten.</dd>
+    <dt><span class="sw" style="background:#e8c84a"></span></dt><dd>Ladung eines Tanklasters.</dd>
+    <dt>Blauer Balken am Haus</dt><dd>Belegung eines Wohnhauses. Grauer Dunst = Industrielärm in der Nähe, dort ziehen Bewohner langsamer ein.</dd>
+    <dt>Schwarze Flecken</dt><dd>Ölfelder · <b>Graue Felsen</b> = Erz · Wald = Deckung für Infanterie · Schlamm bremst Fahrzeuge · Ortschaften = Deckung.</dd>
+    <dt>Grüne Felder</dt><dd>Beim Platzieren: hier darf gebaut werden. Gelbe Rahmen = Erz (für Minen).</dd>
+    <h4>Verteidigung &amp; Krieg</h4>
+    <dt>Verteidigung</dt><dd>Mauern, Stacheldraht und Gräben antippen oder über die Karte ziehen. Stellungen brauchen nach dem Platzieren einige Sekunden Aufbau (gestrichelter Rahmen).</dd>
+    <dt>Heimvorteil</dt><dd>Einheiten nahe der eigenen Stadt nehmen 30 % weniger Schaden und werden dort versorgt (heilen nach 15 s ohne Beschuss). Gebäude reparieren sich nach 12 s ohne Beschuss. Verteidigungsanlagen sind besonders robust.</dd>
+    <dt>Drohnen</dt><dd>Fliegen über alles hinweg. Nur Gewehre, Maschinenkanonen und Flugabwehr treffen sie. Akku leert sich außerhalb der eigenen Stadt.</dd>
+    <dt>Nebel des Krieges</dt><dd>Schwarz = unerforscht, abgedunkelt = erkundet (zuletzt gesehene Gebäude), hell = in Sicht. Spionagedrohnen sehen besonders weit.</dd>
+    <dt>Flughöhe</dt><dd>Tieffliegende Drohnen (FPV) treffen Gewehre, MK und Flugabwehr. Hochfliegende (Spionage, Reaper) nur Flugabwehr und schwach die MK.</dd>
+    <dt>🎓 Universität</dt><dd>Stufe 1: Drohnenwerkstatt, Spionagedrohne · Stufe 2: FPV-Kamikazedrohne, Raketenwerfer · Stufe 3: Reaper-Drohne. Ausbau über „Forschung“ im Reiter Gebäude.</dd>
+    <dt>Fahrzeuge</dt><dd>Max. 4 Kampffahrzeuge je Fahrzeugwerk, sie verbrauchen laufend Öl. Soldaten essen weiter mit.</dd>
+    <h4>Bauleiste</h4>
+    <dt>$300 ⛏80 👥5</dt><dd>Kosten: Geld, Metall, Öl und Einwohner (Soldaten werden aus der Bevölkerung rekrutiert).</dd>
+    <dt>Gelber Balken</dt><dd>Baufortschritt · Zahl oben rechts = Anzahl in der Warteschlange · „PLATZIEREN“ = fertig, antippen und auf die Karte setzen.</dd>
+  </dl>
+  <label class="chk"><input type="checkbox" class="optTips" checked> 💡 Spieltipps anzeigen</label>
+  <button class="big" id="bHelpClose">Zurück ins Spiel</button>
+</div></div>
+
+<div id="end" class="overlay hidden"><div class="card">
+  <h1 id="endTitle">SIEG</h1>
+  <p id="endText"></p>
+  <button class="big" id="bAgain">Neues Spiel</button>
+</div></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
