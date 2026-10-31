@@ -200,6 +200,16 @@ export const FACTIONS = [
   {name:'Grenzmiliz von Belgor', short:'Miliz',    leader:'Hauptmann Dorin', col:'#c9a640', dark:'#6a5317'},
   {name:'Räuberbanden',          short:'Räuber',   leader:'–',               col:'#8a8a82', dark:'#3a3a34'},
 ];
+// ---------- Einsätze ----------
+export const MISSION = {
+  digTime: 6,           // Sekunden, bis sich Truppen in Stellung eingegraben haben
+  dugInf: 0.55,         // Schadensfaktor eingegrabener Infanterie
+  dugVeh: 0.75,         // … und eingegrabener Fahrzeuge
+  clearR: 7,            // Umkreis „Gebiet klären“
+  assaultR: 10,         // Umkreis „Angriff“
+  scoutR: 10,           // Umkreis der Gebietsaufklärung von Drohnen
+  quiet: 4,             // so lange ohne Feind, dann gilt das Gebiet als geklärt
+};
 // ---------- Schutz teurer Waffen ----------
 export const CAGE = {
   cost:{money:80, metal:20},   // Gitterkäfig je Fahrzeug, nachrüsten nahe dem Fahrzeugwerk

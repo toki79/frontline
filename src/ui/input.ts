@@ -6,6 +6,8 @@ import { lacking } from '../sim/costs';
 import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatrol, orderReturn, orderStop, upgradeCage } from '../sim/orders';
 import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { sendDiplomats } from '../sim/trade';
+import { applyOrder, ORDER_NAME } from '../sim/missions';
+import { issuePending } from '../ui/forces';
 import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -36,6 +38,7 @@ export function pickEntity(w){
 }
 export function handleTap(w,right,shift){
   if(G.over) return;
+  if(G.orderPending){ if(right){ G.orderPending=null; refreshCmds(); return; } issuePending(w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ffd36a',life:0.7}); return; }
   if(G.placing&&isDefType(G.placing)){
     if(right){G.placing=null;refreshCmds();return;}
     const x=Math.floor(w.x), y=Math.floor(w.y), road=FEATURES[G.placing]&&FEATURES[G.placing].road;
@@ -63,7 +66,9 @@ export function handleTap(w,right,shift){
       msg(`🛡 ${n} Einheit${n===1?'':'en'} begleite${n===1?'t':'n'} jetzt: ${ent.def.name}.`,'#9fd88a'); }
     else msg('Zum Begleiten einen eigenen Arbeiter, Laster oder eine andere Einheit antippen.','#ffb38a');
     G.escortMode=false; refreshCmds(); return; }
-  if(G.amoveMode&&mine.length){ orderMove(mine,w.x,w.y,'amove'); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ff7a5a',life:0.5}); G.amoveMode=false; refreshCmds(); return; }
+  if(G.amoveMode&&mine.length){ applyOrder(mine,'assault',w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ff7a5a',life:0.5}); G.amoveMode=false; refreshCmds(); return; }
+  if(G.orderMode&&mine.length){ applyOrder(mine,G.orderMode,w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:G.orderMode==='hold'?'#7fb0ea':'#ffd36a',life:0.6});
+    msg(`${mine.length} Einheit${mine.length===1?'':'en'}: ${ORDER_NAME[G.orderMode]}.`); G.orderMode=null; refreshCmds(); return; }
   if(ent&&ent.owner===0){
     if(ent.kind==='building'&&ent.site&&mine.some(u=>u.def.worker)){ assignWorkers(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5}); return; }
     if(ent.kind==='building'&&ent.type==='refinery'&&mine.some(u=>u.def.harvester)){orderReturn(mine.filter(u=>u.def.harvester),ent);fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5});return;}
@@ -112,7 +117,8 @@ export function cmd(c){
   else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
-  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;}
+  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;}
+  else if(c==='hold'||c==='clear'){ if(mine.length){ G.orderMode=G.orderMode===c?null:c; G.amoveMode=false; G.escortMode=false; } else msg('Zuerst Einheiten auswählen.'); }
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
     msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
   else if(c==='demolish'){ const b=selBuilding(); if(b){
@@ -125,6 +131,8 @@ export function selBuilding(){ const s=G.sel.filter(e=>!e.dead); return s.length
 export function refreshCmds(){
   document.querySelector('[data-c=box]').classList.toggle('on',!!(G&&G.boxMode));
   document.querySelector('[data-c=amove]').classList.toggle('on',!!(G&&G.amoveMode));
+  const fight=!!G&&myUnitsSel().some(u=>u.def.weapon||u.def.cls==='air');
+  for(const k of ['hold','clear']){ const b=document.querySelector(`[data-c=${k}]`); b.classList.toggle('show',fight); b.classList.toggle('on',!!(G&&G.orderMode===k)); }
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
   document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
   const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
@@ -143,7 +151,9 @@ export function updateInfo(){
   if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing), road=FEATURES[G.placing]&&FEATURES[G.placing].road, pio=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.pioneer).length;
     el.textContent=`${d.name} ${road?'planen':'beauftragen'}: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ${road?'Bauarbeiter bauen':pio?`${pio} Pionier${pio===1?'':'e'} bauen`:'⚠ keine Pioniere – in der Kaserne ausbilden'} · Plan antippen = zurücknehmen · ✕ beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
-  if(G.amoveMode){el.textContent='Angriffsbewegung: Ziel antippen';return;}
+  if(G.orderPending){ const n=Object.values(G.orderPending.pick).reduce((s: number,v: any)=>s+v,0); el.textContent=`🎯 Einsatz „${ORDER_NAME[G.orderPending.kind]}“ mit ${n} Einheiten: Ziel auf der Karte antippen · ✕ Abwählen bricht ab`; return; }
+  if(G.orderMode){ el.textContent=`${ORDER_NAME[G.orderMode]}: Ziel antippen – ${G.orderMode==='hold'?'Truppen ziehen hin und graben sich ein':'Truppen säubern den Umkreis und halten dann Stellung'}`; return; }
+  if(G.amoveMode){el.textContent='Angriff: Ziel antippen – vorrücken und alles im Umkreis angreifen';return;}
   if(G.escortMode){el.textContent='Begleiten: eigenen Arbeiter oder Laster antippen – die Auswahl bleibt bei ihm und verteidigt ihn';return;}
   if(G.boxMode){el.textContent='Rahmen aufziehen, um Einheiten zu wählen';return;}
   const s=G.sel.filter(e=>!e.dead); if(!s.length){el.textContent='';return;}
@@ -157,6 +167,7 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.diplomat) t+=e.mission!==undefined&&e.mission!==null?' · auf dem Weg zur Botschaft':' · Rathaus Kastrovas antippen, um eine Botschaft zu eröffnen';
     if(e.kind==='unit'&&e.def.caravan) t+=` · Ladung ${e.cargoAmt} ${RES[e.cargoRes].icon} → ${G.players[e.dest?e.dest.owner:0].short}`;
     if(e.kind==='unit'&&e.def.pioneer) t+=e.clearing?' · räumt eine Mine':e.working?' · baut':e.pjob?' · auf dem Weg zum Bauplatz':' · wartet auf Aufträge (Verteidigung planen)';
+    if(e.kind==='unit'&&e.order) t+=` · ${ORDER_NAME[e.order]}${e.order==='hold'?(e.dug?' (eingegraben 🛡)':' (gräbt sich ein …)'):''}`;
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;
@@ -218,7 +229,7 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 cv.addEventListener('wheel',e=>{e.preventDefault();if(G)zoomAt(e.clientX,e.clientY,cam.zoom*Math.exp(-e.deltaY*0.0015));},{passive:false});
 addEventListener('keydown',e=>{ if(!G) return; input.keys.add(e.key.toLowerCase());
   const k=e.key.toLowerCase();
-  if(k==='escape'){G.placing=null;G.amoveMode=false;G.sel=[];refreshCmds();}
+  if(k==='escape'){G.placing=null;G.amoveMode=false;G.orderMode=null;G.orderPending=null;G.sel=[];refreshCmds();}
   if(k==='s'&&!e.repeat) cmd('stop');
   if(k==='a'&&!e.repeat) cmd('amove');
 });

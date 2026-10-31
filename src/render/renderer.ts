@@ -99,6 +99,8 @@ export function render(){
   }
   const selSet0=new Set(G.sel);
   for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
+    if(u.dug){ c.strokeStyle='#a08a5a'; c.lineWidth=3; c.beginPath(); c.arc(u.x*TILE,u.y*TILE,u.def.size*TILE*0.75+3,Math.PI*0.15,Math.PI*1.85); c.stroke();
+      c.strokeStyle='rgba(60,45,25,.6)'; c.lineWidth=1; c.stroke(); }   // Sandsäcke: eingegraben
     drawUnitShape(c,u.type,f.col,f.dark,u.x*TILE,u.y*TILE,u.angle,u.tur,u.working?-1:u.hp/u.maxHp);
     if(u.cage){ c.save(); c.translate(u.x*TILE,u.y*TILE); c.rotate(u.angle); const L=u.def.size*TILE*0.95, W2=u.def.size*TILE*0.7;
       c.strokeStyle='rgba(60,58,50,.9)'; c.lineWidth=0.8; c.strokeRect(-L/2-1.5,-W2/2-1.5,L+3,W2+3);
@@ -127,6 +129,9 @@ export function render(){
   if(G.fog){ for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const v=G.vis[idx(x,y)]; if(v===2) continue;
       c.fillStyle=v===0?'rgba(7,9,5,.96)':'rgba(7,9,5,.5)'; c.fillRect(x*TILE-0.5,y*TILE-0.5,TILE+1,TILE+1); } }
   const selSet=new Set(G.sel);
+  { const areas=new Map(); for(const u of G.sel) if(!u.dead&&u.area) areas.set(u.msn,u.area);   // Einsatzgebiete der Auswahl
+    for(const A of areas.values()){ c.strokeStyle='rgba(255,211,106,.6)'; c.lineWidth=1.5; c.setLineDash([6,5]); c.beginPath(); c.arc(A.x*TILE,A.y*TILE,A.r*TILE,0,7); c.stroke(); c.setLineDash([]); }
+    for(const u of G.sel) if(!u.dead&&u.patrolArea){ const A=u.patrolArea; c.strokeStyle='rgba(127,176,234,.5)'; c.lineWidth=1.5; c.setLineDash([4,6]); c.beginPath(); c.arc(A.x*TILE,A.y*TILE,A.r*TILE,0,7); c.stroke(); c.setLineDash([]); } }
   for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const s=selSet.has(u);
     const R=u.def.size*TILE*0.8;
     if(s){c.strokeStyle=u.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=1.5;c.beginPath();c.arc(u.x*TILE,u.y*TILE,R+3,0,7);c.stroke();}

@@ -35,7 +35,9 @@ button:disabled{opacity:.4;cursor:default}
 #log{position:absolute;left:calc(8px + var(--sal));top:calc(var(--toph,calc(36px + var(--sat))) + 52px);max-width:min(62vw,430px);pointer-events:none;font-size:12.5px;line-height:1.35}
 #log div{background:#0d0f0acc;border-left:3px solid var(--acc);padding:3px 7px;margin-bottom:3px;border-radius:3px;transition:opacity .6s}
 #mini{position:absolute;right:calc(8px + var(--sar));top:calc(var(--toph,calc(36px + var(--sat))) + 8px);width:124px;height:124px;border:1px solid var(--line);border-radius:4px;background:#000;touch-action:none}
-#cmds{position:absolute;left:calc(6px + var(--sal));bottom:calc(136px + var(--sab));display:flex;flex-wrap:wrap-reverse;gap:5px;max-width:calc(100vw - 12px - var(--sal) - var(--sar))}
+#cmds{position:absolute;left:calc(6px + var(--sal));bottom:calc(136px + var(--sab));display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;max-width:calc(100vw - 12px - var(--sal) - var(--sar))}
+#cmds::-webkit-scrollbar{display:none}
+#cmds button{flex:none}
 #cmds button{width:52px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:17px;line-height:1;background:var(--panel)}
 #cmds button small{font-size:9.5px;margin-top:3px;color:var(--dim)}
 #cmds button.ctx{display:none}
@@ -129,3 +131,13 @@ button:disabled{opacity:.4;cursor:default}
 #saves .slot span{flex:1}
 #saves .slot button{padding:6px 10px;font-size:15px}
 #start.ingame .intro{display:none}
+#forces .kinds button{font-size:13px;padding:8px 10px}
+#forces .kinds button.on{border-color:var(--acc);background:#4a4420}
+#forces .frow{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:13px}
+#forces .frow canvas{width:34px;height:34px;flex:none}
+#forces .frow .fi{flex:1;min-width:0;line-height:1.25;overflow:hidden}
+#forces .frow .fi b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#forces .frow .fi small{color:var(--dim)}
+#forces .frow button{padding:6px 7px;font-size:14px;min-width:30px}
+#forces .frow .n{min-width:18px;text-align:center}
+#forces .big:disabled{opacity:.5}

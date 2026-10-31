@@ -3,6 +3,7 @@ import { BANDITS, CAGE, DAMAGE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
+import { dugFactor } from '../sim/missions';
 import { coverAt, detected, hostile, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { msg } from '../core/events';
@@ -63,7 +64,8 @@ export function applyDamage(t,dmg,type,src){
   let m=DAMAGE[type][t.armor]; if(m===undefined) m=1;
   if(t.kind==='unit'&&t.def.cls==='inf') m*=1-coverAt(t.x,t.y);
   if(t.kind==='unit'&&t.owner<2&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen
-  if(t.cage&&CAGE[type]) m*=CAGE[type];                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
+  if(t.cage&&CAGE[type]) m*=CAGE[type];
+  if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
   t.hp-=dmg*m*(0.85+Math.random()*0.3);
   if(src) onAttacked(t,src);

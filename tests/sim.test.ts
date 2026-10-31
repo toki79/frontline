@@ -7,6 +7,7 @@ import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar 
 import { applyDamage, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
+import { applyOrder } from '../src/sim/missions';
 import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
 import { CONSTRUCTION, FEAT, MAP_H, MAP_W, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
@@ -371,6 +372,39 @@ describe('Simulation', () => {
     run(10);
     expect(G.units.some(u => u.def.caravan)).toBe(true);
     expect(runUntil(() => p.res[get.res] >= before + 49, 200)).toBe(true);
+  });
+
+  it('Einsatz „Stellung halten“: Truppen graben sich ein und nehmen weniger Schaden', () => {
+    newGame('mittel'); noBandits();
+    const hq = findBuilding(0, 'hq'), s = spawnAt(0, 'inf', hq.x + 3, hq.y - 3);
+    applyOrder([s], 'hold', hq.x + 6, hq.y - 6);
+    run(15);
+    expect(s.dug).toBe(true);
+    const hp = s.hp; applyDamage(s, 40, 'shell', {owner:1, dead:true, x:0, y:0});
+    expect(hp - s.hp).toBeLessThan(40 * 0.35 * 0.7);   // weniger als ohne Eingraben (Heimvorteil schon eingerechnet)
+  });
+
+  it('Einsatz „Gebiet klären“: Räuberlager wird ausgehoben, danach halten', () => {
+    newGame('mittel', false);
+    const camp = G.buildings.find(b => b.type === 'camp' && b.x < 48);
+    run(2);
+    const grp = []; for (let i = 0; i < 6; i++) grp.push(spawnAt(0, i < 3 ? 'mbt' : 'ifv', camp.x + 9 + (i % 3), camp.y + 9 + Math.floor(i / 3)));
+    G.players[0].res.oil = 1000;
+    applyOrder(grp, 'clear', camp.x, camp.y);
+    expect(runUntil(() => camp.dead, 150)).toBe(true);
+    run(10);
+    expect(grp.filter(u => !u.dead).some(u => u.order === 'hold')).toBe(true);
+  });
+
+  it('Einsatz für Drohnen: FPV lauern am Ziel, Aufklärer überwachen das Gebiet', () => {
+    newGame('mittel');
+    const hq = findBuilding(0, 'hq');
+    const d = spawnAt(0, 'drone', hq.x, hq.y - 3), sp = spawnAt(0, 'spy', hq.x, hq.y - 3);
+    applyOrder([d, sp], 'clear', hq.x + 10, hq.y - 10);
+    expect(d.lurk).toBe(true);
+    expect(sp.patrol && sp.patrolArea).toBeTruthy();
+    run(20);
+    expect(Math.hypot(sp.x - (hq.x + 10), sp.y - (hq.y - 10))).toBeLessThan(14);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

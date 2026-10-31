@@ -8,6 +8,7 @@ import { msg } from '../core/events';
 import { updateWorker } from '../sim/build';
 import { checkMine, updatePioneer } from '../sim/pioneers';
 import { updateCaravan, updateDiplomat } from '../sim/trade';
+import { chaseLimit, updateMission } from '../sim/missions';
 
 /* =====================================================================
    Einheiten-Update
@@ -39,7 +40,8 @@ export function updateUnit(u,dt){
         if(d.cls==='inf') u.angle=u.tur;
         if(Math.abs(angDiff(u.tur,aim))<0.2&&u.cd<=0){ fire(u,t); if(d.upkeep&&G.players[u.owner].fuelShort) u.cd*=2; }
       } else {
-        if(u.mode==='idle'&&dist(u.x,u.y,u.guard.x,u.guard.y)>LEASH){u.target=null;}
+        const lim=chaseLimit(u);
+        if(lim===0||(u.mode==='idle'&&dist(u.x,u.y,u.guard.x,u.guard.y)>(lim??LEASH))){u.target=null;}   // Stellung halten: nicht nachlaufen
         else { u.repathT-=dt; if(!u.path||u.repathT<=0){u.repathT=1+Math.random()*0.3; setPath(u,t.x,t.y);} }
       }
     }
@@ -49,6 +51,7 @@ export function updateUnit(u,dt){
     if(u.jammed){ u.target=null; if(Math.random()<dt*3){ u.path=[{x:u.x+(Math.random()-.5)*2,y:u.y+(Math.random()-.5)*2}]; u.pathI=0; }
       if(Math.random()<dt*JAM.crashPerSec){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.3,life:0.35}); u.dead=true; if(u.owner===0){ G.stats.lost++; msg('📡 Eine FPV-Drohne ist im Störfeld abgestürzt.','#ffb38a'); } G.sel=G.sel.filter(s=>s!==u); return; } }
   }
+  if(u.order) updateMission(u,dt);
   if(d.harvester) updateHarvest(u,dt);
   if(d.worker) updateWorker(u,dt);
   if(d.pioneer) updatePioneer(u,dt);
@@ -108,8 +111,9 @@ function updateDroneDuty(u,home){
       else { u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
     return; }
   if(u.mode==='patrol'&&(!u.path||u.pathI>=u.path.length)){   // nächster Wegpunkt: bevorzugt Unerforschtes bzw. gerade nicht Gesehenes
-    const vis=u.owner===0?G.vis:G.vis1; let best=null,bs=-1e9;
-    for(let k=0;k<10;k++){ const x=2+Math.random()*(MAP_W-4), y=2+Math.random()*(MAP_H-4), i=Math.floor(y)*MAP_W+Math.floor(x);
+    const vis=u.owner===0?G.vis:G.vis1, A=u.patrolArea; let best=null,bs=-1e9;
+    for(let k=0;k<10;k++){ const a=Math.random()*6.283, rr=A?Math.sqrt(Math.random())*A.r:0;
+      const x=A?Math.max(1,Math.min(MAP_W-1,A.x+Math.cos(a)*rr)):2+Math.random()*(MAP_W-4), y=A?Math.max(1,Math.min(MAP_H-1,A.y+Math.sin(a)*rr)):2+Math.random()*(MAP_H-4), i=Math.floor(y)*MAP_W+Math.floor(x);
       const v=vis?vis[i]:1, s=(v===0?30:v===1?12:0)+Math.min(dist(u.x,u.y,x,y),30)*0.4+Math.random()*5; if(s>bs){bs=s;best={x,y};} }
     setPath(u,best.x,best.y); }
 }

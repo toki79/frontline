@@ -17,6 +17,7 @@ import { HUD_TIPS, tipFor, init as initTooltips } from './ui/tooltips';
 import { init as initDialogs } from './ui/dialogs';
 import { init as initMenus, startGame } from './ui/menus';
 import { init as initMessages } from './ui/messages';
+import { init as initForces } from './ui/forces';
 import { autosave } from './ui/saves';
 
 let last = performance.now();
@@ -40,7 +41,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
+initForces(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
 resize();
 requestAnimationFrame(frame);
 
