@@ -12,7 +12,7 @@ import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
 import { applyOrder } from '../src/sim/missions';
 import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
-import { BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
+import { BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
 import { idx } from '../src/core/util';
@@ -311,6 +311,35 @@ describe('Simulation', () => {
     const w = spawnAt(0, 'worker', c.x + 3, c.y + 3); w.mode = 'move';
     run(25);
     expect(w.dead || w.hp < w.maxHp).toBe(true);
+  });
+
+  it('Räuber-Überfall: Schonfrist, Vorwarnung, Plündern statt Zerstören', () => {
+    const msgs: string[] = []; on('msg', (m: string) => msgs.push(m));
+    newGame('mittel'); G.ai.peaceCool = 1e9;
+    for (const u of G.units) if (u.owner === 0 && u.def.weapon) u.dead = true;   // ohne Wache
+    const c = G.buildings.find(b => b.type === 'camp' && b.x < 48 && b.y > 40);
+    const tx = Math.floor(c.x) + 7, ty = Math.floor(c.y) + 7;
+    const farm = placeBuilding(0, 'farm', tx, ty, false);
+    G.players[0].res.money = 1000; G.players[0].res.food = 300;
+    run(BANDITS.firstRaid[0] - BANDITS.warn - 5);
+    expect(msgs.some(m => m.includes('überfallen'))).toBe(false);          // Schonfrist
+    c.raidT = BANDITS.warn - 1;
+    run(3);
+    expect(msgs.some(m => m.includes('Späher'))).toBe(true);               // Vorwarnung
+    c.raidT = 1; const money0 = G.players[0].res.money;
+    expect(runUntil(() => msgs.some(m => m.includes('geplündert')), 90)).toBe(true);
+    expect(G.players[0].res.money).toBeLessThan(money0);
+    expect(farm.dead).toBeFalsy();                                          // Gebäude bleibt stehen
+  });
+
+  it('Stadtwache: bei Vorwarnung rücken untätige Soldaten von selbst aus', () => {
+    newGame('mittel');
+    const c = G.buildings.find(b => b.type === 'camp' && b.x < 48 && b.y > 40);
+    placeBuilding(0, 'farm', Math.floor(c.x) + 7, Math.floor(c.y) + 7, false);
+    const inf = G.units.filter(u => u.owner === 0 && u.type === 'inf');
+    for (const u of inf) { u.x = c.x + 12; u.y = c.y + 14; }
+    run(1); c.raidT = BANDITS.warn - 1; run(2);
+    expect(inf.some(u => u.mode === 'amove')).toBe(true);
   });
 
   it('Begleitschutz: Soldaten folgen dem Arbeiter', () => {

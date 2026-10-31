@@ -249,6 +249,10 @@ export const BANDITS = {
   territory: 9,         // in diesem Umkreis ums Lager wird jeder angegriffen
   raidRange: 18,        // Überfälle auf Gebäude bis zu dieser Entfernung
   raidEvery: [150,240], // Sekunden zwischen Überfällen (zufällig)
+  firstRaid: [600,720], // Schonfrist: erster Überfall frühestens nach 10 Minuten
+  warn: 60,             // so viele Sekunden vorher melden Späher den Überfall
+  plunder: {money:0.15, moneyMax:200, food:80, wood:50, stone:40, metal:20},   // Raub je Überfall (Geld: Anteil, gedeckelt)
+  guardR: 22,           // untätige Soldaten in diesem Umkreis rücken bei einer Vorwarnung als Stadtwache aus
   loot: {money:500, wood:120, stone:80, metal:40},   // Beute beim Zerstören eines Lagers
 };
 // ---------- KI ----------
