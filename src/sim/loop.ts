@@ -2,6 +2,7 @@ import { aiThink } from '../ai/kastrova';
 import { militiaThink } from '../ai/militia';
 import { banditThink } from '../ai/bandits';
 import { updateTrade } from '../sim/trade';
+import { updateNukes } from '../sim/nuke';
 import { updateEconomy } from '../sim/economy';
 import { MARKET_RECOVER } from '../sim/market';
 import { updateProduction } from '../sim/production';
@@ -24,6 +25,7 @@ export function update(dt){
   for(const u of G.units) if(!u.dead) updateUnit(u,dt);
   for(const b of G.buildings) if(!b.dead) updateBuilding(b,dt);
   updateProjectiles(dt);
+  updateNukes(dt);
   separate();
   for(const f of G.fx) f.age+=dt;
   G.fx=G.fx.filter(f=>f.age<f.life);

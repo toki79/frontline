@@ -1,4 +1,5 @@
-import { ECON, EXPORT, MAP_H, MAP_W, MOOD, STORAGE, T } from '../data/config';
+import { ECON, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
 import { G } from '../sim/state';
@@ -23,7 +24,7 @@ export function updateEconomy(pid,dt){
   let upkeep=0, noAccess=0;
   for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid) continue;
     upkeep+=ECON.upkeep[b.type]||0;
-    const rb=bf*(b.eff??1);                         // Transportweg zur Sammelstelle
+    const rb=bf*(b.eff??1)*(hasTech(p,'ai')?1+RESEARCH_SPEED.ai:1);   // Transportweg zur Sammelstelle, KI-Optimierung
     if(hauls(b)&&(b.eff??1)<0.7) noAccess++;   // Betriebe mit weitem Transportweg
     if(b.def.refine&&b.crude>0){ const a=Math.min(b.crude,b.def.refine*bf*dt*(powOk?1:0.5)); b.crude-=a; p.res.oil+=a*mul; oilProd+=a*mul/dt; }
     if(b.def.wood){   // Holzfäller: fällt den Wald Feld für Feld
@@ -36,7 +37,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; } else if(!b.empty){ b.empty=true; if(pid===0) msg('Ein Steinbruch ist erschöpft – baue einen neuen an anderen Felsen.','#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1):1)*(b.type==='hq'?1:bf);
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1):1)*(b.type==='hq'?1:bf*inFallout(b));
     if(b.def.metal){ let got=0;
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
       mines++; if(b.empty) minesEmpty++;
@@ -70,6 +71,9 @@ export function updateEconomy(pid,dt){
   { const core=G.buildings.filter(b=>!b.dead&&b.owner===pid&&(b.type==='hq'||b.def.cap));
     target-=pen(G.buildings.some(c=>!c.dead&&c.type==='camp'&&core.some(h=>dist(c.x,c.y,h.x,h.y)<MOOD.banditR)),MOOD.bandits,'Räuber in Stadtnähe'); }
   target-=pen(G.war,MOOD.war,'Krieg');
+  target-=pen(G.t<(p.shockUntil||0),NUKE.shockMood,'Entsetzen über den eigenen Atomschlag');
+  target-=pen(G.t<(p.bombedUntil||0),NUKE.victimMood,'Atomschlag auf unser Land');
+  target-=pen(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.def.cap&&inFallout(b)<1),NUKE.radiationMood,'Strahlung in Wohngebieten');
   p.moodWhy=why; p.moodTarget=Math.max(0,target);
   if(p.happy===undefined) p.happy=MOOD.start;
   p.happy+=(p.moodTarget-p.happy)*Math.min(1,MOOD.speed*dt);

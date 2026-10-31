@@ -3,13 +3,16 @@ import { describe, it, expect } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
-import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar } from '../src/sim/world';
+import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact } from '../src/sim/world';
+import { enqueue, missingReq } from '../src/sim/production';
+import { launchNuke, inFallout } from '../src/sim/nuke';
+import { aiThink } from '../src/ai/kastrova';
 import { applyDamage, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
 import { applyOrder } from '../src/sim/missions';
 import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
-import { CONSTRUCTION, FEAT, MAP_H, MAP_W, STORAGE, T } from '../src/data/config';
+import { BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
 import { idx } from '../src/core/util';
@@ -29,6 +32,16 @@ function siteNearHq(type: string) {
 const gameWith = (...notScarce: string[]) => { for (let k = 0; k < 50; k++) { newGame('mittel'); if (notScarce.every(r => !G.profile[0].scarce.includes(r))) return; } };
 /** Räuber entfernen (für Tests, die lange Wege brauchen) */
 const noBandits = () => { for (const b of G.buildings) if (b.type === 'camp') b.dead = true; for (const u of G.units) if (u.owner === 3) u.dead = true; G.buildings = G.buildings.filter(b => !b.dead); };
+/** fertiges Gebäude nahe dem Rathaus (ohne Baustelle und Voraussetzungen) */
+function builtNearHq(type: string, pid = 0) {
+  const hq = findBuilding(pid, 'hq'), d = BUILDINGS[type];
+  for (let r = 3; r < 22; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = Math.floor(hq.x) + dx, y = Math.floor(hq.y) + dy; let ok = true;
+    for (let yy = y; yy < y + d.h && ok; yy++) for (let xx = x; xx < x + d.w; xx++) if (xx < 0 || yy < 0 || xx >= MAP_W || yy >= MAP_H || G.occ[idx(xx, yy)] || G.terr[idx(xx, yy)] === T.WATER) { ok = false; break; }
+    if (ok) return placeBuilding(pid, type, x, y, false);
+  }
+  return null;
+}
 const runUntil = (cond: () => boolean, maxSec: number) => { for (let i = 0; i < maxSec * 20 && !cond(); i++) { update(0.05); if (G.offer) answerOffer(true); } return cond(); };
 
 describe('Simulation', () => {
@@ -405,6 +418,77 @@ describe('Simulation', () => {
     expect(sp.patrol && sp.patrolArea).toBeTruthy();
     run(20);
     expect(Math.hypot(sp.x - (hq.x + 10), sp.y - (hq.y - 10))).toBeLessThan(14);
+  });
+
+  it('Forschungsbaum: Voraussetzungen, Rechenzentrum und Strom für die KI', () => {
+    newGame('mittel');
+    const p = G.players[0], hq = findBuilding(0, 'hq');
+    p.res.money = 1e5; p.res.metal = 5000; p.res.oil = 5000; p.res.stone = 5000;
+    expect(missingReq(0, 'res2')).toContain('Universität');
+    builtNearHq('university');
+    expect(missingReq(0, 'res2')).toEqual([]);
+    expect(missingReq(0, 'ai').join()).toContain('Informatik');
+    expect(missingReq(0, 'datacenter').join()).toContain('Informatik');   // Gebäude erst nach der Forschung
+    p.done = { res2: true, res3: true, computing: true };
+    expect(missingReq(0, 'ai').join().replace(/\u00AD/g, '')).toContain('Rechenzentrum');
+    builtNearHq('datacenter');
+    expect(missingReq(0, 'ai')).toEqual([]);
+    p.power = 0; p.use = 999;                       // Strommangel: KI-Forschung steht still
+    expect(enqueue(0, 'ai')).toBe(true);
+    for (let i = 0; i < 40; i++) update(0.05);
+    expect(p.q.research[0].t).toBe(0);
+    expect(p.q.research[0].stalled).toBeTruthy();
+    expect(hq).toBeTruthy();
+  });
+
+  it('Atomrakete: Bau im Silo, Start, Vernichtung, Verstrahlung und Krieg', () => {
+    newGame('mittel'); noBandits(); G.fog = false;
+    const p = G.players[0];
+    p.res.money = 1e5; p.res.metal = 5000; p.res.oil = 5000; p.res.stone = 5000; p.store = 1e5;
+    p.done = { res2: true, res3: true, physics: true, computing: true, ai: true, bomb: true }; p.tech = 3;
+    for (const t of ['npp', 'npp', 'enrich', 'silo']) expect(builtNearHq(t)).toBeTruthy();
+    update(0.05);
+    p.res.money = 1e5; p.res.metal = 5000; p.res.oil = 5000;   // Lagergrenze nach dem ersten Takt umgehen
+    expect(enqueue(0, 'nuke')).toBe(true);
+    p.q.silo[0].t = p.q.silo[0].time - 0.5;
+    expect(runUntil(() => p.nukes === 1, 5)).toBe(true);
+    const ahq = findBuilding(1, 'hq'), aPop = G.players[1].pop;
+    expect(launchNuke(0, ahq.x, ahq.y)).toBe(true);
+    expect(p.nukes).toBe(0);
+    expect(G.war).toBe(true);
+    expect(runUntil(() => G.fallout.length > 0, 60)).toBe(true);
+    expect(ahq.dead).toBeFalsy();                          // Regierungsbunker übersteht den Schlag …
+    expect(ahq.hp).toBeLessThanOrEqual(ahq.maxHp * NUKE.hqKeep + 1);   // … schwer beschädigt
+    expect(G.players[1].pop).toBeLessThan(aPop);
+    expect(G.fallout.length).toBe(1);
+    expect(inFallout({ x: ahq.x, y: ahq.y })).toBe(0);
+    expect(p.shockUntil).toBeGreaterThan(G.t);
+    expect(G.players[1].bombedUntil).toBeGreaterThan(G.t);
+    expect(launchNuke(0, ahq.x, ahq.y)).not.toBe(true);   // keine zweite Rakete
+  });
+
+  it('Kernschmelze: zerstörtes Kernkraftwerk verstrahlt die Umgebung', () => {
+    newGame('mittel');
+    const p = G.players[0]; p.done = { res2: true, res3: true, physics: true }; p.res.money = 1e5; p.res.stone = 5000; p.res.metal = 5000;
+    const b = builtNearHq('npp');
+    destroy(b, null);
+    expect(G.fallout.length).toBe(1);
+    expect(G.fallout[0].r).toBe(NUKE.meltdown.fallout);
+  });
+
+  it('Abschreckung: mit eigener Atomrakete stellt Kastrova keine Forderungen und erklärt keinen Krieg', () => {
+    const tryIt = (nuke: boolean) => {
+      newGame('mittel'); noBandits(); makeContact(0, 1); makeContact(1, 0);
+      const P = G.players[0], A = G.players[1], ahq = findBuilding(1, 'hq');
+      P.nukes = nuke ? 1 : 0;
+      for (let i = 0; i < 8; i++) spawnAt(1, 'mbt', ahq.x + (i % 4) - 2, ahq.y + 3 + Math.floor(i / 4));
+      let hostileAct = false;
+      for (let k = 0; k < 40; k++) { P.pop = 400; P.cap = 500; A.pop = 150; G.t = Math.max(G.t, G.diff.grace + 1); G.ai.cool = 0;
+        aiThink(); if (G.war || (G.offer && G.offer.type === 'demand')) { hostileAct = true; break; } G.offer = null; G.t += 5; }
+      return hostileAct;
+    };
+    expect(tryIt(false)).toBe(true);
+    expect(tryIt(true)).toBe(false);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

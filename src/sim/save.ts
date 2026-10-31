@@ -41,6 +41,9 @@ export function deserialize(str: string): Game {
   const walk=(obj)=>{ for(const k in obj){ const v=obj[k]; if(!v||typeof v!=='object'||ArrayBuffer.isView(v)) continue;
     if('__ref' in v) obj[k]=map.get(v.__ref)||null; else if(!(v.kind==='unit'||v.kind==='building')||obj===g.units||obj===g.buildings) walk(v); } };
   walk(g);
+  // ältere Spielstände: Forschungsbaum und Silo-Warteschlange nachrüsten
+  for(const p of g.players){ p.done=p.done||{}; if(p.tech>=2) p.done.res2=true; if(p.tech>=3) p.done.res3=true; p.nukes=p.nukes||0; p.q.silo=p.q.silo||[]; }
+  g.missiles=g.missiles||[]; g.fallout=g.fallout||[];
   Object.assign(g,{terrCanvas:null, miniBg:null, fx:[], projectiles:[], sel:[], placing:null, terrChanged:[], roadDirty:true, qDirty:true,
     rng:mulberry32((Math.random()*1e9)|0), paused:false, diff:DIFFICULTY[g.diffKey]||g.diff});
   return g;

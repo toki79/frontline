@@ -1,5 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
-import { BANDITS, CAGE, DAMAGE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { blast } from '../sim/nuke';
+import { BANDITS, CAGE, DAMAGE, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -122,6 +123,7 @@ export function destroy(e,src){
     G.scorch.push({x:e.x,y:e.y,r:Math.max(e.w,e.h)*0.7,t:G.t});
     recalcPower(e.owner);
     for(const n of touching(e)) ignite(n);   // Feuer springt auf direkt angrenzende Gebäude über
+    if(e.type==='npp'&&!e.site){ msg('☢ Kernschmelze! Das zerstörte Kernkraftwerk verstrahlt die Umgebung.','#ff5a4a'); const M=NUKE.meltdown; blast(e.x,e.y,M.radius,M.dmg,M.fallout,null); }
     // Bewohner fliehen, wenn Wohnraum zerstört wird
     if(e.def.cap&&e.owner<2){ const V=G.players[e.owner], lost=Math.floor(Math.min(Math.max(0,V.pop-ECON.minPop),e.def.cap*0.5));
       if(lost>0){ V.pop-=lost; if(e.owner===0) msg(`−${lost} Einwohner sind geflohen.`,'#ff8a7a'); else if(src&&src.owner===0) msg(`Kastrova verliert ${lost} Einwohner.`,'#9fd88a'); } }

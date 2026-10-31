@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
-import { hash, idx, inMap } from '../core/util';
-import { BUILDINGS, FACTIONS, FEAT, JAM, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
+import { dist, hash, idx, inMap } from '../core/util';
+import { BUILDINGS, FACTIONS, FEAT, JAM, MAP_H, MAP_W, NUKE, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, siteLacks, siteWorkers } from '../sim/build';
@@ -115,7 +115,12 @@ export function render(){
     if(p.type==='shell'){c.fillStyle='#ffe08a';c.fillRect(-4,-1.2,8,2.4);}
     else if(p.type==='rocket'){c.fillStyle='#e8e2d0';c.fillRect(-5,-1.2,8,2.4);c.fillStyle='#ff9a30';c.fillRect(-8,-1.2,3,2.4);} else {c.fillStyle='#ddd';c.fillRect(-4,-1,7,2);c.fillStyle='#ffb040';c.fillRect(-6,-1,2,2);}
     c.restore(); }
-  for(const e of G.fx){ if(e.age<0) continue; if(G.fog&&tileVis(e.x??e.x1,e.y??e.y1)<2) continue; const k=e.age/e.life;
+  for(const f of (G.fallout||[])){ if(G.t>=f.until) continue; const a=Math.min(1,(f.until-G.t)/60)*0.28;   // Verstrahlung
+    const gr=c.createRadialGradient(f.x*TILE,f.y*TILE,0,f.x*TILE,f.y*TILE,f.r*TILE); gr.addColorStop(0,`rgba(170,210,40,${a*1.4})`); gr.addColorStop(1,`rgba(170,210,40,${a*0.4})`);
+    c.fillStyle=gr; c.beginPath(); c.arc(f.x*TILE,f.y*TILE,f.r*TILE,0,7); c.fill();
+    c.strokeStyle=`rgba(230,200,40,${0.5+0.3*Math.sin(G.t*3)})`; c.lineWidth=2; c.setLineDash([10,8]); c.stroke(); c.setLineDash([]);
+    c.font='bold 18px sans-serif'; c.textAlign='center'; c.fillStyle='rgba(30,30,10,.75)'; c.fillText('☢',f.x*TILE,f.y*TILE+6); c.textAlign='left'; }
+  for(const e of G.fx){ if(e.age<0||e.k==='nuke') continue; if(G.fog&&tileVis(e.x??e.x1,e.y??e.y1)<2) continue; const k=e.age/e.life;
     if(e.k==='tracer'){c.strokeStyle=e.col;c.globalAlpha=1-k;c.lineWidth=1.3;c.beginPath();c.moveTo(e.x1*TILE,e.y1*TILE);c.lineTo(e.x2*TILE,e.y2*TILE);c.stroke();c.globalAlpha=1;}
     else if(e.k==='flash'){c.fillStyle=`rgba(255,230,140,${1-k})`;c.beginPath();c.arc(e.x*TILE,e.y*TILE,e.r,0,7);c.fill();}
     else if(e.k==='boom'){const r=e.r*TILE*(0.4+k);c.fillStyle=`rgba(255,${Math.floor(200-150*k)},60,${(1-k)*0.9})`;c.beginPath();c.arc(e.x*TILE,e.y*TILE,r,0,7);c.fill();
@@ -128,6 +133,20 @@ export function render(){
   }
   if(G.fog){ for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const v=G.vis[idx(x,y)]; if(v===2) continue;
       c.fillStyle=v===0?'rgba(7,9,5,.96)':'rgba(7,9,5,.5)'; c.fillRect(x*TILE-0.5,y*TILE-0.5,TILE+1,TILE+1); } }
+  for(const e of G.fx){ if(e.age<0||e.k!=='nuke') continue; const k=e.age/e.life, R=e.r*TILE;   // Atompilz: sichtbar auch im Nebel
+    if(k<0.12){ c.fillStyle=`rgba(255,255,240,${1-k/0.12})`; c.beginPath(); c.arc(e.x*TILE,e.y*TILE,R*1.6*(k/0.12+0.2),0,7); c.fill(); }
+    const g=c.createRadialGradient(e.x*TILE,e.y*TILE,0,e.x*TILE,e.y*TILE,R*(0.3+k*0.9)); g.addColorStop(0,`rgba(255,240,170,${(1-k)*0.95})`); g.addColorStop(0.5,`rgba(255,120,30,${(1-k)*0.8})`); g.addColorStop(1,'rgba(90,40,20,0)');
+    c.fillStyle=g; c.beginPath(); c.arc(e.x*TILE,e.y*TILE,R*(0.3+k*0.9),0,7); c.fill();
+    c.strokeStyle=`rgba(255,250,230,${Math.max(0,0.8-k*1.6)})`; c.lineWidth=4; c.beginPath(); c.arc(e.x*TILE,e.y*TILE,R*Math.min(2,k*4),0,7); c.stroke();   // Druckwelle
+    const my=e.y*TILE-k*R*0.9; c.fillStyle=`rgba(110,80,60,${(1-k)*0.8})`; c.fillRect(e.x*TILE-R*0.08,my,R*0.16,e.y*TILE-my);   // Pilz
+    c.fillStyle=`rgba(150,100,70,${(1-k)*0.85})`; c.beginPath(); c.ellipse(e.x*TILE,my,R*(0.25+k*0.35),R*(0.14+k*0.18),0,0,7); c.fill(); }
+  for(const m of (G.missiles||[])){ const k=Math.min(1,(G.t-m.t0)/m.dur), x=m.x0+(m.x-m.x0)*k, y=m.y0+(m.y-m.y0)*k-Math.sin(k*Math.PI)*Math.min(14,dist(m.x0,m.y0,m.x,m.y)*0.3);   // Raketenflug
+    const k2=Math.min(1,k+0.02), x2=m.x0+(m.x-m.x0)*k2, y2=m.y0+(m.y-m.y0)*k2-Math.sin(k2*Math.PI)*Math.min(14,dist(m.x0,m.y0,m.x,m.y)*0.3);
+    c.save(); c.translate(x*TILE,y*TILE); c.rotate(Math.atan2(y2-y,x2-x)); c.fillStyle='#eee'; c.fillRect(-9,-2.5,16,5); c.fillStyle='#c0392b'; c.fillRect(5,-2.5,3,5); c.fillStyle='#ffb040'; c.fillRect(-14,-1.8,5,3.6); c.restore();
+    if(Math.random()<0.6) fxAdd({k:'smoke',x,y,r:0.35,life:2});
+    c.strokeStyle='rgba(255,90,74,.7)'; c.lineWidth=2; c.setLineDash([6,6]); c.beginPath(); c.arc(m.x*TILE,m.y*TILE,NUKE.radius*TILE,0,7); c.stroke(); c.setLineDash([]); }
+  if(G.nukeAim&&G.hover){ c.strokeStyle='rgba(255,90,74,.85)'; c.lineWidth=2; c.setLineDash([8,6]); c.beginPath(); c.arc(G.hover.x*TILE,G.hover.y*TILE,NUKE.radius*TILE,0,7); c.stroke(); c.setLineDash([]);
+    c.font='bold 22px sans-serif'; c.textAlign='center'; c.fillStyle='#ff5a4a'; c.fillText('☢',G.hover.x*TILE,G.hover.y*TILE+8); c.textAlign='left'; }
   const selSet=new Set(G.sel);
   { const areas=new Map(); for(const u of G.sel) if(!u.dead&&u.area) areas.set(u.msn,u.area);   // Einsatzgebiete der Auswahl
     for(const A of areas.values()){ c.strokeStyle='rgba(255,211,106,.6)'; c.lineWidth=1.5; c.setLineDash([6,5]); c.beginPath(); c.arc(A.x*TILE,A.y*TILE,A.r*TILE,0,7); c.stroke(); c.setLineDash([]); }
@@ -140,7 +159,7 @@ export function render(){
   for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; const s=selSet.has(b);
     if(s){c.strokeStyle=b.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=2;c.strokeRect(b.tx*TILE-1,b.ty*TILE-1,b.w*TILE+2,b.h*TILE+2);}
     if(s||b.hp<b.maxHp) hpBar(c,b.tx*TILE+3,b.ty*TILE-6,b.w*TILE-6,b.hp/b.maxHp);
-    if(b.type==='house'&&b.quality!==undefined){
+    if(b.def.cap&&b.quality!==undefined){
       if(b.quality<0.95){ c.fillStyle=`rgba(80,78,70,${(1-b.quality)*0.55})`; c.fillRect(b.tx*TILE+1,b.ty*TILE+1,b.w*TILE-2,b.h*TILE-2); }
       if(b.owner===0){ const w=b.w*TILE-8; c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w,4); c.fillStyle='#7fb3ff'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w*(b.resid||0)/b.def.cap,4); }
     }

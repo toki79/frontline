@@ -1,6 +1,7 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, RES, TILE, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
 import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatrol, orderReturn, orderStop, upgradeCage } from '../sim/orders';
@@ -38,6 +39,7 @@ export function pickEntity(w){
 }
 export function handleTap(w,right,shift){
   if(G.over) return;
+  if(G.nukeAim){ if(right){ G.nukeAim=false; G.nukeArm=null; refreshCmds(); return; } nukeTap(w); return; }
   if(G.orderPending){ if(right){ G.orderPending=null; refreshCmds(); return; } issuePending(w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ffd36a',life:0.7}); return; }
   if(G.placing&&isDefType(G.placing)){
     if(right){G.placing=null;refreshCmds();return;}
@@ -82,6 +84,16 @@ export function handleTap(w,right,shift){
   if(mine.length){ command(ent,w,mine); return; }
   G.sel = ent?[ent]:[]; refreshCmds();
 }
+/** Atomrakete: erstes Antippen zielt, zweites Antippen an derselben Stelle startet */
+function nukeTap(w){
+  const a=G.nukeArm;
+  if(a&&dist(a.x,a.y,w.x,w.y)<2.5&&G.t-a.t<10){ const r=launchNuke(0,a.x,a.y); G.nukeAim=false; G.nukeArm=null; G.hover=null;
+    if(r!==true) msg('Start nicht möglich: '+r,'#ffb38a'); refreshCmds(); return; }
+  if(G.fog&&G.vis[idx(clamp(Math.floor(w.x),0,MAP_W-1),clamp(Math.floor(w.y),0,MAP_H-1))]===0){ msg('Ziel nicht erkundet – nur aufgeklärte Gebiete können anvisiert werden.','#ffb38a'); return; }
+  G.nukeArm={x:w.x,y:w.y,t:G.t}; G.hover={x:w.x,y:w.y};
+  const own=G.buildings.some(b=>!b.dead&&b.owner===0&&dist(b.x,b.y,w.x,w.y)<NUKE.radius+1);
+  msg(`☢ Ziel markiert.${own?' ⚠ EIGENE GEBÄUDE IM SPRENGRADIUS!':''} Zum Start dieselbe Stelle noch einmal antippen – ✕ bricht ab.`,'#ff8a7a'); refreshCmds();
+}
 export function command(ent,w,mine){
   if(ent&&ent.owner===1&&ent.type==='hq'&&mine.some(u=>u.def.diplomat)&&!hostile(0,1)){ const n=sendDiplomats(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8d27a',life:0.6}); msg(`🎩 ${n} Diplomat${n===1?'':'en'} unterwegs zu ${G.players[1].name}.`); return; }
   if(ent&&ent.owner!==0){
@@ -117,7 +129,9 @@ export function cmd(c){
   else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
-  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;}
+  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;}
+  else if(c==='nuke'){ const b=selBuilding(); if(b&&b.type==='silo'){ if(!(G.players[0].nukes>0)) msg('Noch keine Atomrakete fertig – im Reiter 🎓 Forschung bauen.','#ffb38a');
+    else { G.nukeAim=!G.nukeAim; G.nukeArm=null; if(G.nukeAim) msg('☢ Ziel wählen: ein erkundetes Gebiet antippen. Alles im Umkreis von '+NUKE.radius+' Feldern wird vernichtet.','#ff8a7a'); } } }
   else if(c==='hold'||c==='clear'){ if(mine.length){ G.orderMode=G.orderMode===c?null:c; G.amoveMode=false; G.escortMode=false; } else msg('Zuerst Einheiten auswählen.'); }
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
     msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
@@ -143,6 +157,7 @@ export function refreshCmds(){
   document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
+  { const nb=document.querySelector('[data-c=nuke]'); nb.classList.toggle('show',!!(G&&(G.nukeAim||(sb&&sb.type==='silo'&&!sb.site)))); nb.classList.toggle('on',!!(G&&G.nukeAim)); }
   document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&(sb.eff??1)<0.97));
   updateInfo();
 }
@@ -151,6 +166,7 @@ export function updateInfo(){
   if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing), road=FEATURES[G.placing]&&FEATURES[G.placing].road, pio=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.pioneer).length;
     el.textContent=`${d.name} ${road?'planen':'beauftragen'}: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ${road?'Bauarbeiter bauen':pio?`${pio} Pionier${pio===1?'':'e'} bauen`:'⚠ keine Pioniere – in der Kaserne ausbilden'} · Plan antippen = zurücknehmen · ✕ beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
+  if(G.nukeAim){ el.textContent=G.nukeArm?'☢ Ziel markiert – dieselbe Stelle nochmal antippen = START · ✕ Abwählen bricht ab':`☢ Atomschlag: erkundetes Ziel antippen (Radius ${NUKE.radius} Felder) · ✕ Abwählen bricht ab`; return; }
   if(G.orderPending){ const n=Object.values(G.orderPending.pick).reduce((s: number,v: any)=>s+v,0); el.textContent=`🎯 Einsatz „${ORDER_NAME[G.orderPending.kind]}“ mit ${n} Einheiten: Ziel auf der Karte antippen · ✕ Abwählen bricht ab`; return; }
   if(G.orderMode){ el.textContent=`${ORDER_NAME[G.orderMode]}: Ziel antippen – ${G.orderMode==='hold'?'Truppen ziehen hin und graben sich ein':'Truppen säubern den Umkreis und halten dann Stellung'}`; return; }
   if(G.amoveMode){el.textContent='Angriff: Ziel antippen – vorrücken und alles im Umkreis angreifen';return;}
@@ -185,6 +201,7 @@ export function updateInfo(){
     if(e.owner===0&&e.def.desc) t+=' · '+e.def.desc;
     if(e.def.weapon) t+=' · '+WEAPON_INFO[e.def.weapon.type];
     if(e.kind==='building'&&e.def.cap&&e.quality!==undefined) t+=` · Bewohner ${Math.floor(e.resid||0)}/${e.def.cap} · Wohnqualität ${Math.round(e.quality*100)} %`+(e.noiseSrc&&e.noiseSrc.length?` (Lärm: ${e.noiseSrc.join(', ')})`:'');
+    if(e.kind==='building'&&e.type==='silo'&&e.owner===0) t+=` · ☢ ${G.players[0].nukes||0} Rakete${G.players[0].nukes===1?'':'n'} bereit`+(G.players[0].q.silo.length?` · Bau ${Math.floor(G.players[0].q.silo[0].t/G.players[0].q.silo[0].time*100)} %`:'');
     if(e.kind==='building'&&e.type==='mine') t+=e.empty?' · erschöpft':' · Erz übrig: '+fmt(e.oreTiles.reduce((s,i)=>s+G.ore[i],0));
     el.textContent=t; return;}
   const cnt={}; for(const e of s) cnt[e.def.name]=(cnt[e.def.name]||0)+1;

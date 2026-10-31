@@ -1,5 +1,5 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, isDefType, isPlain, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
@@ -20,14 +20,17 @@ export function missingReq(pid,type){
   for(const r of (d.req||[])) if(!findBuilding(pid,r)) miss.push(BUILDINGS[r].name);
   const p=G.players[pid];
   if(d.tech&&p.tech<d.tech) miss.push(`Universität Stufe ${d.tech}`);
-  if(RESEARCH[type]&&p.tech<d.level-1) miss.push(`Stufe ${d.level-1}`);
+  if(d.research&&!hasTech(p,d.research)) miss.push(`Forschung „${RESEARCH[d.research].name}“`);
+  if(RESEARCH[type]){ for(const n of (d.need||[])) if(!hasTech(p,n)) miss.push(RESEARCH[n].name);
+    for(const b of (d.needB||[])) if(!findBuilding(pid,b)) miss.push(BUILDINGS[b].name); }
   return miss;
 }
 export const available=(pid,type)=>missingReq(pid,type).length===0;
 export function enqueue(pid,type){
   const p=G.players[pid], qn=queueName(type), q=p.q[qn]; if(!q) return false;
   if(!available(pid,type)||!canAfford(pid,type)) return false;
-  if(qn==='research'&&(q.length||p.tech>=DEF(type).level)) return false;
+  if(qn==='research'&&(q.length||hasTech(p,type))) return false;
+  if(qn==='silo'&&(q.length||(p.nukes||0)>=NUKE.maxStock)) return false;
   if(q.length>=(qn==='factory'?2:qn==='droneshop'?3:6)) return false;   // Fahrzeuge nur in kleinen Stückzahlen vorbestellen
   pay(pid,type,1); q.push({type,t:0,time:DEF(type).time}); return true;
 }
@@ -37,15 +40,24 @@ export function cancelItem(pid,type){
   return false;
 }
 export function updateProduction(pid,dt){
-  const p=G.players[pid], f=(p.use>p.power?0.5:1)*(p.broke?ECON.brokeFactor:1);
-  for(const qn of ['hq','kontor','barracks','factory','droneshop','research']){
-    const q=p.q[qn]; if(!q.length) continue;
-    const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;   // ohne Zufahrt ruht die Produktion
-    const it=q[0]; it.t+=dt*f;
+  const p=G.players[pid], f=(p.use>p.power?0.5:1)*(p.broke?ECON.brokeFactor:1)*(hasTech(p,'ai')?1+RESEARCH_SPEED.ai:1);
+  for(const qn of ['hq','kontor','barracks','factory','droneshop','silo','research']){
+    const q=p.q[qn]; if(!q||!q.length) continue;
+    const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;
+    const it=q[0];
+    let ff=f;
+    if(qn==='research'){ ff*=1+RESEARCH_SPEED.datacenter*Math.min(RESEARCH_SPEED.maxDatacenters,G.buildings.filter(b=>b.owner===pid&&b.type==='datacenter'&&!b.dead&&!b.site).length);   // Rechenzentren
+      const R=RESEARCH[it.type]; if(R.power&&p.use>p.power) ff=0; it.stalled=ff===0?'⚡ Strommangel – steht still':''; }   // KI und Atomprogramm: nur mit genug Strom
+    if(qn==='silo'){ if(!findWorking(pid,'enrich')) ff=0; it.stalled=ff===0?'Anreicherungsanlage arbeitet nicht':''; }
+    it.t+=dt*ff;
     if(it.t>=it.time){
-      if(qn==='research'){ const L=RESEARCH[it.type].level; q.shift(); p.tech=Math.max(p.tech,L);
-        if(pid===0) msg(`🎓 Universität Stufe ${L} erreicht: ${TECH_UNLOCKS[L]} freigeschaltet.`,'#9fd88a');
-        else msg(`Geheimdienst: Kastrova hat Forschungsstufe ${L} erreicht (${TECH_UNLOCKS[L]}).`,'#d6b45a'); }
+      if(qn==='research'){ const R=RESEARCH[it.type]; q.shift(); p.done=p.done||{}; p.done[it.type]=true; if(R.level) p.tech=Math.max(p.tech,R.level);
+        const what=R.level?`Stufe ${R.level}: ${TECH_UNLOCKS[R.level]}`:`${R.name}: ${R.desc}`;
+        if(pid===0) msg(`${R.icon||'🎓'} Erforscht – ${what}.`,'#9fd88a');
+        else if(G.known[0][1]&&(R.level||it.type==='bomb'||it.type==='ai'||it.type==='physics')) msg(it.type==='bomb'?'☢ Geheimdienst: Kastrova betreibt ein Atomwaffenprogramm!':`Geheimdienst: Kastrova hat „${R.name}“ erforscht.`,it.type==='bomb'?'#ff8a7a':'#d6b45a'); }
+      else if(UNITS[it.type].stored){ q.shift(); p.nukes=(p.nukes||0)+1;
+        if(pid===0) msg('☢ Eine Atomrakete ist einsatzbereit. Schon ihr Besitz schreckt Kastrova ab.','#ffd36a');
+        else if(G.known[0][1]) msg('☢☢ Geheimdienst: Kastrova besitzt jetzt eine Atomrakete!','#ff8a7a'); }
       else if(spawnUnit(pid,it.type,producer)){q.shift();}
       else it.t=it.time;
     }

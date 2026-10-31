@@ -1,5 +1,5 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W } from '../data/config';
+import { CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
@@ -47,7 +47,7 @@ export function updateUnit(u,dt){
     }
   }
   if(d.weapon&&d.weapon.kamikaze){   // Störsender in der Nähe: Verbindung weg, Drohne taumelt und stürzt ab
-    u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }
+    u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=!hasTech(G.players[u.owner],'ai')&&G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }   // mit KI fliegen sie autonom
     if(u.jammed){ u.target=null; if(Math.random()<dt*3){ u.path=[{x:u.x+(Math.random()-.5)*2,y:u.y+(Math.random()-.5)*2}]; u.pathI=0; }
       if(Math.random()<dt*JAM.crashPerSec){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.3,life:0.35}); u.dead=true; if(u.owner===0){ G.stats.lost++; msg('📡 Eine FPV-Drohne ist im Störfeld abgestürzt.','#ffb38a'); } G.sel=G.sel.filter(s=>s!==u); return; } }
   }

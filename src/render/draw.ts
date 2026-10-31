@@ -201,12 +201,6 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       c.fillStyle='#2b2b26'; c.beginPath(); c.arc(W-14,H-24,5,0,7); c.fill(); c.fillStyle='#c49a3a'; c.fillRect(W-16,H-30,4,6);
       box(W-12,2,8,5,col,dark);
       break;
-    case 'kontor':
-      box(3,8,W-6,H-14,'#8a7a5a','#4f4533'); c.fillStyle='#6b5d42'; c.fillRect(3,8,W-6,5);
-      for(const [cx2,cy2] of [[8,H-20],[18,H-20],[8,H-12],[W-16,H-12]]){ c.fillStyle='#b08a52'; c.fillRect(cx2,cy2,8,7); c.strokeStyle='#6e5530'; c.strokeRect(cx2+0.5,cy2+0.5,7,6); }
-      c.fillStyle='#2b2b26'; c.beginPath(); c.arc(W-14,H-24,5,0,7); c.fill(); c.fillStyle='#c49a3a'; c.fillRect(W-16,H-30,4,6);
-      box(W-12,2,8,5,col,dark);
-      break;
     case 'university':
       box(4,4,W-8,H-12,'#b8ad92','#6e6650'); c.fillStyle='#8a5a3e'; c.fillRect(4,4,W-8,7);
       c.fillStyle='#ece5cf'; for(let i=0;i<6;i++) c.fillRect(10+i*((W-24)/5),12,4,H-24);
@@ -214,6 +208,47 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       if(G){ const own=G.buildings.find(q=>q.type==='university'&&q.tx*TILE===Math.round(px)&&q.ty*TILE===Math.round(py)); const lv=own?G.players[own.owner].tech:1;
         c.fillStyle='#000a'; c.fillRect(W-24,H-12,20,10); c.fillStyle='#e9d27a'; c.font='bold 9px sans-serif'; c.fillText('S'+lv,W-20,H-4); }
       break;
+    case 'block':   // Wohnblock: zwei Hochhausriegel mit Fensterreihen
+      for(const [bx,by,bw,bh] of [[4,4,W/2-6,H-8],[W/2+2,10,W/2-6,H-14]]){ box(bx,by,bw,bh,'#a8a49a','#5c5a52');
+        c.fillStyle='#4a5a6a'; for(let yy=by+4;yy<by+bh-3;yy+=6) for(let xx=bx+3;xx<bx+bw-3;xx+=5) c.fillRect(xx,yy,3,3); }
+      c.fillStyle=col; c.fillRect(6,6,W/2-10,3); c.fillRect(W/2+4,12,W/2-10,3);
+      break;
+    case 'greenhouse':   // Gewächshaus: Glasdächer mit Pflanzenreihen
+      for(let i=0;i<3;i++){ const x=4+i*(W-8)/3, ww=(W-8)/3-2; box(x,4,ww,H-8,'#9fc8b8','#5f8a7a');
+        c.fillStyle='#4f8a3a'; for(let yy=8;yy<H-8;yy+=5) c.fillRect(x+3,yy,ww-6,2.5);
+        c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(x+1,5,2,H-10); }
+      c.fillStyle=col; c.fillRect(W/2-4,H-6,8,3);
+      break;
+    case 'datacenter':   // Rechenzentrum: Serverhalle, Kühlaggregate, blinkende Lichter
+      box(3,8,W-6,H-12,'#5d636b','#30343a');
+      for(let i=0;i<4;i++){ c.fillStyle='#3a3f46'; c.fillRect(7+i*(W-14)/4,13,(W-14)/4-3,H-22);
+        c.fillStyle=(Math.floor(tt*3+i)%3)?'#5ad06a':'#5ac8ff'; c.fillRect(9+i*(W-14)/4,16,2,2); c.fillRect(9+i*(W-14)/4,24,2,2); }
+      for(const fx of [8,20,W-20]){ c.fillStyle='#8b9096'; c.beginPath(); c.arc(fx+4,6,4,0,7); c.fill(); c.strokeStyle='#30343a'; c.beginPath(); c.moveTo(fx+4,6); c.lineTo(fx+4+Math.cos(tt*9)*3.5,6+Math.sin(tt*9)*3.5); c.stroke(); }
+      box(W-12,H-8,8,5,col,dark);
+      break;
+    case 'npp': {   // Kernkraftwerk: zwei Kühltürme mit Dampf, Reaktorkuppel
+      for(const [kx,ky] of [[W*0.28,H*0.3],[W*0.28,H*0.72]]){ c.fillStyle='#b7b5ab'; c.beginPath(); c.arc(kx,ky,H*0.2,0,7); c.fill(); c.strokeStyle='#6a6860'; c.stroke();
+        c.fillStyle='#55534d'; c.beginPath(); c.arc(kx,ky,H*0.13,0,7); c.fill();
+        c.fillStyle='rgba(235,235,235,.55)'; for(let k=0;k<3;k++){ const a=(tt*0.6+k/3)%1; c.beginPath(); c.arc(kx+a*10,ky-a*14,5+a*6,0,7); c.fill(); } }
+      c.fillStyle='#d6d2c4'; c.beginPath(); c.arc(W*0.72,H*0.45,H*0.2,0,7); c.fill(); c.strokeStyle='#6a6860'; c.stroke();
+      c.fillStyle='#e8c230'; c.beginPath(); c.arc(W*0.72,H*0.45,5,0,7); c.fill(); c.fillStyle='#222'; c.font='bold 9px sans-serif'; c.textAlign='center'; c.fillText('☢',W*0.72,H*0.45+3);
+      box(W*0.55,H*0.75,W*0.38,H*0.18,col,dark);
+      break; }
+    case 'enrich':   // Anreicherung: lange Halle mit Zentrifugenreihen
+      box(3,4,W-6,H-8,'#7c7f74','#41433b');
+      c.fillStyle='#c9ccc0'; for(let i=0;i<10;i++) for(let j=0;j<3;j++){ c.beginPath(); c.arc(10+i*(W-20)/9,12+j*(H-24)/2,2.6,0,7); c.fill(); }
+      c.fillStyle='#e8c230'; c.fillRect(W-22,H-12,16,7); c.fillStyle='#222'; c.font='bold 8px sans-serif'; c.textAlign='center'; c.fillText('☢',W-14,H-6);
+      box(6,H-10,10,5,col,dark);
+      break;
+    case 'silo': {   // Raketensilo: Betondeckel, im Besitz einer Rakete halb geöffnet
+      const own=G&&G.buildings.find(q=>q.type==='silo'&&q.tx*TILE===Math.round(px)&&q.ty*TILE===Math.round(py)), armed=own&&G.players[own.owner].nukes>0;
+      c.fillStyle='#6f6e66'; c.beginPath(); c.arc(W/2,H/2,W*0.4,0,7); c.fill(); c.strokeStyle='#3c3b36'; c.lineWidth=2; c.stroke(); c.lineWidth=1;
+      c.fillStyle='#25251f'; c.beginPath(); c.arc(W/2,H/2,W*0.3,0,7); c.fill();
+      c.fillStyle='#9a988d'; c.fillRect(W/2-W*0.3,H/2-W*0.3,W*0.6,armed?W*0.25:W*0.6);
+      c.strokeStyle='#e8c230'; c.setLineDash([3,3]); c.beginPath(); c.arc(W/2,H/2,W*0.44,0,7); c.stroke(); c.setLineDash([]);
+      if(armed){ c.fillStyle='#e0ded4'; c.beginPath(); c.arc(W/2,H/2+4,4,0,7); c.fill(); c.fillStyle='#c0392b'; c.beginPath(); c.arc(W/2,H/2+4,1.8,0,7); c.fill(); }
+      box(W-12,H-8,8,5,col,dark);
+      break; }
     case 'droneshop':
       box(3,5,W-6,H-12,'#6d7258','#3f4229'); c.fillStyle='#4d523c'; c.beginPath(); c.arc(W/2,5,W/2-3,0,Math.PI); c.fill();
       c.save(); c.translate(W/2,H/2+2); c.strokeStyle='#222'; c.lineWidth=1.4; c.beginPath(); c.moveTo(-6,-6); c.lineTo(6,6); c.moveTo(6,-6); c.lineTo(-6,6); c.stroke();

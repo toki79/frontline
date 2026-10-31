@@ -25,7 +25,7 @@
 <div id="log"></div>
 <canvas id="mini" width="124" height="124"></canvas>
 <div id="panel">
-  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
+  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><button data-tab="forsch">Forschung</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
   <div id="items"></div>
 </div>
 <div id="cmds">
@@ -42,6 +42,7 @@
   <button data-c="patrol" class="ctx">🛰<small>Aufklären</small></button>
   <button data-c="road" class="ctx">🛣<small>Straße</small></button>
   <button data-c="demolish" class="ctx">🗑<small>Abriss</small></button>
+  <button data-c="nuke" class="ctx nukeb">☢<small>Start</small></button>
 </div>
 <div id="stack">
   <div id="advisor" class="hidden"><span class="ai">💡</span><span class="at" id="advText"></span><span class="ab"><button id="advX" title="Tipps ausblenden">✕</button><button id="advAct"></button></span></div>
@@ -73,6 +74,8 @@
     <b>Teure Waffen schützen:</b> Billige FPV-Drohnen zerstören Panzer. Fahrzeuge am Fahrzeugwerk mit ▦ Käfig nachrüsten, Störsender und Flakpanzer als Begleitung mitschicken.<br>
     <b>Handelsverträge:</b> Diplomat im Handelskontor ausbilden, zum Rathaus Kastrovas schicken (Botschaft), dann über 🤝 Daueraustausch vereinbaren. Karawanen fahren die Waren – schützt sie vor Räubern.<br>
     <b>🪖 Kräfte:</b> Übersicht aller Einheiten (frei/gesamt, was sie tun, 📍 zeigen). Kräfte zusammenstellen, Befehl wählen (Stellung halten, Gebiet klären, Angriff, Sammeln) und Ziel antippen – es rücken die nächstgelegenen freien Einheiten aus.<br>
+    <b>🎓 Forschung:</b> Eigener Reiter. In der Universität wird ein Baum erforscht: Düngemittel (+50 % Ernte) und Gewächshäuser sparen Ackerfläche, Stadtplanung bringt Wohnblöcke (150 Einwohner auf 2×2). Informatik → Rechenzentrum → Künstliche Intelligenz, Kernphysik → Kernkraftwerk. KI + Kernphysik → Atomwaffenprogramm. Lang drücken zeigt Voraussetzungen.<br>
+    <b>☢ Atomrakete:</b> Anreicherungsanlage (frisst 400 Strom) + Raketensilo. Schon der Besitz schreckt Kastrova von Forderungen und Krieg ab. Einsatz: Silo wählen → ☢ Start → erkundetes Ziel zweimal antippen. Das Rathaus übersteht den Schlag als Bunker – erobern müssen Truppen. Folgen: Krieg mit allen, Verstrahlung, lange Entsetzen im eigenen Volk.<br>
     <b>Speichern:</b> Im Menü (⏸) gibt es 3 Speicherplätze; zusätzlich wird jede Minute automatisch gespeichert.<br>
     <b>Rohstoffe sind ungleich verteilt:</b> Jede Stadt hat zwei Rohstoffe reichlich und zwei kaum. Was fehlt, muss gehandelt oder erobert werden.<br>
     <b>Haushalt:</b> Gebäude, Soldaten und die Stadtverwaltung kosten laufend Geld. Lager sind begrenzt – Lagerhaus bauen oder Überschuss über das Kontor verkaufen.<br>
@@ -137,6 +140,7 @@
     <dt>🎯 Lauern</dt><dd>FPV-Drohnen wählen: Sie schweben an ihrem Posten und stürzen sich auf Feinde in Sicht. Ohne Lauern nur auf Befehl. Beim Schweben verbrauchen sie wenig Akku; bei niedrigem Akku fliegen alle Drohnen selbst zum Laden heim.</dd>
     <dt>🛰 Aufklären</dt><dd>Spionage-/Reaper-Drohnen wählen: Sie überfliegen selbstständig das ganze Tal, bevorzugt Unerforschtes, und liefern Sicht – auch für eure Raketenwerfer.</dd>
     <dt>Tarnung</dt><dd>Hochfliegende Drohnen sind für den Gegner unsichtbar und unangreifbar – außer im Radarkreis einer Flugabwehr (9 Felder) oder kurz nachdem sie gefeuert haben. Für euch gilt dasselbe bei feindlichen Drohnen.</dd>
+    <dt>☢ Verstrahlung</dt><dd>Gelbgrüner Kreis nach Atomschlag oder Kernschmelze: Höfe und Gewächshäuser darin liefern nichts, Infanterie nimmt laufend Schaden, Wohnen dort verärgert die Einwohner. Klingt nach 10 Minuten ab.</dd>
     <dt>Pioniere</dt><dd>In der Kaserne ausbilden. Sie bauen alles aus dem Reiter Verteidigung vor Ort (geplant = gestrichelter Rahmen) und räumen feindliche Minen in ihrer Nähe.</dd>
     <dt>Panzermine</dt><dd>Grüne Scheibe = eigene Mine. Für Feinde unsichtbar; nur Fahrzeuge lösen sie aus. Entdeckte feindliche Minen haben einen roten Ring.</dd>
     <dt>⛉ Halten</dt><dd>Ausgewählte Truppen ziehen zum Ziel und graben sich ein (Sandsäcke). Eingegraben: Infanterie nimmt 45 % weniger Schaden, Fahrzeuge 25 %. Sie verfolgen niemanden.</dd>

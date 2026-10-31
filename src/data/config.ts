@@ -36,7 +36,7 @@ export const HAUL = {
 // ---------- Dichte Bebauung ----------
 export const DENSITY = {
   farmFieldR: 2,        // Bauernhof bewirtschaftet freie Steppe in diesem Umkreis
-  farmFields: 14,       // so viele freie Ackerfelder braucht ein Hof für vollen Ertrag
+  farmFields: 12,       // so viele freie Ackerfelder braucht ein Hof für vollen Ertrag
   steppeYield: 0.4,     // ein Acker auf karger Steppe bringt nur 40 % eines Ackers auf grüner Wiese
   crowdPenalty: 0.45,   // Wohnhaus komplett umbaut (alle Nachbarfelder belegt) = −45 % Wohnqualität
   fireTime: 10,         // Sekunden, die ein Gebäude brennt
@@ -70,7 +70,7 @@ export const ECON = {
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
-           university:1.2, droneshop:1.0, depot:0.15, sentry:0.1, turret:0.25, flak:0.25},
+           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   adminPerHead2: 0.000015, // Stadtverwaltung: wächst mit dem Quadrat der Einwohner (1000 EW ≈ 15 $/s, 2000 EW ≈ 60 $/s)
   brokeFactor: 0.5,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil
@@ -143,6 +143,8 @@ export const UNITS = {
           weapon:{type:'flak', dmg:20, range:6.5, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
   jammer:{name:'Störsender', cls:'veh', tech:1, cost:{money:350, metal:40, oil:20, pop:2}, time:10, hp:220, upkeep:0.04, armor:'light', speed:1.9, sight:7, size:0.6, jam:true,
           prod:'factory', req:[], desc:'Elektronische Kampfführung: feindliche FPV-Drohnen in der Nähe verlieren die Verbindung und stürzen ab'},
+  nuke:  {name:'Atomrakete', cls:'stored', cost:{money:15000, metal:1500, oil:800}, time:600, prod:'silo', req:['enrich'], stored:true, hp:1, armor:'none', speed:0, sight:0, size:0,
+          desc:'Vernichtet alles im Umkreis von 9 Feldern und verstrahlt das Gebiet. Schon der Besitz schreckt Angreifer ab.'},
   diplomat:{name:'Diplomat', cls:'inf', cost:{money:200, pop:1}, time:10, hp:50, armor:'none', speed:1.45, sight:5, size:0.3, diplomat:true,
           prod:'kontor', req:[], desc:'Reist zum Rathaus einer anderen Macht und eröffnet dort eine Botschaft – Voraussetzung für Handelsverträge'},
   caravan:{name:'Handelskarawane', cls:'veh', cost:{money:0}, time:0, hp:260, armor:'light', speed:1.8, sight:5, size:0.62, caravan:true,
@@ -171,6 +173,12 @@ export const BUILDINGS = {
   farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
   lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
   quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein, nur direkt an Felsen'},
+  block:   {name:'Wohnblock',     w:2,h:2, hp:700,  power:-20, cost:{money:500, wood:20, stone:120, metal:20}, time:14, req:[], research:'urban', cap:150, sight:3, desc:'150 Wohnraum auf kleiner Fläche'},
+  greenhouse:{name:'Gewächshaus', w:2,h:2, hp:400,  power:-30, cost:{money:600, wood:40, stone:60, metal:60}, time:12, req:[], research:'glass', food:5, noise:0.05, sight:3, desc:'+5 Nahrung/s ohne Äcker'},
+  datacenter:{name:'Rechen\u00ADzentrum', w:2,h:2, hp:600, power:-150, cost:{money:2500, stone:100, metal:200}, time:20, req:['university'], research:'computing', noise:0.1, sight:3, desc:'Forschung +50 % (bis zu zwei)'},
+  npp:     {name:'Kern\u00ADkraftwerk', w:3,h:3, hp:1500, power:600, cost:{money:6000, stone:400, metal:400}, time:40, req:[], research:'physics', noise:0.3, sight:5, desc:'+600 Strom – wird es zerstört, kommt es zur Kernschmelze'},
+  enrich:  {name:'Anreicherungs\u00ADanlage', w:3,h:2, hp:900, power:-400, cost:{money:8000, stone:300, metal:600}, time:40, req:[], research:'bomb', noise:0.3, sight:4, desc:'Uran für Atomwaffen – braucht enorm viel Strom'},
+  silo:    {name:'Raketen\u00ADsilo', w:2,h:2, hp:1200, power:-50, cost:{money:5000, stone:400, metal:400}, time:30, req:['enrich'], research:'bomb', sight:4, desc:'Baut und startet Atomraketen'},
   depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
   mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
@@ -263,13 +271,38 @@ export const BASEVAL = {food:2.2, wood:1.6, stone:1.8, metal:4.5, oil:1.6};
 // Handelskontor: verkauft nur, was über der Reserve liegt; Exportpreis je Einheit
 export const EXPORT = {order:['oil','metal','stone','wood','food'], reserve:{oil:300, metal:250, stone:300, wood:300, food:400}, price:{oil:1.1, metal:2.8, stone:1.0, wood:0.8, food:1.4}};
 export const LOT = {food:100, wood:100, stone:80, metal:50, oil:100};
-// Universität: Stufe 1 = gebaut, Stufe 2/3 durch Forschung in der Universität
+// Forschungsbaum: Universität Stufe 1 = gebaut; alles Weitere wird in der Universität erforscht.
+// need = vorher erforscht, needB = Gebäude muss stehen, power = forscht nur ohne Stromengpass
 export const RESEARCH = {
-  res2:{name:'Forschung Stufe 2', level:2, cost:{money:1500, metal:150}, time:180, desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
-  res3:{name:'Forschung Stufe 3', level:3, cost:{money:2400, metal:250, oil:150}, time:300, desc:'Schaltet die Reaper-Drohne frei'},
+  res2:   {name:'Forschung Stufe 2', icon:'🎓', level:2, cost:{money:1500, metal:150}, time:180, need:[], desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
+  res3:   {name:'Forschung Stufe 3', icon:'🎓', level:3, cost:{money:2400, metal:250, oil:150}, time:300, need:['res2'], desc:'Schaltet die Reaper-Drohne frei'},
+  fert:   {name:'Düngemittel', icon:'🌾', cost:{money:1200, metal:60}, time:150, need:['res2'], desc:'Alle Bauernhöfe bringen 50 % mehr Ertrag'},
+  glass:  {name:'Gewächshäuser', icon:'🥬', cost:{money:2000, metal:120, stone:200}, time:200, need:['fert','res3'], desc:'Gewächshaus: ernährt 250 Einwohner auf 2×2 Feldern ohne Äcker (braucht viel Strom)'},
+  urban:  {name:'Stadtplanung', icon:'🏙', cost:{money:1500, stone:200}, time:150, need:['res2'], desc:'Wohnblock: 150 Einwohner auf 2×2 Feldern'},
+  physics:{name:'Kernphysik', icon:'⚛', cost:{money:4000, metal:300}, time:300, need:['res3'], desc:'Kernkraftwerk: +600 Strom – zerstört verstrahlt es die Umgebung'},
+  computing:{name:'Informatik', icon:'💻', cost:{money:3000, metal:200}, time:240, need:['res3'], desc:'Rechenzentrum: beschleunigt die Forschung, braucht viel Strom'},
+  ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
+  bomb:   {name:'Atomwaffenprogramm', icon:'☢', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
+};
+export const RESEARCH_SPEED = {datacenter:0.5, maxDatacenters:2, ai:0.15};
+// KI Kastrova: Reihenfolge der Forschung und Mindest-Einwohnerzahl je Schritt
+export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['res3',240],['computing',320],['physics',340],['glass',360],['ai',420],['bomb',480]];
+// KI und Atomwaffen: Abschreckung dämpft die Angriffslust, Einsatz nur in der Not
+export const AI_NUKE = {stock:1, reserve:1500, deterAggr:0.15, blackmail:0.5, ratio:0.6, cool:300};
+// ---------- Atomwaffe ----------
+export const NUKE = {
+  radius: 9, dmg: 4000, speed: 8,      // Sprengradius, Schaden im Zentrum, Flugtempo (Felder/s)
+  fallout: 7, falloutTime: 600, falloutDps: 6,
+  shock: 900, shockMood: 0.35,         // eigene Bevölkerung nach dem Einsatz
+  victimMood: 0.3, victimTime: 600, radiationMood: 0.15,
+  meltdown: {radius:4, dmg:1500, fallout:5},   // zerstörtes Kernkraftwerk
+  maxStock: 3,
+  hqKeep: 0.15,                        // Rathaus (Regierungsbunker) überlebt mit diesem Anteil – erobern müssen Truppen
 };
 export const TECH_UNLOCKS = {1:'Drohnenwerkstatt, Spionagedrohne', 2:'FPV-Kamikazedrohne, Raketenwerfer', 3:'Reaper-Drohne'};
 export const DEF = t => UNITS[t] || BUILDINGS[t] || FEATURES[t] || RESEARCH[t];
+/** Forschungs-Fortschritt einer Partei */
+export const hasTech = (p,k) => !!(p&&p.done&&p.done[k]);
 export const isDefType = t => !!(FEATURES[t] || (BUILDINGS[t]&&BUILDINGS[t].def));
 /** Gebäude, die als Baustelle entstehen und von Arbeitern gebaut werden */
 export const isSiteType = t => !!(BUILDINGS[t] && !BUILDINGS[t].def && BUILDINGS[t].buildable!==false);

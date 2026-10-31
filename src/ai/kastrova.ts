@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { AI_MIX, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -10,6 +10,7 @@ import { demolish, hauls, orderRoadTo, previewFields, siteLacks } from '../sim/b
 import { G } from '../sim/state';
 import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
+import { deterrent, launchNuke } from '../sim/nuke';
 
 /* =====================================================================
    KI Kastrova – handelt nach Bedarf, Stärkeverhältnis und Vorsprung
@@ -61,8 +62,11 @@ export function aiThink(){
     if(!open&&p.res.stone>=80) for(const b of myB.filter(b=>!b.site&&hauls(b)&&(b.eff??1)<0.8).sort((a,c)=>a.eff-c.eff)){ if(orderRoadTo(pid,b)>0) break; } }
   aiDefense(pid);
   // --- Forschung ---
-  if(findBuilding(pid,'university')&&!p.q.research.length){ const r=p.tech<2?'res2':p.tech<3?'res3':null;
-    if(r&&p.pop>(r==='res2'?140:240)&&available(pid,r)&&canAfford(pid,r)&&p.res.money>DEF(r).cost.money+150) enqueue(pid,r); }
+  const nextRes=aiNextResearch(p);
+  if(nextRes&&!p.q.research.length&&available(pid,nextRes)&&canAfford(pid,nextRes)&&p.res.money>DEF(nextRes).cost.money+(RESEARCH[nextRes].level?150:600)) enqueue(pid,nextRes);
+  // --- Atomrakete ---
+  if(findBuilding(pid,'silo')&&!p.q.silo.length&&(p.nukes||0)<AI_NUKE.stock&&canAfford(pid,'nuke')&&p.res.money>UNITS.nuke.cost.money+AI_NUKE.reserve) enqueue(pid,'nuke');
+  aiNukeStrike(pid,ratio,urgent);
   // --- Gitterkäfige für Fahrzeuge am Werk ---
   if(p.res.metal>150&&p.res.money>600) upgradeCage(pid,army.filter(u=>u.type==='mbt'||u.type==='ifv'||u.type==='mlrs'));
   // --- Tanklaster ---
@@ -73,7 +77,6 @@ export function aiThink(){
   if(marketOpen(pid)){
     if(p.res.oil>300) trade(pid,'sellOil');
     if(need==='food'&&ratio<1.2&&p.res.money>400) trade(pid,'buyFood');
-    const nextRes=findBuilding(pid,'university')&&!p.q.research.length?(p.tech<2?'res2':p.tech<3?'res3':null):null;
     // Baustoffe zukaufen, wenn eine Baustelle darauf wartet (bei knappen Rohstoffen schon früher)
     for(const [r,k] of [['wood','buyWood'],['stone','buyStone']]){ const waits=G.buildings.some(b=>!b.dead&&b.owner===pid&&b.site&&siteLacks(b)===r);
       if(p.res[r]<80&&(waits||G.profile[pid].scarce.includes(r))&&p.res.money>320) trade(pid,k); }
@@ -124,7 +127,9 @@ export function aiThink(){
   // --- Absicht ---
   if(!G.war){
     ai.mode='frieden';
-    let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0))*D.aggr - Math.max(0,G.aiAtt)/60 - (G.t-(ai.tradedT||-999)<90?0.4:0);
+    let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(1)&&!deterrent(0)?AI_NUKE.blackmail:0))*D.aggr - Math.max(0,G.aiAtt)/60 - (G.t-(ai.tradedT||-999)<90?0.4:0);
+    const deterred=deterrent(0);   // Aldorias Atomrakete: keine Forderungen, kein Krieg
+    if(deterred){ aggr*=AI_NUKE.deterAggr; if(!ai.deterMsg&&met){ ai.deterMsg=true; msg('☢ Geheimdienst: Kastrova fürchtet eure Atomrakete. Forderungen und Kriegsdrohungen bleiben aus.','#9fd88a'); } } else ai.deterMsg=false;
     if(met && G.t>D.grace && aggr>=1 && G.t>ai.cool && !G.offer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
       if(need&&!urgent&&P.res[need]>=150&&Math.random()<0.7){
         const amt=need==='food'?150:need==='metal'?100:120;
@@ -132,7 +137,7 @@ export function aiThink(){
       } else { ai.cool=G.t+60; setWar(true,1); ai.nextRaid=0; }
     }
     // Schutzgeld: Stärke ausnutzen, wenn Aldoria reich und schwach ist
-    else if(met&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!G.offer&&G.aiAtt<40){
+    else if(!deterred&&met&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!G.offer&&G.aiAtt<40){
       ai.cool=G.t+220; showOffer({type:'demand',res:'money',amt:Math.min(600,Math.floor(P.res.money*0.3/50)*50)});
     }
     if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&!u.task&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x+(Math.random()-.5)*4,rally.y+(Math.random()-.5)*4);
@@ -149,7 +154,7 @@ export function aiThink(){
       launchRaid(army,need,lead,rally);
     } else if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x,rally.y);
     // Frieden anbieten, wenn das Ziel erreicht oder der Krieg aussichtslos ist
-    if(!raiders.length&&!urgent&&G.t-ai.lastCombat>40&&G.t>ai.peaceCool&&!G.offer&&((!need&&ai.lootSince>150)||ratio<0.7)){
+    if(!raiders.length&&!urgent&&G.t-ai.lastCombat>40&&G.t>ai.peaceCool&&!G.offer&&((!need&&ai.lootSince>150)||ratio<0.7||(deterrent(0)&&!deterrent(1)))){
       ai.peaceCool=G.t+120; showOffer({type:'peace'});
     }
   }
@@ -215,25 +220,57 @@ export function aiPickBuilding(p,armyN,need,lead){
 }
 function aiPickMain(p,need,has,ok){
   const pid=1;
-  if(p.use+12>p.power) return 'power';
-  if(p.foodRate<0.3||need==='food') return 'farm';
-  if(p.pop>=p.cap-6) return 'house';
+  const npp=hasTech(p,'physics')&&!has('npp')&&p.res.money>BUILDINGS.npp.cost.money+300;
+  if(p.use+12>p.power) return npp?'npp':'power';
+  const food=hasTech(p,'glass')&&p.power-p.use>40&&p.res.money>BUILDINGS.greenhouse.cost.money+200?'greenhouse':'farm';   // Gewächshaus spart Fläche
+  const home=hasTech(p,'urban')&&p.res.money>BUILDINGS.block.cost.money+150&&p.res.stone>=BUILDINGS.block.cost.stone?'block':'house';   // Wohnblock statt Häuserteppich
+  if(p.foodRate<0.3||need==='food') return food;
+  if(p.pop>=p.cap-6) return home;
   if(!has('barracks')) return 'barracks';
-  if(p.pop>=p.cap-20&&p.res.money>400) return 'house';
+  if(p.pop>=p.cap-20&&p.res.money>400) return home;
   if((!has('mine')||(need==='metal'))&&ok('mine')) { if(aiCanReachOre(pid)) return 'mine'; }
   if(!has('refinery')) return 'refinery';
-  if(p.foodRate<1.2) return 'farm';
+  if(p.foodRate<1.2) return food;
   const rich=t=>p.res.money>BUILDINGS[t].cost.money+250;   // teure Gebäude erst, wenn das Geld da ist (sonst blockieren sie den Aufbau)
   if(!has('factory')&&p.pop>90&&rich('factory')) return 'factory';
   if(has('factory')&&!has('university')&&p.pop>110&&rich('university')) return 'university';
   if(has('factory')&&!has('droneshop')&&p.tech>=1&&p.pop>140&&rich('droneshop')) return 'droneshop';
-  if(p.pop>=p.cap-25) return 'house';
+  const hi=aiPickHighTech(p,has,rich); if(hi) return hi;
+  if(p.pop>=p.cap-25) return home;
   if(p.res.money>4500&&has('factory')<2&&p.pop>300) return 'factory';
-  if(p.foodRate<2.5) return 'farm';
+  if(p.foodRate<2.5) return food;
   if(!has('kontor')&&p.pop>180&&(p.res.oil>500||p.res.food>900||p.res.metal>500)) return 'kontor';
   if(has('lumber')<2&&p.pop>120) return 'lumber';
-  if((G.mode!=='race'||p.cap<ECON.target+20)&&p.pop>p.cap-80) return 'house';
+  if((G.mode!=='race'||p.cap<ECON.target+20)&&p.pop>p.cap-80) return home;
   return null;
+}
+/** nächster Forschungsschritt der KI (nach AI_RESEARCH) */
+export function aiNextResearch(p){
+  if(!findBuilding(1,'university')) return null;
+  for(const [k,pop] of AI_RESEARCH as [string,number][]){ if(hasTech(p,k)) continue; return p.pop>pop&&available(1,k)?k:null; }
+  return null;
+}
+/** Hochtechnologie: Rechenzentrum, Kernkraft, Atomprogramm */
+function aiPickHighTech(p,has,rich){
+  const spare=p.power-p.use;
+  if(hasTech(p,'computing')&&!has('datacenter')&&p.pop>320&&rich('datacenter')) return spare>160?'datacenter':hasTech(p,'physics')&&rich('npp')?'npp':'power';
+  if(hasTech(p,'physics')&&!has('npp')&&spare<250&&rich('npp')) return 'npp';
+  if(hasTech(p,'bomb')&&!has('enrich')&&rich('enrich')) return spare>=420?'enrich':hasTech(p,'physics')&&rich('npp')?'npp':'power';
+  if(has('enrich')&&!has('silo')&&rich('silo')) return 'silo';
+  return null;
+}
+/** Atomschlag der KI: nur im Krieg, als Vergeltung oder in höchster Not – und nicht gegen eine Atommacht ohne Grund */
+function aiNukeStrike(pid,ratio,urgent){
+  const ai=G.ai, p=G.players[pid];
+  if(!G.war||!(p.nukes>0)||G.t<(ai.nukeT||0)) return;
+  const revenge=!!(G.nukedBy&&G.nukedBy[0]), desperate=(urgent||ratio<AI_NUKE.ratio)&&!deterrent(0);
+  if(!revenge&&!desperate) return;
+  // Ziel: dort, wo die meisten Gebäude Aldorias im Sprengradius stehen (eigene verschonen)
+  let best=null, bs=0;
+  for(const b of G.buildings){ if(b.dead||b.owner!==0) continue;
+    let s=0; for(const o of G.buildings){ if(o.dead) continue; const d=dist(o.x,o.y,b.x,b.y); if(d>NUKE.radius) continue; if(o.owner===0) s+=o.def.cap?2:1; else if(o.owner===pid){ s=-1; break; } }
+    if(s>bs){ bs=s; best=b; } }
+  if(best&&bs>=6){ ai.nukeT=G.t+AI_NUKE.cool; launchNuke(pid,best.x,best.y); }
 }
 export function aiCanReachOre(pid){ for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;
   for(let y=b.ty-8;y<=b.ty+b.h+8;y++)for(let x=b.tx-8;x<=b.tx+b.w+8;x++) if(inMap(x,y)&&G.ore[idx(x,y)]>0) return true; } return false; }

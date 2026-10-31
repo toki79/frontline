@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -20,8 +20,14 @@ export const WEAPON_INFO = {bullet:'Gewehre: stark gegen Infanterie, schwach geg
 export const ARMOR_NAME = {none:'keine (Infanterie)', light:'leicht', heavy:'schwer', building:'Gebäude', fort:'Befestigung', air:'tieffliegend – Gewehre, Maschinenkanonen und Flugabwehr treffen', airHigh:'hochfliegend – nur Flugabwehr und (schwach) Maschinenkanonen treffen'};
 export function tipFor(k){
   const d=DEF(k), L=[`<b>${d.name}</b> – ${d.desc}`, 'Kosten: '+costLong(d.cost)+(isDefType(k)?' je Feld':'')];
-  if(RESEARCH[k]) { L.push(`<span class="dim">Forschungsdauer ${d.time} s in der Universität (Strommangel halbiert das Tempo).</span>`);
-    if(G&&G.players[0].tech>=d.level) L.push('<span style="color:#9fd88a">✓ Bereits erforscht.</span>'); }
+  if(RESEARCH[k]) { L.push(`<span class="dim">Forschungsdauer ${d.time} s in der Universität. ${d.power?'<b>Braucht ausreichend Strom</b> – bei Strommangel steht die Forschung still.':'Strommangel halbiert das Tempo.'} Jedes Rechenzentrum (max. ${RESEARCH_SPEED.maxDatacenters}) beschleunigt um ${Math.round(RESEARCH_SPEED.datacenter*100)} %.</span>`);
+    const pre=[...(d.need||[]).map(n=>RESEARCH[n].icon+' '+RESEARCH[n].name), ...(d.needB||[]).map(b=>'🏢 '+BUILDINGS[b].name)];
+    if(pre.length) L.push('Voraussetzung: '+pre.join(', '));
+    const opens=Object.keys(RESEARCH).filter(o=>(RESEARCH[o].need||[]).includes(k)).map(o=>RESEARCH[o].icon+' '+RESEARCH[o].name);
+    if(opens.length) L.push('Führt zu: '+opens.join(', '));
+    if(G&&hasTech(G.players[0],k)) L.push('<span style="color:#9fd88a">✓ Bereits erforscht.</span>'); }
+  if(k==='nuke') L.push(`Wird im Raketensilo gebaut (die Anreicherungsanlage muss laufen), höchstens ${NUKE.maxStock} auf Lager. <b>Abschreckung:</b> Solange du eine Rakete besitzt, erklärt Kastrova keinen Krieg und stellt keine Forderungen. <b>Einsatz:</b> Silo wählen → ☢ Start → erkundetes Ziel antippen. Vernichtet alles im Umkreis von ${NUKE.radius} Feldern (nur das Rathaus übersteht es als Bunker, schwer beschädigt – erobern müssen Truppen) und verstrahlt das Gebiet ${Math.round(NUKE.falloutTime/60)} min lang. Folgen: Krieg mit allen, die eigene Bevölkerung ist lange entsetzt.`);
+  if(d.research&&!RESEARCH[k]) L.push(`${RESEARCH[d.research].icon} Benötigt Forschung „${RESEARCH[d.research].name}“.`);
   if(d.tech) L.push(`🎓 Benötigt Universität Stufe ${d.tech}.`);
   if(k==='kontor') L.push(`Verkauft laufend bis ${BUILDINGS.kontor.export} Einheiten/s, aber nur was über der Reserve liegt (🛢 ${EXPORT.reserve.oil}, ⛏ ${EXPORT.reserve.metal}, 🌾 ${EXPORT.reserve.food}). Preise: 🛢 ${f1(EXPORT.price.oil)} $, ⛏ ${f1(EXPORT.price.metal)} $, 🌾 ${f1(EXPORT.price.food)} $ je Einheit – weniger als beim Handel mit Kastrova, dafür ohne Marktsättigung.`);
   if(k==='university') L.push(`Stufe 1: ${TECH_UNLOCKS[1]} · Stufe 2: ${TECH_UNLOCKS[2]} · Stufe 3: ${TECH_UNLOCKS[3]}. Erforschtes Wissen bleibt auch erhalten, wenn die Universität zerstört wird.`);
@@ -48,6 +54,10 @@ export function tipFor(k){
     if(k==='farm') L.push(`🌾 Bewirtschaftet freie Fläche im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Äcker auf <b>grüner Wiese</b> = voller Ertrag, auf karger Steppe nur ${Math.round(DENSITY.steppeYield*100)} %. Zugebaute Felder fehlen.`);
     if(k==='depot') L.push('Sammelstelle: Betriebe in der Nähe liefern hierhin statt zum Rathaus (kürzere Transportwege).');
     if(k==='depot') L.push(`Lagerplatz: Rathaus ${STORAGE.base}, je Lagerhaus +${STORAGE.depot} für Nahrung, Holz, Stein, Metall und Öl. Was nicht ins Lager passt, geht verloren.`);
+    if(k==='npp') L.push(`☢ Wird es zerstört, kommt es zur Kernschmelze: Verwüstung im Umkreis von ${NUKE.meltdown.radius} Feldern und ${Math.round(NUKE.falloutTime/60)} min Verstrahlung. Nicht an die Front bauen!`);
+    if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);
+    if(k==='greenhouse') L.push('Braucht keine Äcker – spart viel Fläche gegenüber Bauernhöfen, kostet aber Strom und Unterhalt.');
+    if(k==='enrich') L.push('Ohne laufende Anreicherung baut das Silo keine Raketen. Schon die Bauphase verrät dich dem Geheimdienst des Gegners.');
     if(d.needsOre) L.push('Muss direkt an graue Erzfelsen grenzen.');
     if(d.needsRock) L.push('Muss direkt an helle Felsbrocken grenzen.');
     if(d.needsForest) L.push('Braucht Wald in der Nähe (mind. 3 Waldfelder).');
@@ -55,7 +65,7 @@ export function tipFor(k){
     if(d.weapon) L.push('Waffe: '+WEAPON_INFO[d.weapon.type]+` · Reichweite ${d.weapon.range}`);
     if(!d.def) L.push(`🏗 Wird als Baustelle gesetzt und von Bauarbeitern errichtet: ${Math.round(d.time*CONSTRUCTION.workTime)} s mit einem Arbeiter, mit ${CONSTRUCTION.maxWorkers} Arbeitern ${Math.round(d.time*CONSTRUCTION.workTime/CONSTRUCTION.maxWorkers)} s. Bezahlt wird beim Setzen.`);
     L.push(`<span class="dim">Größe ${d.w}×${d.h} Felder · Zustand ${d.hp}</span>`);
-  } else {
+  } else if(!d.stored) {
     L.push(`Zustand ${d.hp} · Panzerung: ${ARMOR_NAME[d.armor]}`);
     if(d.weapon) L.push('Waffe: '+WEAPON_INFO[d.weapon.type]+` · Reichweite ${d.weapon.range}`);
     if(d.worker) L.push(`Sucht sich selbst Arbeit: Baustellen zuerst, dann geplante Straßen. Bis zu ${CONSTRUCTION.maxWorkers} Arbeiter je Baustelle. Unbewaffnet – im Krieg schützen!`);

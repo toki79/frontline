@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { fmt } from '../core/util';
-import { BUILDINGS, DEF, ECON, FACTIONS, FEATURES, RES, RESEARCH, TILE, UNITS, isDefType } from '../data/config';
+import { BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType } from '../data/config';
 import { drawBuildingShape, drawFeature, drawRoad, drawUnitShape } from '../render/draw';
 import { canAfford, lacking } from '../sim/costs';
 import { nextMilestone } from '../sim/economy';
@@ -20,7 +20,8 @@ export function setTab(t){ui.tab=t;$$('.tabs [data-tab]').forEach(b=>b.classList
 export function drawIcon(cvs,type){
   const c=cvs.getContext('2d'); c.clearRect(0,0,84,84); c.save(); c.scale(2,2);
   const f=FACTIONS[0];
-  if(RESEARCH[type]){ c.font='26px sans-serif'; c.textAlign='center'; c.fillText('🎓',21,28); c.font='bold 11px sans-serif'; c.fillStyle='#e9d27a'; c.fillText('Stufe '+RESEARCH[type].level,21,40); }
+  if(RESEARCH[type]){ const R=RESEARCH[type]; c.font='26px sans-serif'; c.textAlign='center'; c.fillText(R.icon||'🎓',21,R.level?28:31); if(R.level){ c.font='bold 11px sans-serif'; c.fillStyle='#e9d27a'; c.fillText('Stufe '+R.level,21,40); } }
+  else if(type==='nuke'){ c.font='30px sans-serif'; c.textAlign='center'; c.fillText('🚀',21,31); }
   else if(FEATURES[type]&&FEATURES[type].road){ c.translate(5,5); c.fillStyle='#6f7e45'; c.fillRect(0,0,32,32); drawRoad(c,0,0,[[1,-1],[-1,1]],32,false); }
   else if(FEATURES[type]){ c.translate(5,5); drawFeature(c,FEATURES[type].id,0,0,[[1,-1],[-1,1]],32); }
   else if(UNITS[type]){ c.translate(21,21); c.scale(1.45,1.45); drawUnitShape(c,type,f.col,f.dark,0,0,-0.5,-0.5,1); }
@@ -29,9 +30,10 @@ export function drawIcon(cvs,type){
 }
 export function buildPanel(){
   const box=$('#items'); box.innerHTML=''; ui.btns={};
-  const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def), ...Object.keys(RESEARCH)]
+  const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
+            : ui.tab==='forsch' ? [...Object.keys(RESEARCH), 'nuke']
             : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak']
-            : Object.keys(UNITS).filter(k=>UNITS[k].prod);
+            : Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored);
   for(const k of list){
     const d=DEF(k), el=document.createElement('button'); el.className='it';
     el.innerHTML=`<canvas width="84" height="84"></canvas><span class="n">${d.name}</span><span class="c">${costHtml(d.cost)}</span><div class="pr"></div><span class="q"></span><span class="st"></span>`;
@@ -61,7 +63,9 @@ export function buildClick(k){
     const lack=lacking(0,k);
     if(lack.length){msg('Es fehlt: '+lack.map(r=>RES[r].name).join(', '),'#ffb38a');return;}
     G.placing=k; G.sel=[]; refreshCmds(); return; }
-  if(RESEARCH[k]){ if(p.tech>=RESEARCH[k].level){msg('Bereits erforscht.');return;} if(p.q.research.length){msg('Die Universität forscht bereits.','#ffb38a');return;} }
+  if(k==='nuke'&&(p.nukes||0)+p.q.silo.length>=NUKE.maxStock){msg(`Höchstens ${NUKE.maxStock} Atomraketen gleichzeitig.`,'#ffb38a');return;}
+  if(k==='nuke'&&p.q.silo.length){msg('Im Silo wird bereits eine Rakete gebaut.','#ffb38a');return;}
+  if(RESEARCH[k]){ if(hasTech(p,k)){msg('Bereits erforscht.');return;} if(p.q.research.length){msg('Die Universität forscht bereits.','#ffb38a');return;} }
   const lack=lacking(0,k);
   if(lack.length){msg('Es fehlt: '+lack.map(r=>r==='pop'?`Einwohner (mind. ${ECON.minPop} müssen bleiben)`:RES[r].name).join(', '),'#ffb38a');return;}
   enqueue(0,k);
@@ -77,7 +81,9 @@ export function updatePanel(){
     b.el.classList.toggle('poor',!miss.length&&!canAfford(0,k)&&!n);
     b.pr.style.width=cur?(cur.t/cur.time*100)+'%':'0';
     b.q.style.display=n>0&&!isDefType(k)?'block':'none'; b.q.textContent=String(n);
-    if(RESEARCH[k]&&p.tech>=RESEARCH[k].level){ b.el.classList.add('locked'); b.st.textContent='✓ erforscht'; continue; }
+    if(RESEARCH[k]&&hasTech(p,k)){ b.el.classList.add('locked','done'); b.st.textContent='✓ erforscht'; continue; }
+    if(k==='nuke'&&p.nukes>0&&!cur){ b.st.textContent=`☢ ${p.nukes} bereit – Silo wählen`; continue; }
+    if(cur&&cur.stalled){ b.st.textContent=cur.stalled; continue; }
     b.st.textContent=G.placing===k?(isDefType(k)?'Feld antippen…':'Bauplatz antippen…'):miss.length?'benötigt: '+miss.join(', '):'';
   }
   $('#rMoney').textContent='$'+fmt(p.res.money);
