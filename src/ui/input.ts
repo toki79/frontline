@@ -3,8 +3,8 @@ import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
 import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, RES, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
-import { orderAttack, orderEscort, orderHarvest, orderMove, orderReturn, orderStop } from '../sim/orders';
-import { placeDefense, placeSite } from '../sim/production';
+import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatrol, orderReturn, orderStop } from '../sim/orders';
+import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -39,6 +39,7 @@ export function handleTap(w,right,shift){
     if(right){G.placing=null;refreshCmds();return;}
     const x=Math.floor(w.x), y=Math.floor(w.y), road=FEATURES[G.placing]&&FEATURES[G.placing].road;
     if(road&&cancelRoad(0,x,y)){ G.lastPaint=idx(x,y); return; }   // geplantes Straßenfeld antippen = zurücknehmen
+    if(!road&&cancelDefPlan(0,x,y)){ G.lastPaint=idx(x,y); msg('Plan zurückgenommen, Kosten erstattet.'); return; }
     if(!placeDefense(0,G.placing,x,y)){ const lack=lacking(0,G.placing);
       if(G.t-(G.defMsgT||-9)>1.5){G.defMsgT=G.t; msg(lack.length?'Es fehlt: '+lack.map(r=>RES[r].name).join(', '):road?`Straßen nur auf freier Steppe, Schlamm oder Ortschaft, höchstens ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden.`:`Hier nicht möglich (freies Land, höchstens ${DEF_RADIUS} Felder vor der Stadt).`,'#ffb38a');} }
     G.lastPaint=idx(x,y); return;
@@ -100,6 +101,10 @@ export function cmd(c){
   const mine=myUnitsSel();
   if(c==='box'){G.boxMode=!G.boxMode;G.amoveMode=false;}
   else if(c==='amove'){ if(mine.length){G.amoveMode=!G.amoveMode;G.boxMode=false;G.escortMode=false;} else msg('Zuerst Einheiten auswählen.'); }
+  else if(c==='lurk'){ const fp=mine.filter(u=>u.def.weapon&&u.def.weapon.kamikaze); const on=!fp.every(u=>u.lurk); orderLurk(fp,on);
+    msg(on?`🎯 ${fp.length} FPV-Drohne${fp.length===1?'':'n'} in Lauerstellung: Sie stürzen sich auf Feinde in Sicht.`:'FPV-Drohnen halten still und greifen nur auf Befehl an.'); }
+  else if(c==='patrol'){ const sc=mine.filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)); const on=!sc.every(u=>u.patrol); orderPatrol(sc,on);
+    msg(on?`🛰 ${sc.length} Drohne${sc.length===1?'':'n'} auf Aufklärungsflug – sie erkunden selbstständig das Tal und laden zwischendurch zu Hause.`:'Aufklärungsflug beendet.'); }
   else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
@@ -117,7 +122,11 @@ export function refreshCmds(){
   document.querySelector('[data-c=box]').classList.toggle('on',!!(G&&G.boxMode));
   document.querySelector('[data-c=amove]').classList.toggle('on',!!(G&&G.amoveMode));
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
-  document.querySelector('[data-c=escort]').classList.toggle('show',armed);
+  document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
+  const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
+  const bl=document.querySelector('[data-c=lurk]'), bp=document.querySelector('[data-c=patrol]');
+  bl.classList.toggle('show',fpv.length>0); bl.classList.toggle('on',fpv.length>0&&fpv.every(u=>u.lurk));
+  bp.classList.toggle('show',scouts.length>0); bp.classList.toggle('on',scouts.length>0&&scouts.every(u=>u.patrol));
   document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
@@ -126,7 +135,8 @@ export function refreshCmds(){
 }
 export function updateInfo(){
   const el=$('#info'); if(!G){el.textContent='';return;}
-  if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing); el.textContent=`${d.name} bauen: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ✕ Abwählen beendet`; return; }
+  if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing), road=FEATURES[G.placing]&&FEATURES[G.placing].road, pio=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.pioneer).length;
+    el.textContent=`${d.name} ${road?'planen':'beauftragen'}: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ${road?'Bauarbeiter bauen':pio?`${pio} Pionier${pio===1?'':'e'} bauen`:'⚠ keine Pioniere – in der Kaserne ausbilden'} · Plan antippen = zurücknehmen · ✕ beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
   if(G.amoveMode){el.textContent='Angriffsbewegung: Ziel antippen';return;}
   if(G.escortMode){el.textContent='Begleiten: eigenen Arbeiter oder Laster antippen – die Auswahl bleibt bei ihm und verteidigt ihn';return;}
@@ -134,6 +144,10 @@ export function updateInfo(){
   const s=G.sel.filter(e=>!e.dead); if(!s.length){el.textContent='';return;}
   if(s.length===1){const e=s[0], f=G.players[e.owner];
     let t=`${e.def.name} · Zustand ${Math.ceil(e.hp)}/${e.maxHp}`+(e.owner!==0?` · ${f.short} (${G.rel[0][e.owner]})`:'');
+    if(e.kind==='unit'&&e.def.weapon&&e.def.weapon.kamikaze) t+=e.lurk?' · 🎯 Lauerstellung':' · hält still (🎯 für Lauerstellung)';
+    if(e.kind==='unit'&&e.def.cls==='air'&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
+    if(e.kind==='unit'&&e.def.armor==='airHigh'&&e.owner===0) t+=' · getarnt – nur Radar der Flugabwehr entdeckt sie';
+    if(e.kind==='unit'&&e.def.pioneer) t+=e.clearing?' · räumt eine Mine':e.working?' · baut':e.pjob?' · auf dem Weg zum Bauplatz':' · wartet auf Aufträge (Verteidigung planen)';
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;

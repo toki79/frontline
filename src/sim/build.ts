@@ -46,7 +46,8 @@ export function siteWorkers(b){ let n=0; for(const u of G.units) if(!u.dead&&u.j
 export function demolish(pid,b){
   if(!b||b.dead||b.owner!==pid||b.type==='hq'||b.kind!=='building') return false;
   const c=costOf(b.type), p=G.players[pid];
-  if(b.site){ p.res.money+=c.money||0; for(const m of MATS) p.res[m]+=Math.floor(((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0)); }   // Baustelle: Geld und verbautes Material zurück
+  if(b.site&&b.pio){ for(const r in c) if(r!=='pop') p.res[r]+=c[r]; }   // Stellung im Bau: alles zurück
+  else if(b.site){ p.res.money+=c.money||0; for(const m of MATS) p.res[m]+=Math.floor(((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0)); }   // Baustelle: Geld und verbautes Material zurück
   else for(const r in c){ if(r==='pop') continue; p.res[r]+=Math.floor(c[r]*CONSTRUCTION.demolishRefund); }
   b.dead=true;
   for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.occ[idx(x,y)]===b.id) G.occ[idx(x,y)]=0;
@@ -187,7 +188,7 @@ function stillNeeded(b,m){ const c=costOf(b.type); if(!c[m]) return 0; return c[
 /** kann an der Baustelle gearbeitet werden? (jeder nötige Baustoff liegt vor Ort oder ist schon verbaut) */
 function buildable(b){ const c=costOf(b.type); for(const m of MATS) if(c[m]&&((b.used&&b.used[m])||0)<c[m]-0.01&&((b.dlv&&b.dlv[m])||0)<0.01) return false; return true; }
 /** Fehlt einer Baustelle Material im Lager? (Rohstoff oder null) */
-export function siteLacks(b){ const p=G.players[b.owner], c=costOf(b.type);
+export function siteLacks(b){ if(b.pio) return null; const p=G.players[b.owner], c=costOf(b.type);
   for(const m of MATS) if(c[m]&&stillNeeded(b,m)>0.01&&((b.dlv&&b.dlv[m])||0)<0.01&&p.res[m]<1) return m; return null; }
 /** Baustoffe vor Ort / gebraucht (für die Anzeige) */
 export function siteStock(b){ const c=costOf(b.type), out=[]; for(const m of MATS) if(c[m]) out.push({m,have:((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0),need:c[m]}); return out; }
@@ -202,7 +203,7 @@ function findJob(u){
   const carry=u.carry;
   let best=null, bs=1e9;
   const consider=(s,j)=>{ if(s<bs){ bs=s; best=j; } };
-  for(const b of G.buildings){ if(b.dead||b.owner!==pid||!b.site) continue;
+  for(const b of G.buildings){ if(b.dead||b.owner!==pid||!b.site||b.pio) continue;   // Stellungen bauen die Pioniere
     // bauen
     if(buildable(b)&&(load.get(b.id)||0)<CONSTRUCTION.maxWorkers) consider(distTo(u,b)-8+(load.get(b.id)||0)*2,{kind:'site',b});
     // Material bringen

@@ -27,6 +27,13 @@ Räuberlager in abgelegenen Gebieten bewachen ihr Umland und überfallen Außenp
 Begleitschutz (🛡). Die **Zufriedenheit** fasst Versäumnisse zusammen (Hunger, Strom, leere Kasse, Wohnlage, Angriffe,
 Räuber, Krieg) und wirkt verzögert auf Steuern, Wachstum und Abwanderung.
 
+## Aufklärung & Verteidigung
+Kastrova und die Miliz sind zu Beginn unbekannt – Diplomatie, Handel und Forderungen erst nach dem Erstkontakt.
+Jede Seite hat ihren eigenen Nebel. Hochfliegende Drohnen sind getarnt (nur Flak-Radar entdeckt sie), Reaper und
+Spionagedrohnen klären auf Wunsch selbstständig auf, FPV-Drohnen lauern an ihrem Posten. Raketenwerfer wirken auf
+22 Felder, aber nur gegen aufgeklärte Ziele. Verteidigung wird geplant und von Pionieren gebaut; Panzerminen sind
+für Feinde unsichtbar und treffen nur Fahrzeuge.
+
 ## KI (Kastrova)
 Kein Sprachmodell, sondern Regeln mit Bewertung: Bedarf, Kräfteverhältnis, Vorsprung des Gegners, Haltung.
 Eskalation: **Marktanfrage → Forderung → Überfall** (gezielt aufs fehlende Gut) → Friedensangebot nach Beute.

@@ -38,8 +38,10 @@ export function attBar(v){const w=Math.abs(v)/2, left=v>=0?50:50-w, col=v>=30?'#
 export function btn(a,l,en,bg?){return `<button data-a="${a}" ${en?'':'disabled'} ${bg?`style="background:${bg}"`:''}>${l}</button>`;}
 export function renderDiplo(){
   const p=G.players[0], A=G.players[1]; let h='';
+  const unknown=(name,txt)=>`<div class="party"><h3><span class="dot" style="background:#555"></span>${name}<span class="badge">unbekannt</span></h3><div class="barl"><span>${txt}</span></div></div>`;
   // Kastrova
-  { const [lab,cls]=relLabel(1);
+  if(!G.known[0][1]) h+=unknown('Unbekannte Macht','Irgendwo jenseits des Flusses soll eine zweite Stadt liegen. Erkunde das Tal – mit Truppen, Spionage- oder Reaper-Drohnen –, um Kontakt aufzunehmen.');
+  else { const [lab,cls]=relLabel(1);
     h+=`<div class="party"><h3><span class="dot" style="background:${A.col}"></span>${A.name}<span class="badge b-${cls}">${lab}</span></h3>
       <div class="lead">${A.leader} · ${fmt(A.pop)} Einwohner</div><div class="quote">${quote(1)}</div>
       <div class="barl"><span>Haltung gegenüber Aldoria</span><span>${Math.round(G.aiAtt)}</span></div>${attBar(G.aiAtt)}
@@ -58,7 +60,8 @@ export function renderDiplo(){
     else { h+=btn('gift1','Geschenk ($200)',p.res.money>=200)+btn('food1','Nahrung schenken (🌾100)',p.res.food>=100)+btn('war1','Krieg erklären',true,'#5a221c'); }
     h+='</div></div>'; }
   // Miliz
-  { const f=G.players[2], [lab,cls]=relLabel(2), alive=!!findBuilding(2,'bunker');
+  if(!G.known[0][2]) h+=unknown('Unbekannte Gruppe','Gerüchte sprechen von Bewaffneten auf einer Flussinsel in der Mitte des Tals.');
+  else { const f=G.players[2], [lab,cls]=relLabel(2), alive=!!findBuilding(2,'bunker');
     h+=`<div class="party"><h3><span class="dot" style="background:${f.col}"></span>${f.name}<span class="badge b-${cls}">${lab}</span></h3>
       <div class="lead">${f.leader}</div><div class="quote">${quote(2)}</div>
       <div class="barl"><span>Ansehen bei der Miliz: Aldoria</span><span>${Math.round(G.attitude[0])}</span></div>${attBar(G.attitude[0])}

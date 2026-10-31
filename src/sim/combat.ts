@@ -3,7 +3,7 @@ import { BANDITS, DAMAGE, DENSITY, ECON, FEAT, RES, canHit } from '../data/confi
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
-import { coverAt, hostile, recalcPower, rectDist, updateRel } from '../sim/world';
+import { coverAt, detected, hostile, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { msg } from '../core/events';
 
@@ -17,9 +17,12 @@ export function distTo(a,e){
 export function homeTurf(u){ for(const b of G.buildings) if(!b.dead&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=6) return true; return false; }
 export function findTarget(src,range){
   let best=null,bs=1e9; const w=src.def.weapon, minR=w.minRange||0, drone=w.type==='drone';
-  for(const e of G.units){ if(e.dead||!hostile(src.owner,e.owner)||!canHit(w,e)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
+  const far=src.kind==='unit'?src.def.sight+0.5:1e9;   // jenseits der eigenen Sicht nur auf aufgeklärte Ziele (Raketenwerfer)
+  for(const e of G.units){ if(e.dead||!hostile(src.owner,e.owner)||!canHit(w,e)||!detected(e,src.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
+    if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
     const sc=d-(drone&&e.def.cls==='veh'?3:0); if(sc<bs){bs=sc;best=e;} }
   if(!w.airOnly) for(const e of G.buildings){ if(e.dead||!hostile(src.owner,e.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
+    if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
     const sc=d+1.5+(e.def.def&&!e.def.weapon?3:0); if(sc<bs){bs=sc;best=e;} }   // Mauern nur, wenn sonst nichts da ist
   return best;
 }
@@ -32,6 +35,7 @@ export function splash(x,y,r,dmg,type,src){
 export function aimPoint(t){ if(t.kind==='building') return {x:t.x+(Math.random()-0.5)*t.w*0.6,y:t.y+(Math.random()-0.5)*t.h*0.6}; return {x:t.x+(Math.random()-0.5)*0.3,y:t.y+(Math.random()-0.5)*0.3}; }
 export function fire(s,t){
   const w=s.def.weapon; s.cd=w.rof*(0.9+Math.random()*0.2);
+  if(s.kind==='unit'&&s.def.armor==='airHigh') s.revealT=G.t+4;   // Abschuss verrät den Hochflieger kurz
   const a=Math.atan2(t.y-s.y,t.x-s.x), ml=s.kind==='unit'?s.def.size*0.75:0.55;
   const mx=s.x+Math.cos(a)*ml, my=s.y+Math.sin(a)*ml, hp=aimPoint(t);
   if(w.salvo){   // Raketenwerfer: Salve auf zufällige Punkte um das Ziel

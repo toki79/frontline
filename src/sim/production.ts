@@ -1,5 +1,5 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, isPlain, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, isDefType, isPlain, RESEARCH, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
@@ -13,7 +13,8 @@ import { msg } from '../core/events';
 export function queueName(type){return RESEARCH[type]?'research':BUILDINGS[type]||FEATURES[type]?null:UNITS[type].prod;}
 export function missingReq(pid,type){
   const d=DEF(type), miss=[];
-  const prod = RESEARCH[type] ? 'university' : (BUILDINGS[type]||FEATURES[type]) ? 'hq' : d.prod;
+  // Verteidigung bauen Pioniere aus der Kaserne; Straßen und Gebäude das Rathaus
+  const prod = RESEARCH[type] ? 'university' : (isDefType(type)&&!(FEATURES[type]&&FEATURES[type].road)) ? 'barracks' : (BUILDINGS[type]||FEATURES[type]) ? 'hq' : d.prod;
   if(!prod) return ['—'];
   if(!findBuilding(pid,prod)) miss.push(BUILDINGS[prod].name);
   for(const r of (d.req||[])) if(!findBuilding(pid,r)) miss.push(BUILDINGS[r].name);
@@ -70,18 +71,27 @@ export function tileBuildable(pid,x,y){ return tileFree(idx(x,y)) && nearOwn(pid
 export function canPlaceDef(pid,type,x,y){
   if(FEATURES[type]&&FEATURES[type].road) return canPlaceRoad(pid,x,y);
   if(!inMap(x,y)) return false; const i=idx(x,y), t=G.terr[i];
-  if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]) return false;
+  if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]||G.fplan[i]) return false;
   if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&!isPlain(t)&&t!==T.MUD) return false; }
   else { if(!TERRAIN[t].build||G.feat[i]) return false; for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&Math.floor(u.x)===x&&Math.floor(u.y)===y&&u.owner!==pid) return false; }
   for(const b of G.buildings) if(!b.dead&&b.owner===pid&&!b.def.def&&rectDist(b,x,y,1,1)<=DEF_RADIUS) return true;
   return false;
 }
+/** Verteidigung beauftragen: wird bezahlt und als Plan bzw. Baustelle gesetzt – Pioniere bauen es vor Ort */
 export function placeDefense(pid,type,x,y){
   if(FEATURES[type]&&FEATURES[type].road) return !missingReq(pid,type).length&&planRoad(pid,x,y);
   if(!canPlaceDef(pid,type,x,y)||missingReq(pid,type).length||!canAfford(pid,type)) return false;
   pay(pid,type,1);
-  if(FEATURES[type]) G.feat[idx(x,y)]=FEATURES[type].id; else placeBuilding(pid,type,x,y,false);
+  if(FEATURES[type]){ const i=idx(x,y); G.fplan[i]=FEATURES[type].id; G.fplanOwner[i]=pid+1; }
+  else { const b=placeBuilding(pid,type,x,y,false,true); b.pio=true; }
   return true;
+}
+/** geplantes Verteidigungsfeld zurücknehmen (volle Erstattung) */
+export function cancelDefPlan(pid,x,y){
+  if(!inMap(x,y)) return false; const i=idx(x,y);
+  if(!G.fplan[i]||G.fplanOwner[i]!==pid+1) return false;
+  const k=Object.keys(FEATURES).find(k=>FEATURES[k].id===G.fplan[i]&&!FEATURES[k].road); if(k) pay(pid,k,-1);
+  G.fplan[i]=0; G.fplanOwner[i]=0; return true;
 }
 /** Baustelle beauftragen: Kosten werden sofort bezahlt, Bauarbeiter erledigen den Rest. */
 export function placeSite(pid,type,tx,ty){

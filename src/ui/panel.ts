@@ -30,7 +30,7 @@ export function drawIcon(cvs,type){
 export function buildPanel(){
   const box=$('#items'); box.innerHTML=''; ui.btns={};
   const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def), ...Object.keys(RESEARCH)]
-            : ui.tab==='vert' ? ['wall','wire','trench','sentry','turret','flak']
+            : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak']
             : Object.keys(UNITS).filter(k=>UNITS[k].prod);
   for(const k of list){
     const d=DEF(k), el=document.createElement('button'); el.className='it';
@@ -95,9 +95,10 @@ export function updatePanel(){
   { const h=p.happy??0.8, el=$('#happy'); el.textContent=`${h>=0.75?'😊':h>=0.5?'😐':h>=0.35?'😟':'😠'} ${Math.round(h*100)} %`; el.classList.toggle('low',h<0.5); }
   const goalMe=G.mode==='race'?ECON.target:nextMilestone(p.pop), goalAi=G.mode==='race'?ECON.target:nextMilestone(A.pop);
   $('#popMeBar').style.width=Math.min(100,p.pop/goalMe*100)+'%';
-  $('#popAi').textContent=Math.floor(A.pop);
-  $('#popAiBar').style.width=Math.min(100,A.pop/goalAi*100)+'%';
-  const st=$('#stance'); st.textContent=G.war?'⚔ Krieg':'Frieden'; st.style.background=G.war?'#7a2219':'#2a4f7a';
+  $('#popAi').textContent=G.known[0][1]?String(Math.floor(A.pop)):'???';
+  $('#popAiBar').style.width=G.known[0][1]?Math.min(100,A.pop/goalAi*100)+'%':'0';
+  $('#popAiBar').closest('.pb').querySelector('.nm').textContent=G.known[0][1]?'👥 Kastrova':'👥 ???';
+  const st=$('#stance'); st.textContent=!G.known[0][1]?'unbekannt':G.war?'⚔ Krieg':'Frieden'; st.style.background=!G.known[0][1]?'#3a3a34':G.war?'#7a2219':'#2a4f7a';
 }
 
 export function init(){

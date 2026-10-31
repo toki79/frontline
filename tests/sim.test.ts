@@ -3,10 +3,10 @@ import { describe, it, expect } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
-import { findBuilding, countBuildings, tileCost, spawnAt } from '../src/sim/world';
+import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar } from '../src/sim/world';
 import { destroy } from '../src/sim/combat';
-import { orderEscort, orderMove } from '../src/sim/orders';
-import { CONSTRUCTION, MAP_H, MAP_W, STORAGE, T } from '../src/data/config';
+import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
+import { CONSTRUCTION, FEAT, MAP_H, MAP_W, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
 import { idx } from '../src/core/util';
@@ -189,13 +189,88 @@ describe('Simulation', () => {
     expect(G.players[1].pop).toBeGreaterThan(60);
   });
 
-  it('Verteidigung wird direkt platziert und kostet Geld', () => {
+  it('Verteidigung: geplant und bezahlt, Pioniere bauen sie vor Ort', () => {
     newGame('mittel');
-    const hq = findBuilding(0, 'hq'), m = G.players[0].res.money;
-    let ok = false;
-    for (let d = 4; d < 8 && !ok; d++) ok = placeDefense(0, 'trench', Math.floor(hq.x) + d, Math.floor(hq.y) - d);
-    expect(ok).toBe(true);
+    const hq = findBuilding(0, 'hq');
+    expect(placeDefense(0, 'trench', Math.floor(hq.x) + 4, Math.floor(hq.y) - 4)).toBe(false);   // ohne Kaserne nicht
+    const bar = placeBuilding(0, 'barracks', hq.tx + 4, hq.ty, true);
+    const m = G.players[0].res.money; let spot = null;
+    for (let d = 4; d < 9 && !spot; d++) if (placeDefense(0, 'trench', Math.floor(hq.x) + d, Math.floor(hq.y) - d)) spot = [Math.floor(hq.x) + d, Math.floor(hq.y) - d];
+    expect(spot).toBeTruthy();
     expect(G.players[0].res.money).toBe(m - 30);
+    const i = idx(spot[0], spot[1]);
+    run(20); expect(G.feat[i]).toBe(0);                 // ohne Pioniere bleibt es Plan
+    spawnAt(0, 'pioneer', bar.x, bar.y + 2);
+    expect(runUntil(() => G.feat[i] === FEAT.TRENCH, 60)).toBe(true);
+  });
+
+  it('Panzermine zerstört feindliches Fahrzeug, Infanterie löst sie nicht aus', () => {
+    newGame('mittel');
+    const hq = findBuilding(0, 'hq'), x = hq.tx + 8, y = hq.ty - 4, i = idx(x, y);
+    G.feat[i] = FEAT.MINE; G.featOwner[i] = 1;
+    setWar(true, 0);
+    const drive = (u) => { u.mode = 'move'; u.goal = {x: x + 2.5, y: y + 0.5}; u.path = [{x: x + 0.5, y: y + 0.5}, {x: x + 2.5, y: y + 0.5}]; u.pathI = 0; };
+    const inf = spawnAt(1, 'inf', x - 1 + 0.5, y + 0.5); drive(inf);
+    run(4); expect(G.feat[i]).toBe(FEAT.MINE);
+    const ifv = spawnAt(1, 'ifv', x - 1 + 0.5, y + 0.5); drive(ifv);
+    run(4);
+    expect(G.feat[i]).toBe(0);
+    expect(ifv.dead || ifv.hp < ifv.maxHp * 0.2).toBe(true);
+  });
+
+  it('Erstkontakt: Kastrova ist zu Beginn unbekannt', () => {
+    newGame('mittel', true);
+    expect(G.known[0][1]).toBe(false);
+    const k = findBuilding(1, 'hq');
+    spawnAt(0, 'spy', k.x - 6, k.y + 6);
+    run(1);
+    expect(G.known[0][1]).toBe(true);
+  });
+
+  it('Tarnung: Hochflieger ohne Radar nicht angreifbar, mit Flak schon', () => {
+    newGame('mittel');
+    setWar(true, 0);
+    const k = findBuilding(1, 'hq');
+    const r = spawnAt(0, 'spy', k.x + 6, k.y + 6); r.mode = 'idle';
+    const t = spawnAt(1, 'ifv', k.x + 7, k.y + 6);
+    run(1);
+    expect(r.det[1]).toBe(false);
+    expect(t.target === r).toBe(false);
+    placeBuilding(1, 'flak', Math.floor(k.x) + 4, Math.floor(k.y) + 8, true);
+    run(1);
+    expect(r.det[1]).toBe(true);
+  });
+
+  it('Raketenwerfer schießt weit, aber nur auf aufgeklärte Ziele', () => {
+    newGame('mittel', false);
+    setWar(true, 0);
+    G.fog = true; G.vis.fill(0);
+    const m = spawnAt(0, 'mlrs', 30.5, 60.5), tg = placeBuilding(1, 'house', 30, 42, true);
+    const p = G.players[0]; p.res.oil = 500;
+    run(3);
+    expect(m.target).toBeFalsy();                      // nicht aufgeklärt
+    spawnAt(0, 'spy', 31, 44);
+    run(3);
+    expect(m.target).toBeTruthy(); void tg;
+  });
+
+  it('FPV-Drohne: lauert nur, wenn eingestellt', () => {
+    newGame('mittel');
+    setWar(true, 0);
+    const d = spawnAt(0, 'drone', 30.5, 60.5); d.mode = 'idle'; d.guard = {x:30.5, y:60.5};
+    const e = spawnAt(1, 'mbt', 33.5, 60.5); e.mode = 'idle';   // Panzerkanone trifft keine Drohnen
+    run(2); expect(d.dead).toBeFalsy();
+    orderLurk([d], true);
+    run(4); expect(d.dead).toBe(true);
+  });
+
+  it('Reaper auf Aufklärungsflug erkundet selbstständig', () => {
+    newGame('mittel', true);
+    const r = spawnAt(0, 'reaper', 20, 70);
+    const explored0 = G.vis.reduce((s, v) => s + (v > 0 ? 1 : 0), 0);
+    orderPatrol([r], true);
+    run(60);
+    expect(G.vis.reduce((s, v) => s + (v > 0 ? 1 : 0), 0)).toBeGreaterThan(explored0 + 300);
   });
 
   it('Bauarbeiter tragen Material zur Baustelle', () => {

@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, MOOD, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -26,12 +26,15 @@ export function tipFor(k){
   if(k==='kontor') L.push(`Verkauft laufend bis ${BUILDINGS.kontor.export} Einheiten/s, aber nur was über der Reserve liegt (🛢 ${EXPORT.reserve.oil}, ⛏ ${EXPORT.reserve.metal}, 🌾 ${EXPORT.reserve.food}). Preise: 🛢 ${f1(EXPORT.price.oil)} $, ⛏ ${f1(EXPORT.price.metal)} $, 🌾 ${f1(EXPORT.price.food)} $ je Einheit – weniger als beim Handel mit Kastrova, dafür ohne Marktsättigung.`);
   if(k==='university') L.push(`Stufe 1: ${TECH_UNLOCKS[1]} · Stufe 2: ${TECH_UNLOCKS[2]} · Stufe 3: ${TECH_UNLOCKS[3]}. Erforschtes Wissen bleibt auch erhalten, wenn die Universität zerstört wird.`);
   if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. Planen ist kostenlos, jedes Feld verbraucht beim Bau ${DEF('road').cost.stone} 🪨 Stein. <b>Transport:</b> Höfe, Holzfäller, Steinbrüche und Minen liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an – eine Straße zählt nur ${Math.round(HAUL.roadCost*100)} % des Weges, lohnt sich also besonders bei weiten Strecken. Gebäude wählen → 🛣 Straße plant den Weg.`);
-  else if(isDefType(k)) L.push(`Wird direkt auf der Karte gebaut (bis ${DEF_RADIUS} Felder vor der Stadt)${d.line?', auch durch Ziehen über mehrere Felder':''}.`);
+  else if(isDefType(k)) L.push(`Wird auf der Karte geplant (bis ${DEF_RADIUS} Felder vor der Stadt)${d.line?', auch durch Ziehen über mehrere Felder':''} und von <b>Pionieren</b> vor Ort gebaut – erst in der Kaserne Pioniere ausbilden. Bezahlt wird beim Planen; Plan antippen nimmt ihn zurück.`);
+  if(k==='atmine') L.push(`Für Feinde unsichtbar. Nur Fahrzeuge lösen sie aus (${PIONEER.mineDmg} Schaden – leichte Fahrzeuge sind meist hinüber). Feindliche Pioniere können Minen entdecken und räumen.`);
+  if(k==='pioneer') L.push('Bauen alles aus dem Reiter Verteidigung vor Ort und räumen feindliche Minen, die sie in ihrer Nähe entdecken. Leicht bewaffnet.');
   if(FEATURES[k]){ if(k==='trench') L.push('Infanterie im Graben erhält 60 % Deckung. Fahrzeuge kommen nur sehr langsam hindurch. Unzerstörbar.');
     if(k==='wire') L.push('Infanterie kommt nur sehr langsam durch. Panzer walzen ihn platt, Granaten und Raketen zerreißen ihn.'); }
   else if(RESEARCH[k]){}
   else if(BUILDINGS[k]){
-    if(d.def&&d.time) L.push(`Nach dem Platzieren ${d.time} s Aufbau, erst dann einsatzbereit.`);
+    if(d.def) L.push(`Bauzeit für einen Pionier: ${Math.round(Math.max(1,d.time)*PIONEER.workTime)} s.`);
+    if(d.radar) L.push(`📡 Radar: entdeckt getarnte Hochflieger (Spionage- und Reaper-Drohnen) im Umkreis von ${d.radar} Feldern – nur dann können sie bekämpft werden.`);
     if(d.power) L.push(d.power>0?`Strom: erzeugt +${d.power} ⚡`:`Strom: verbraucht ${-d.power} ⚡`);
     if(d.cap) L.push(`Wohnraum: +${d.cap} Einwohner. <b>Ruhig bauen:</b> Industrie im Umkreis von ${NOISE_R} Feldern und zugebaute Nachbarfelder (enge Bebauung) senken die Wohnqualität, dann ziehen Bewohner langsamer ein. Beim Platzieren zeigen die Farben grün/gelb/orange die Qualität.`);
     if(d.noise) L.push(`<span style="color:#ffb38a">Lärm: senkt die Wohnqualität von Häusern im Umkreis von ${NOISE_R} Feldern (direkt daneben −${Math.round(d.noise*100)} %).</span>`);
@@ -58,8 +61,9 @@ export function tipFor(k){
     if(d.worker) L.push(`Sucht sich selbst Arbeit: Baustellen zuerst, dann geplante Straßen. Bis zu ${CONSTRUCTION.maxWorkers} Arbeiter je Baustelle. Unbewaffnet – im Krieg schützen!`);
     if(d.harvester) L.push(`Fasst ${d.harvester.cap} Öl pro Fahrt. Tippe ein Ölfeld an, um ihn dorthin zu schicken.`);
     if(d.weapon&&d.weapon.minRange) L.push(`Mindestreichweite ${d.weapon.minRange} – kann nahe Ziele nicht treffen.`);
+    if(d.weapon&&d.weapon.range>d.sight) L.push(`🔭 Reichweite ${d.weapon.range} Felder, aber selbst sieht er nur ${d.sight}: Ziele dahinter müssen gerade aufgeklärt sein (Drohnen, Späher, eigene Truppen).`);
     if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
-    if(d.armor==='airHigh') L.push('Fliegt hoch: nur Flugabwehr und (schwach) Maschinenkanonen können sie treffen.');
+    if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder kurz nachdem sie feuert). Dann treffen nur Flugabwehr und schwach Maschinenkanonen.');
     else if(d.cls==='air') L.push('Fliegt tief: Gewehre, Maschinenkanonen und Flugabwehr können sie abschießen.');
     if(d.sight>=12) L.push(`Sichtweite ${d.sight} Felder – deckt den Nebel des Krieges weit auf.`);
     if(d.battery) L.push(`Akku ${d.battery} s außerhalb der eigenen Stadt, lädt zu Hause wieder. Höchstens ${DRONES_PER_SHOP} je Werkstatt.`);
@@ -83,7 +87,7 @@ export const HUD_TIPS: Record<string, ()=>string> = {
   oil:()=>{const p=G.players[0],n=G.units.filter(u=>u.owner===0&&u.def.harvester).length,rf=countBuildings(0,'refinery');return `<b>🛢 Öl: ${fmt(p.res.oil)}</b><br>+${f1(p.rate?p.rate.oil||0:0)}/s aus ${rf} Raffinerie${rf===1?'':'n'} (je max. 3/s) · ${n} Tanklaster. Mehr Laster als die Raffinerie verarbeiten kann, bringen nichts – dann warten sie. Öl braucht man für Fahrzeuge; Überschuss am Milizmarkt verkaufen (zurzeit 100 🛢 → $${tradeTerms(0,'sellOil').get.money}; jeder Verkauf drückt den Preis).<br><span class="dim">Raffinerie bauen → Tanklaster fördert automatisch.</span>${regionNote('oil')}`;},
   pop:()=>{const p=G.players[0];const why={unzufrieden:'Unzufriedenheit – Einwohner wandern ab!',hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];
     return `<b>👥 Einwohner: ${Math.floor(p.pop)} von ${p.cap} Wohnraum</b><br>${G.mode==='race'?`Siegziel: ${ECON.target} Einwohner (Balken).`:`Stadtstufe: <b>${ECON.ranks[rankOf(p.pop)][1]}</b> · Balken = Weg zur nächsten Stufe (${nextMilestone(p.pop)}).`} Wachstum zurzeit ${p.growth>=0?'+':''}${f1((p.growth||0)*60)} pro Minute.<br>Neue Bewohner ziehen zuerst in die ruhigsten Häuser.${why?`<br><span style="color:#ffb38a">${why}</span>`:''}<br><span class="dim">Soldaten kosten Einwohner. Zerstörte Wohnhäuser vertreiben Bewohner.</span>`;},
-  popAi:()=>{const A=G.players[1];return `<b>👥 Kastrova: ${Math.floor(A.pop)} Einwohner</b><br>${G.mode==='race'?`Wer zuerst ${ECON.target} erreicht, gewinnt.`:`Stadtstufe: ${ECON.ranks[rankOf(A.pop)][1]}.`} Liegt ihr deutlich vorn, wird Kastrova misstrauisch und rüstet auf.`;},
+  popAi:()=>{const A=G.players[1];if(!G.known[0][1]) return '<b>Unbekannte Macht</b><br>Noch kein Kontakt. Erkunde das Tal, um herauszufinden, wer hier noch lebt.';return `<b>👥 Kastrova: ${Math.floor(A.pop)} Einwohner</b><br>${G.mode==='race'?`Wer zuerst ${ECON.target} erreicht, gewinnt.`:`Stadtstufe: ${ECON.ranks[rankOf(A.pop)][1]}.`} Liegt ihr deutlich vorn, wird Kastrova misstrauisch und rüstet auf.`;},
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
   stance:()=>G.war?'<b>⚔ Krieg mit Kastrova</b><br>Einheiten greifen sich gegenseitig an. Zerstörte Gebäude bringen dem Angreifer Beute. Frieden über 🤝 anbieten.':'<b>Frieden mit Kastrova</b><br>Niemand schießt. Kastrova kann aber Forderungen stellen oder den Krieg erklären, wenn ihr zu schnell wachst oder schwach seid.',
 };

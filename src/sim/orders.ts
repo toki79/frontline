@@ -20,7 +20,7 @@ export function orderMove(units,gx,gy,mode='move'){
   const spots=formationSpots(gx,gy,units.length,'veh');
   const rest=[...units].sort((a,b)=>dist(a.x,a.y,gx,gy)-dist(b.x,b.y,gx,gy));
   rest.forEach((u,i)=>{ const s=spots[i]||spots[spots.length-1]||{x:gx,y:gy};
-    u.mode=mode; u.target=null; u.escort=null; u.goal={x:s.x,y:s.y}; if(u.def.harvester&&mode!=='harvest') u.hs=null; setPath(u,s.x,s.y); u.repathT=1; });
+    u.mode=mode; u.target=null; u.escort=null; u.patrol=false; u.resume=null; u.goal={x:s.x,y:s.y}; if(u.def.harvester&&mode!=='harvest') u.hs=null; setPath(u,s.x,s.y); u.repathT=1; });
 }
 export function orderAttack(units,t){
   const armed=units.filter(u=>u.def.weapon), other=units.filter(u=>!u.def.weapon);
@@ -28,6 +28,9 @@ export function orderAttack(units,t){
   if(other.length) orderMove(other,t.x,t.y);
 }
 export function orderStop(units){for(const u of units){u.mode='idle';u.escort=null;u.path=null;u.target=null;u.guard={x:u.x,y:u.y};if(u.def.harvester)u.hs=null;}}
+/** Drohnen: Lauerstellung (FPV) bzw. Aufklärungsflug (Spionage/Reaper) umschalten */
+export function orderLurk(units,on){ for(const u of units) if(u.def.weapon&&u.def.weapon.kamikaze){ u.lurk=on; if(on&&!u.post) u.post={x:u.x,y:u.y}; } }
+export function orderPatrol(units,on){ for(const u of units) if(u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)){ u.patrol=on; u.mode=on?'patrol':'idle'; u.target=null; u.path=null; u.guard={x:u.x,y:u.y}; } }
 /** Begleitschutz: bewaffnete Einheiten folgen einem eigenen Arbeiter/Laster und verteidigen ihn */
 export function orderEscort(units,t){ let n=0; for(const u of units){ if(!u.def.weapon||u===t) continue; u.mode='escort'; u.escort=t; u.target=null; u.path=null; u.repathT=0; n++; } return n; }
 export function orderHarvest(trucks,tile){for(const u of trucks){u.mode='harvest';u.hs='toOil';u.oilTile=tile;u.target=null;setPath(u,tile%MAP_W+0.5,((tile/MAP_W)|0)+0.5);}}

@@ -104,20 +104,33 @@ export const DAMAGE = {
   rocket:     {none:0.6,  light:0.7, heavy:0.35, building:1.0,  fort:0.6,  air:0, airHigh:0},
   drone:      {none:0.7,  light:1.3, heavy:1.0,  building:0.5,  fort:0.35, air:0, airHigh:0},
   flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:1.6},
+  mine:       {none:0.3,  light:1.3, heavy:1.0,  building:0,    fort:0,    air:0,   airHigh:0},
 };
 export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.airOnly) return air; return (DAMAGE[w.type][t.armor]||0)>0; };
 // ---------- Geländeausbau (Graben, Stacheldraht) ----------
-export const FEAT = {NONE:0, WIRE:1, TRENCH:2};
+export const FEAT = {NONE:0, WIRE:1, TRENCH:2, MINE:3};
+// Pioniere: bauen Verteidigung vor Ort, legen und räumen Minen
+export const PIONEER = {
+  workTime: 2.5,        // Bauzeit einer Stellung = time × workTime (ein Pionier)
+  maxPerSite: 2,
+  clearTime: 3,         // Sekunden, um eine feindliche Mine in der Nähe zu räumen
+  detect: 1.6,          // so nah muss ein Pionier an eine feindliche Mine
+  mineDmg: 300,         // Schaden einer Panzermine am auslösenden Fahrzeug
+  mineSplash: 0.9,
+};
 // Straße: wird geplant (gezogen) und von Bauarbeitern gebaut
 export const FEATURES = {
   road:   {id:0, name:'Straße', cost:{stone:2}, desc:'Zufahrt: Gebäude arbeiten nur mit Anschluss ans Straßennetz. Einheiten sind auf Straßen fast doppelt so schnell.', line:true, road:true},
-  wire:   {id:1, name:'Stacheldraht',  cost:{money:15}, desc:'Bremst Infanterie stark, Fahrzeuge walzen ihn platt', line:true},
-  trench: {id:2, name:'Schützengraben',cost:{money:30}, desc:'Infanterie darin: 60 % Deckung · bremst Fahrzeuge stark', line:true},
+  wire:   {id:1, name:'Stacheldraht',  cost:{money:15}, work:2.5, desc:'Bremst Infanterie stark, Fahrzeuge walzen ihn platt', line:true},
+  trench: {id:2, name:'Schützengraben',cost:{money:30}, work:6, desc:'Infanterie darin: 60 % Deckung · bremst Fahrzeuge stark', line:true},
+  atmine: {id:3, name:'Panzermine',    cost:{money:40, metal:5}, work:3, desc:'Für Feinde unsichtbar; zerstört bzw. beschädigt schwer jedes feindliche Fahrzeug, das darüber fährt', line:true},
 };
 // ---------- Einheiten ----------
 export const UNITS = {
   worker:{name:'Bauarbeiter', cls:'inf', cost:{money:90, pop:1}, time:8, hp:40, armor:'none', speed:1.45, sight:4, size:0.3,
           worker:true, prod:'hq', req:[], desc:'Baut Gebäude und Straßen – mehr Arbeiter, schnellerer Bau'},
+  pioneer:{name:'Pioniere', cls:'inf', cost:{money:150, pop:3}, time:8, hp:85, armor:'none', speed:1.3, sight:6, size:0.4, pioneer:true,
+          weapon:{type:'bullet', dmg:5, range:3.5, rof:1.2}, prod:'barracks', req:[], desc:'Bauen Mauern, Gräben, Stacheldraht, Minen und Stellungen vor Ort; räumen feindliche Minen'},
   inf:   {name:'Schützentrupp', cls:'inf', cost:{money:100, pop:5}, time:4, hp:90, armor:'none', speed:1.25, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:9, range:4, rof:0.9}, prod:'barracks', req:[], desc:'Günstig, stark in Wald und Ortschaften'},
   at:    {name:'Panzerabwehr', cls:'inf', cost:{money:200, metal:20, pop:5}, time:6, hp:80, armor:'none', speed:1.15, sight:6, size:0.4,
@@ -128,14 +141,14 @@ export const UNITS = {
           weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge'},
   truck: {name:'Tanklaster', cls:'veh', cost:{money:400, metal:30, pop:2}, time:10, hp:420, armor:'light', speed:1.7, sight:5, size:0.62,
           harvester:{cap:350, rate:70, unload:200}, prod:'factory', req:['refinery'], desc:'Fördert Öl, bringt es zur Raffinerie'},
-  mlrs:  {name:'Raketenwerfer', cls:'veh', tech:2, cost:{money:550, metal:100, oil:60, pop:4}, time:18, hp:260, armor:'light', speed:1.4, sight:10, size:0.66, upkeep:0.08, combat:true,
-          weapon:{type:'rocket', dmg:32, range:9.5, minRange:3, rof:11, salvo:6, splash:1.1, spread:1.6}, prod:'factory', req:[], desc:'Salven auf große Distanz, Flächenschaden, ungenau'},
+  mlrs:  {name:'Raketenwerfer', cls:'veh', tech:2, cost:{money:550, metal:100, oil:60, pop:4}, time:18, hp:260, armor:'light', speed:1.4, sight:7, size:0.66, upkeep:0.08, combat:true,
+          weapon:{type:'rocket', dmg:48, range:22, minRange:4, rof:14, salvo:8, splash:1.6, spread:2.0}, prod:'factory', req:[], desc:'Verheerende Salven auf 22 Felder – aber nur auf Ziele, die gerade aufgeklärt sind (Drohnen, Späher)'},
   drone: {name:'FPV-Kamikazedrohne', cls:'air', tech:2, cost:{money:120, metal:15, pop:1}, time:4, hp:30, armor:'air', speed:4.5, sight:9, size:0.35, battery:90,
-          weapon:{type:'drone', dmg:80, range:0.45, rof:1, kamikaze:true, splash:0.7}, prod:'droneshop', req:[], desc:'Tieffliegend, stürzt sich aufs Ziel, fliegt über Hindernisse'},
-  spy:   {name:'Spionagedrohne', cls:'air', tech:1, cost:{money:220, metal:20, pop:1}, time:6, hp:60, armor:'airHigh', speed:3.4, sight:13, size:0.35, battery:180,
-          prod:'droneshop', req:[], desc:'Hochfliegend, unbewaffnet, sieht sehr weit'},
-  reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:240, armor:'airHigh', speed:2.6, sight:10, size:0.6, battery:150,
-          weapon:{type:'missile', dmg:75, range:6.5, rof:5}, prod:'droneshop', req:[], desc:'Hochfliegende Kampfdrohne mit Lenkraketen'},
+          weapon:{type:'drone', dmg:80, range:0.45, rof:1, kamikaze:true, splash:0.7}, prod:'droneshop', req:[], desc:'Tieffliegend, schwebt an ihrem Posten; in Lauerstellung (🎯) stürzt sie sich auf Feinde in Sicht'},
+  spy:   {name:'Spionagedrohne', cls:'air', tech:1, cost:{money:220, metal:20, pop:1}, time:6, hp:60, armor:'airHigh', speed:3.4, sight:13, size:0.35, battery:420,
+          prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, unbewaffnet, sieht sehr weit – auf Aufklärungsflug (🛰) erkundet sie selbstständig die Karte'},
+  reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:240, armor:'airHigh', speed:2.6, sight:12, size:0.6, battery:480,
+          weapon:{type:'missile', dmg:75, range:6.5, rof:5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, lange Flugzeit, Lenkraketen – auf Aufklärungsflug (🛰) überfliegt sie selbstständig das ganze Tal'},
   militia:{name:'Milizionäre', cls:'inf', cost:{money:150}, time:0, hp:75, armor:'none', speed:1.3, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:8, range:4, rof:0.95}, prod:null, desc:'Kämpfer der Grenzmiliz'},
   bandit: {name:'Räuber', cls:'inf', cost:{money:0}, time:0, hp:70, armor:'none', speed:1.35, sight:6, size:0.4,
@@ -161,12 +174,12 @@ export const BUILDINGS = {
   university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:900, metal:60, stone:120}, time:16, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
   droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:1300, metal:120, stone:100}, time:14, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
   // --- Verteidigung (def:true): direkt auf der Karte platzieren, Stellungen brauchen danach Bauzeit ---
-  wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:20, stone:10},  time:0, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},
+  wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:20, stone:10},  time:3, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},
   sentry:  {name:'Selbstschuss\u00ADanlage', w:1,h:1, hp:420, power:-5, cost:{money:150, stone:10}, time:6, req:[], def:true, noise:0.05, sight:6, desc:'Automatisches MG gegen Infanterie und Drohnen',
             weapon:{type:'bullet', dmg:10, range:4.5, rof:0.35}},
   turret:  {name:'MK-Stellung',   w:1,h:1, hp:750,  power:-15, cost:{money:300, metal:30, stone:20}, time:8, req:['barracks'], def:true, noise:0.1, sight:7, desc:'Maschinenkanone gegen Fahrzeuge, Infanterie und Drohnen',
             weapon:{type:'autocannon', dmg:17, range:6, rof:0.55}},
-  flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:250, metal:25, stone:20}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, desc:'Holt Drohnen vom Himmel (nur Luftziele)',
+  flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:250, metal:25, stone:20}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, radar:9, desc:'Holt Drohnen vom Himmel; ihr Radar entdeckt getarnte Hochflieger im Umkreis von 9 Feldern',
             weapon:{type:'flak', dmg:24, range:8, rof:0.4, airOnly:true}},
   bunker:  {name:'Milizbunker',   w:2,h:2, hp:1400, power:0,   cost:{}, time:0, buildable:false, sight:7,
             weapon:{type:'bullet', dmg:13, range:5.5, rof:0.5}},
@@ -179,6 +192,11 @@ export const FACTIONS = [
   {name:'Grenzmiliz von Belgor', short:'Miliz',    leader:'Hauptmann Dorin', col:'#c9a640', dark:'#6a5317'},
   {name:'Räuberbanden',          short:'Räuber',   leader:'–',               col:'#8a8a82', dark:'#3a3a34'},
 ];
+// ---------- Drohnen ----------
+export const DRONE = {
+  hoverDrain: 0.3,      // Akkuverbrauch beim Schweben (Anteil vom Flug)
+  returnAt: 0.25,       // unter diesem Akkustand fliegen Drohnen selbstständig zum Laden heim
+};
 // ---------- Räuber ----------
 export const BANDITS = {
   camps: [[9,13],[15,27],[26,40],[3,36]],   // Lager im Entwurfsmaß (64er-Karte, Aldoria-Seite), werden gespiegelt

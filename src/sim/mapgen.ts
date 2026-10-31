@@ -77,7 +77,7 @@ export function genMap(){
   for(const side of [0,1]){
     // Holz: knapp = Wald rund um die Stadt gerodet; reich = zusätzliche Wälder am Stadtrand
     const w=lvl(side,'wood');
-    if(w===0) lb(side,9.5,51.5,23,i=>{ if(terr[i]===T.FOREST) terr[i]=T.GRASS; });
+    if(w===0){ lb(side,9.5,51.5,23,i=>{ if(terr[i]===T.FOREST) terr[i]=T.GRASS; }); lb(side,17,60,1.8,toForest); }   // knapp: nur ein Wäldchen
     if(w>=1) lb(side,13.5,61,2.6,toForest);
     if(w===2){ lb(side,13.5,61,3.4,toForest); lb(side,2.5,43.5,2.8,toForest); lb(side,18.5,47.5,2.4,toForest); }
     // Nahrung: grüne Wiesen
@@ -89,7 +89,7 @@ export function genMap(){
     if(st>=1) lf(G.rock,15.5,56.5,st===2?1.6:1.3,st===2?1500:1100,0.85,side);
     if(st===2){ lf(G.rock,2.5,57.5,1.6,1500,0.85,side); lf(G.rock,19.5,51.5,1.4,1400,0.85,side); }
     if(st>=1) gf(G.rock,13.5,36.5,1.5,1400,0.85,side);
-    else gf(G.rock,23.5,33.5,1.2,900,0.8,side);
+    else { gf(G.rock,23.5,33.5,1.2,900,0.8,side); lf(G.rock,3.5,60,1.0,500,0.9,side); }   // knapp: nur ein paar Brocken
     // Öl: knapp = nichts in Stadtnähe, reich = reich + Zusatzfeld
     const o=lvl(side,'oil'), om=o===2?1.6:1;
     if(o>=1){ lf(G.oil,18.5,58.5,2.2,420*om,0.8,side); lf(G.oil,3.5,40.5,1.8,380*om,0.8,side); }

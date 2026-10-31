@@ -1,11 +1,12 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { FEAT, LEASH, MAP_H, MAP_W } from '../data/config';
+import { DRONE, FEAT, LEASH, MAP_H, MAP_W } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
-import { hostile, nearestPassable, passable, tileCost } from '../sim/world';
+import { detected, hostile, nearestPassable, passable, tileCost } from '../sim/world';
 import { msg } from '../core/events';
 import { updateWorker } from '../sim/build';
+import { checkMine, updatePioneer } from '../sim/pioneers';
 
 /* =====================================================================
    Einheiten-Update
@@ -13,13 +14,14 @@ import { updateWorker } from '../sim/build';
 export function updateUnit(u,dt){
   const d=u.def;
   u.cd-=dt;
-  if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner))){u.target=null;if(u.mode==='attack'){u.mode='idle';u.guard={x:u.x,y:u.y};}}
+  if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner)||!detected(u.target,u.owner))){u.target=null;if(u.mode==='attack'){u.mode='idle';u.guard={x:u.x,y:u.y};}}
   let firing=false;
   if(d.weapon){
     u.scanT-=dt;
     if(u.scanT<=0){ u.scanT=0.35+Math.random()*0.2;
-      if(u.mode!=='move'&&u.mode!=='attack'){
-        if(!u.target||distTo(u,u.target)>d.weapon.range){const t=findTarget(u,d.sight); if(t) u.target=t;}
+      // FPV greifen nur in Lauerstellung selbstständig an; Aufklärer auf Patrouille lassen sich nicht ablenken
+      if(u.mode!=='move'&&u.mode!=='attack'&&u.mode!=='patrol'&&u.mode!=='recharge'&&!(d.weapon.kamikaze&&!u.lurk)){
+        if(!u.target||distTo(u,u.target)>d.weapon.range){const t=findTarget(u,Math.max(d.sight,d.weapon.range)); if(t) u.target=t;}
       }
     }
     if(u.target&&d.weapon.minRange&&distTo(u,u.target)<d.weapon.minRange) u.target=null;   // zu nah für Raketen
@@ -43,10 +45,13 @@ export function updateUnit(u,dt){
   }
   if(d.harvester) updateHarvest(u,dt);
   if(d.worker) updateWorker(u,dt);
+  if(d.pioneer) updatePioneer(u,dt);
   if(u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15&&d.cls!=='air'&&(u.healChk=(u.healChk||0)-dt)<=0){ u.healChk=1; u.home=homeTurf(u); }
   if(u.home&&u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.015*dt);   // Versorgung zu Hause
-  if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt
-    if(G.buildings.some(b=>!b.dead&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9)) u.battery=Math.min(d.battery,(u.battery??d.battery)+dt*4); else u.battery=(u.battery??d.battery)-dt;
+  if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt (Schweben braucht wenig)
+    const home=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9);
+    if(home) u.battery=Math.min(d.battery,(u.battery??d.battery)+dt*4); else u.battery=(u.battery??d.battery)-dt*(u.path&&u.path.length?1:DRONE.hoverDrain);
+    updateDroneDuty(u,home);
     if(u.battery<=0){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.25,life:0.3}); u.dead=true; if(u.owner===0){G.stats.lost++; msg('Eine Drohne ist mit leerem Akku abgestürzt.','#ffb38a');} G.sel=G.sel.filter(s=>s!==u); return; }
   }
   if(u.mode==='escort'){   // Begleitschutz: dicht beim Schützling bleiben, Ziele nicht zu weit verfolgen
@@ -72,6 +77,7 @@ export function updateUnit(u,dt){
       const c=tileCost(ti,d.cls); let spd=d.speed/(c===Infinity?1:c);
       if(d.upkeep&&G.players[u.owner].fuelShort) spd*=0.5;                        // Treibstoffmangel
       if(d.cls==='veh'&&G.feat[ti]===FEAT.WIRE) G.feat[ti]=0;                      // Fahrzeuge walzen Draht platt
+      if(d.cls==='veh'&&G.feat[ti]===FEAT.MINE){ checkMine(u,ti); if(u.dead) return; }
       const step=spd*dt;
       if(L>0.01){ const want=Math.atan2(dy,dx); u.angle=d.cls==='inf'?want:rotTo(u.angle,want,5*dt); if(!u.target) u.tur=rotTo(u.tur,u.angle,5*dt); }
       if(L<=step){u.x=p.x;u.y=p.y;u.pathI++;}
@@ -79,7 +85,27 @@ export function updateUnit(u,dt){
     }
   }
 }
-export function arrived(u){ if(u.mode==='move'||u.mode==='amove'){ u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
+/** Drohnen: zum Laden heimfliegen, danach Posten bzw. Aufklärungsflug fortsetzen; Patrouille über die ganze Karte */
+function updateDroneDuty(u,home){
+  const d=u.def;
+  if(u.mode!=='recharge'&&!home&&u.battery<d.battery*DRONE.returnAt&&u.mode!=='attack'){
+    u.resume={patrol:!!u.patrol, post:u.post||null}; u.mode='recharge'; u.target=null;
+    let best=null,bd=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===u.owner&&!b.def.def){ const dd=dist(u.x,u.y,b.x,b.y)+(b.type==='droneshop'?-4:0); if(dd<bd){bd=dd;best=b;} }
+    if(best) setPath(u,best.x,best.y); return; }
+  if(u.mode==='recharge'){
+    if(home&&!u.path) u.path=null;
+    if(home&&u.battery>=d.battery-0.5){ const r=u.resume||{}; u.resume=null;
+      if(r.patrol){ u.mode='patrol'; u.patrol=true; u.path=null; }
+      else if(r.post){ u.mode='move'; u.goal={...r.post}; setPath(u,r.post.x,r.post.y); }
+      else { u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
+    return; }
+  if(u.mode==='patrol'&&(!u.path||u.pathI>=u.path.length)){   // nächster Wegpunkt: bevorzugt Unerforschtes bzw. gerade nicht Gesehenes
+    const vis=u.owner===0?G.vis:G.vis1; let best=null,bs=-1e9;
+    for(let k=0;k<10;k++){ const x=2+Math.random()*(MAP_W-4), y=2+Math.random()*(MAP_H-4), i=Math.floor(y)*MAP_W+Math.floor(x);
+      const v=vis?vis[i]:1, s=(v===0?30:v===1?12:0)+Math.min(dist(u.x,u.y,x,y),30)*0.4+Math.random()*5; if(s>bs){bs=s;best={x,y};} }
+    setPath(u,best.x,best.y); }
+}
+export function arrived(u){ if(u.mode==='move'||u.mode==='amove'){ u.mode='idle'; u.guard={x:u.x,y:u.y}; if(u.def.cls==='air') u.post={x:u.x,y:u.y}; } }
 export function updateBuilding(b,dt){
   // Selbstreparatur, wenn längere Zeit kein Beschuss
   if(b.fire>0){ updateFire(b,dt); if(b.dead) return; }

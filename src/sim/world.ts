@@ -99,22 +99,49 @@ export function refreshQuality(){
   for(const b of G.buildings){ if(b.dead||b.site||!b.def.cap) continue; const r=housingQuality(b.owner,b.tx,b.ty,b.w,b.h); b.quality=r.q; b.noiseSrc=r.src; }
   G.qDirty=false;
 }
-// ---------- Nebel des Krieges (nur für den Spieler; die KI sieht alles) ----------
-// vis: 0 = unerforscht, 1 = erkundet (Gelände + zuletzt gesehene Gebäude), 2 = gerade in Sicht
+// ---------- Sicht & Nebel des Krieges ----------
+// vis (Spieler) und vis1 (Kastrova): 0 = unerforscht, 1 = erkundet, 2 = gerade in Sicht.
+// Ohne Nebel sieht der Spieler alles; Kastrova hat immer ihre eigene Sicht (Erstkontakt, Raketenwerfer).
+// Hochfliegende Drohnen (airHigh) sind getarnt: nur Radar der Flugabwehr oder eigenes Feuer verrät sie.
 export const fogOn=()=>!!(G&&G.fog);
-export function seesFor0(o){ return o===0||(o===2&&G.militiaAlly===0); }
+export function seesFor(pid,o){ return o===pid||(o===2&&G.militiaAlly===pid); }
+export function seesFor0(o){ return seesFor(0,o); }
+export const visOf=pid=>pid===0?G.vis:G.vis1;
+/** ist ein Feld für eine Partei gerade aufgeklärt? */
+export function spotted(pid,x,y){ if(pid>1) return false; if(pid===0&&!G.fog) return true; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)&&visOf(pid)[idx(tx,ty)]===2; }
+/** Hochflieger für eine Partei entdeckt? (andere Einheiten immer) */
+export function detected(e,pid){ return e.kind!=='unit'||e.def.armor!=='airHigh'||seesFor(pid,e.owner)||!!(e.det&&e.det[pid]); }
 export function updateVision(){
-  if(!G.fog) return;
-  const v=G.vis; for(let i=0;i<v.length;i++) if(v[i]===2) v[i]=1;
-  const reveal=(x,y,r)=>{ const r2=r*r; for(let ty=Math.max(0,Math.floor(y-r));ty<=Math.min(MAP_H-1,Math.ceil(y+r));ty++)for(let tx=Math.max(0,Math.floor(x-r));tx<=Math.min(MAP_W-1,Math.ceil(x+r));tx++){
-    const dx=tx+0.5-x, dy=ty+0.5-y; if(dx*dx+dy*dy<=r2) v[ty*MAP_W+tx]=2; } };
-  for(const u of G.units) if(!u.dead&&seesFor0(u.owner)) reveal(u.x,u.y,u.def.sight+0.5);
-  for(const b of G.buildings) if(!b.dead&&seesFor0(b.owner)) reveal(b.x,b.y,(b.def.sight||4)+Math.max(b.w,b.h)/2);
+  G.vis1=G.vis1||new Uint8Array(MAP_W*MAP_H);
+  for(const pid of [0,1]){
+    if(pid===0&&!G.fog) continue;
+    const v=visOf(pid); for(let i=0;i<v.length;i++) if(v[i]===2) v[i]=1;
+    const reveal=(x,y,r)=>{ const r2=r*r; for(let ty=Math.max(0,Math.floor(y-r));ty<=Math.min(MAP_H-1,Math.ceil(y+r));ty++)for(let tx=Math.max(0,Math.floor(x-r));tx<=Math.min(MAP_W-1,Math.ceil(x+r));tx++){
+      const dx=tx+0.5-x, dy=ty+0.5-y; if(dx*dx+dy*dy<=r2) v[ty*MAP_W+tx]=2; } };
+    for(const u of G.units) if(!u.dead&&seesFor(pid,u.owner)) reveal(u.x,u.y,u.def.sight+0.5);
+    for(const b of G.buildings) if(!b.dead&&seesFor(pid,b.owner)) reveal(b.x,b.y,(b.def.sight||4)+Math.max(b.w,b.h)/2);
+  }
+  // Tarnung: Radar der Flugabwehr (fertig) erfasst Hochflieger im Umkreis; wer feuert, verrät sich kurz
+  const radars=G.buildings.filter(b=>!b.dead&&!b.site&&b.def.radar);
+  for(const u of G.units){ if(u.dead||u.def.armor!=='airHigh') continue; const rev=G.t<(u.revealT||-1);
+    u.det=[0,1,2,3].map(pid=>rev||radars.some(r=>r.owner===pid&&Math.hypot(r.x-u.x,r.y-u.y)<=r.def.radar)); }
   for(const b of G.buildings) if(!b.dead&&!b.seen&&inSightRect(b)) b.seen=true;
+  // Erstkontakt
+  for(const pid of [0,1]) for(const o of [0,1,2]){ if(o===pid||G.known[pid][o]) continue;
+    const seen=G.units.some(u=>!u.dead&&u.owner===o&&detected(u,pid)&&spotted(pid,u.x,u.y))||G.buildings.some(b=>!b.dead&&b.owner===o&&spotted(pid,b.x,b.y));
+    if(seen) makeContact(pid,o); }
+}
+/** Erstkontakt zwischen zwei Parteien */
+export function makeContact(pid,o){
+  if(G.known[pid][o]) return; G.known[pid][o]=true;
+  if(pid===0&&o===1){ msg('🔭 Erstkontakt: Wir sind auf die Föderation Kastrova gestoßen! Diplomatie und Handel sind jetzt möglich (🤝).','#d6b45a');
+    msg(`Geheimdienst: Kastrova hat ${G.regionText1}.`,'#d6b45a'); }
+  if(pid===0&&o===2) msg('🔭 Erstkontakt: die Grenzmiliz von Belgor auf der Flussinsel – sie betreibt einen Markt (🤝).','#d6b45a');
+  if(pid===1&&o===0) msg('⚠ Späher Kastrovas haben unsere Stadt entdeckt.','#ffb38a');
 }
 export function tileVis(x,y){ if(!G.fog) return 2; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)?G.vis[idx(tx,ty)]:0; }
-export function inSightRect(b){ for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.vis[idx(x,y)]===2) return true; return false; }
-export function visibleUnit(u){ return !G.fog||seesFor0(u.owner)||tileVis(u.x,u.y)===2; }
+export function inSightRect(b){ if(!G.fog) return true; for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.vis[idx(x,y)]===2) return true; return false; }
+export function visibleUnit(u){ return (!G.fog||seesFor0(u.owner)||tileVis(u.x,u.y)===2)&&detected(u,0); }
 export function knownBuilding(b){ return !G.fog||seesFor0(b.owner)||b.seen; }
 /** Fertiges Gebäude eines Typs (Baustellen zählen nicht) */
 export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===type);}
@@ -147,5 +174,6 @@ export function spawnUnit(pid,type,prod){
     if(r) orderMove([u], r.x+0.5, r.y+0.5);
   }
   if(pid===0) G.stats.built++;
+  if(pid===1&&d.cls==='air'){ if(d.weapon&&d.weapon.kamikaze) u.lurk=true; else { u.patrol=true; u.mode='patrol'; u.path=null; } }   // KI: FPV lauern, Aufklärer fliegen los
   return u;
 }

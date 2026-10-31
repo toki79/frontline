@@ -17,7 +17,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
       c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
-  } else if(type==='worker'){
+  } else if(type==='worker'||type==='pioneer'){
     // Bauarbeiter: gelber Helm, beim Arbeiten schwingt der Hammer (hpf<0 = arbeitet)
     const work=hpf<0, t=G?G.t:0;
     c.rotate(ang);
@@ -26,7 +26,8 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       c.fillStyle='#5a5a55'; c.fillRect(6,-1,2.5,4); c.restore(); }
     else { c.strokeStyle='#6b4a2a'; c.lineWidth=1.2; c.beginPath(); c.moveTo(-1,3); c.lineTo(5,4); c.stroke(); }
     c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; c.beginPath(); c.arc(0,0,3.8,0,7); c.fill(); c.stroke();
-    c.fillStyle='#f2c230'; c.strokeStyle='#8a6a10'; c.beginPath(); c.arc(0,0,2.5,0,7); c.fill(); c.stroke();
+    if(type==='pioneer'){ c.fillStyle='#5a6236'; c.strokeStyle='#2a2e18'; c.beginPath(); c.arc(0,0,2.7,0,7); c.fill(); c.stroke(); c.fillStyle='#e0c040'; c.fillRect(-1,-3.6,2,1.6); }
+    else { c.fillStyle='#f2c230'; c.strokeStyle='#8a6a10'; c.beginPath(); c.arc(0,0,2.5,0,7); c.fill(); c.stroke(); }
   } else if(type==='ifv'||type==='mbt'){
     const big=type==='mbt', L=big?24:20, Wd=big?16:13;
     c.rotate(ang);
@@ -218,7 +219,14 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
   c.restore();
 }
 // Graben / Stacheldraht: Linien von der Feldmitte zu gleichartigen Nachbarn (auch diagonal)
-export function drawFeature(c,f,px,py,dirs,S){
+export function drawFeature(c,f,px,py,dirs,S,enemy?){
+  if(f===FEAT.MINE){   // Panzermine: flache Scheibe mit Zünder
+    const cx=px+S/2, cy=py+S/2; c.save();
+    c.fillStyle='rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(cx+1,cy+1.5,S*0.24,S*0.17,0,0,7); c.fill();
+    c.fillStyle=enemy?'#7a3a2a':'#4d5238'; c.strokeStyle='#22241a'; c.lineWidth=1; c.beginPath(); c.ellipse(cx,cy,S*0.24,S*0.17,0,0,7); c.fill(); c.stroke();
+    c.fillStyle='#c8b040'; c.beginPath(); c.arc(cx,cy,S*0.06,0,7); c.fill();
+    if(enemy){ c.strokeStyle='#ff5a3a'; c.lineWidth=1.5; c.beginPath(); c.arc(cx,cy,S*0.36,0,7); c.stroke(); }
+    c.restore(); return; }
   const m=S/2, cx=px+m, cy=py+m;
   const segs=dirs.length?dirs:[[1,0],[-1,0]];
   const path=()=>{ c.beginPath(); for(const [dx,dy] of segs){ c.moveTo(cx,cy); c.lineTo(cx+dx*m,cy+dy*m); } };

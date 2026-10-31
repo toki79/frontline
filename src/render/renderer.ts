@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { hash, idx, inMap } from '../core/util';
-import { BUILDINGS, FACTIONS, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
+import { BUILDINGS, FACTIONS, FEAT, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, siteLacks, siteWorkers } from '../sim/build';
@@ -46,9 +46,11 @@ export function render(){
     if(need){ c.strokeStyle='rgba(255,230,120,.9)'; c.lineWidth=2;
       for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++) if(need[idx(x,y)]>0) c.strokeRect(x*TILE+2,y*TILE+2,TILE-4,TILE-4); } }
   // Gräben & Stacheldraht
-  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const f=G.feat[idx(x,y)]; if(!f) continue;
-    const dirs=[]; for(const d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const xx=x+d[0],yy=y+d[1]; if(inMap(xx,yy)&&G.feat[idx(xx,yy)]===f) dirs.push(d); }
-    drawFeature(c,f,x*TILE,y*TILE,dirs,TILE); }
+  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const i=idx(x,y), f=G.feat[i], pl=G.fplan[i]&&G.fplanOwner[i]===1?G.fplan[i]:0; if(!f&&!pl) continue;
+    if(f===FEAT.MINE){ if(G.featOwner[i]===1||G.mineSeen[i]||!G.fog) drawFeature(c,f,x*TILE,y*TILE,[],TILE,G.featOwner[i]!==1); continue; }   // feindliche Minen nur, wenn entdeckt
+    const k=f||pl, dirs=[]; for(const d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const xx=x+d[0],yy=y+d[1]; if(inMap(xx,yy)&&(G.feat[idx(xx,yy)]===k||(G.fplan[idx(xx,yy)]===k&&G.fplanOwner[idx(xx,yy)]===1))) dirs.push(d); }
+    if(f) drawFeature(c,f,x*TILE,y*TILE,dirs,TILE);
+    else { c.globalAlpha=0.35; drawFeature(c,pl,x*TILE,y*TILE,pl===FEAT.MINE?[]:dirs,TILE); c.globalAlpha=1; c.strokeStyle='rgba(232,210,122,.8)'; c.lineWidth=1; c.setLineDash([3,3]); c.strokeRect(x*TILE+3,y*TILE+3,TILE-6,TILE-6); c.setLineDash([]); } }
   // Öl & Erz
   for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){
     const i=idx(x,y), o=G.oil[i], h=hash(x,y), px=x*TILE, py=y*TILE;

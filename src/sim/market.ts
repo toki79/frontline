@@ -17,7 +17,7 @@ export const TRADES = {
   buyStone: {label:'Stein kaufen',   give:{money:200}, get:{stone:80}, step:0.18},
 };
 export const MARKET_RECOVER = 1/30;   // Sättigung sinkt um 1 Stufe pro 30 s
-export function marketOpen(pid){return !!findBuilding(2,'bunker')&&!G.militiaWar[pid];}
+export function marketOpen(pid){return !!findBuilding(2,'bunker')&&!G.militiaWar[pid]&&!!G.known[pid][2];}
 export function priceFactor(key){ const t=TRADES[key], s=G.market[key]||0; return t.sell?Math.max(t.min,1-t.step*s):1+t.step*s; }
 export function tradeTerms(pid,key): {give: Record<string,number>, get: Record<string,number>}{
   const t=TRADES[key], f=priceFactor(key), friend=G.attitude[pid]>=30?1.15:1, give={}, get={};
@@ -58,6 +58,7 @@ export function aiQuotes(){
 }
 export function tradeAI(side,res){
   if(G.war) return 'krieg';
+  if(!G.known[0][1]) return 'kein';
   const q=aiQuotes().find(q=>q.side===side&&q.res===res); if(!q) return 'kein';
   const P=G.players[0], A=G.players[1];
   if(side==='buy'){ if(P.res[res]<q.amt) return 'arm'; if(A.res.money<q.price) return 'pleite';
