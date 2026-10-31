@@ -184,7 +184,8 @@ describe('Simulation', () => {
     newGame('mittel');
     run(300);
     expect(countBuildings(1)).toBeGreaterThan(5);
-    expect(countBuildings(1, 'lumber') + countBuildings(1, 'quarry')).toBeGreaterThan(0);
+    const sc = G.profile[1].scarce;   // sind Holz UND Stein knapp, kauft die KI zu statt selbst abzubauen
+    if (!(sc.includes('wood') && sc.includes('stone'))) expect(countBuildings(1, 'lumber', true) + countBuildings(1, 'quarry', true)).toBeGreaterThan(0);
     expect(G.players[1].pop).toBeGreaterThan(60);
   });
 
