@@ -36,6 +36,7 @@
   <button data-c="desel">✕<small>Abwählen</small></button>
   <button data-c="escort" class="ctx">🛡<small>Begleiten</small></button>
   <button data-c="lurk" class="ctx">🎯<small>Lauern</small></button>
+  <button data-c="cage" class="ctx">▦<small>Käfig</small></button>
   <button data-c="patrol" class="ctx">🛰<small>Aufklären</small></button>
   <button data-c="road" class="ctx">🛣<small>Straße</small></button>
   <button data-c="demolish" class="ctx">🗑<small>Abriss</small></button>
@@ -48,9 +49,9 @@
 
 <div id="start" class="overlay"><div class="card">
   <h1>FRONTLINIE</h1>
-  <div class="sub">Das Grenztal von Belgor · Version 0.10</div>
-  <p>Die <b style="color:#6fa2ea">Republik Aldoria</b> und die <b style="color:#e0756b">Föderation Kastrova</b> bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wenn Nahrung oder Metall knapp werden oder eine Seite zu stark wird, greifen die Waffen. Mitten im Fluss hält die neutrale <b style="color:#d6b45a">Grenzmiliz</b> die Insel und betreibt einen Markt.</p>
-  <p><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
+  <div class="sub">Das Grenztal von Belgor · Version 0.11</div>
+  <p class="intro">Die <b style="color:#6fa2ea">Republik Aldoria</b> und die <b style="color:#e0756b">Föderation Kastrova</b> bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wenn Nahrung oder Metall knapp werden oder eine Seite zu stark wird, greifen die Waffen. Mitten im Fluss hält die neutrale <b style="color:#d6b45a">Grenzmiliz</b> die Insel und betreibt einen Markt.</p>
+  <p class="intro"><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
   <div class="sub" style="margin-top:12px">Schwierigkeit</div>
   <div class="row" id="diffRow"><button data-d="leicht">Leicht</button><button data-d="mittel" class="on">Mittel</button><button data-d="schwer">Schwer</button></div>
   <label class="chk"><input type="checkbox" class="optTips" checked> 💡 Spieltipps anzeigen (Berater meldet Engpässe)</label>
@@ -58,6 +59,8 @@
   <label class="chk"><input type="checkbox" id="optFog" checked> 🌫 Nebel des Krieges (nur erkundete Gebiete sichtbar)</label>
   <button class="big" id="bStart">Neues Spiel starten</button>
   <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
+  <div class="sub" style="margin-top:12px">Spielstände</div>
+  <div id="saves"></div>
   <div class="help">
     <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Geld zahlst du beim Setzen, Holz, Stein und Metall <b>tragen die Arbeiter</b> aus Rathaus oder Lagerhaus zur Baustelle – weite Wege bremsen, fehlt Material, wartet die Baustelle. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Betriebe liefern zum Rathaus oder Lagerhaus: je weiter der Weg, desto weniger kommt an – <b>Straßen</b> verkürzen ihn. Lass Platz: Höfe brauchen Äcker (am besten grüne Wiese), Häuser Freiraum, und Feuer springt über.<br>
     <b>Räuber</b> hausen in abgelegenen Lagern und überfallen unbegleitete Arbeiter, Laster und Außenposten – Soldaten wählen, <b>🛡 Begleiten</b>, Schützling antippen. Ein ausgehobenes Lager bringt Beute.<br>
@@ -65,6 +68,9 @@
     <b>Unbekanntes Tal:</b> Wer außer euch hier lebt, wisst ihr zu Beginn nicht. Diplomatie und Handel gibt es erst nach dem Erstkontakt – schickt Späher oder Drohnen aus.<br>
     <b>Verteidigung</b> bauen <b>Pioniere</b> (Kaserne): Mauern, Gräben, Stacheldraht, <b>Panzerminen</b> und Stellungen werden geplant und vor Ort errichtet.<br>
     <b>Drohnen:</b> FPV schweben an ihrem Posten, mit 🎯 Lauern stürzen sie sich auf Feinde. Spionage- und Reaper-Drohnen fliegen mit 🛰 Aufklären selbstständig über das Tal; sie sind getarnt, nur das Radar der Flugabwehr entdeckt sie. Raketenwerfer treffen auf 22 Felder – aber nur aufgeklärte Ziele.<br>
+    <b>Teure Waffen schützen:</b> Billige FPV-Drohnen zerstören Panzer. Fahrzeuge am Fahrzeugwerk mit ▦ Käfig nachrüsten, Störsender und Flakpanzer als Begleitung mitschicken.<br>
+    <b>Handelsverträge:</b> Diplomat im Handelskontor ausbilden, zum Rathaus Kastrovas schicken (Botschaft), dann über 🤝 Daueraustausch vereinbaren. Karawanen fahren die Waren – schützt sie vor Räubern.<br>
+    <b>Speichern:</b> Im Menü (⏸) gibt es 3 Speicherplätze; zusätzlich wird jede Minute automatisch gespeichert.<br>
     <b>Rohstoffe sind ungleich verteilt:</b> Jede Stadt hat zwei Rohstoffe reichlich und zwei kaum. Was fehlt, muss gehandelt oder erobert werden.<br>
     <b>Haushalt:</b> Gebäude, Soldaten und die Stadtverwaltung kosten laufend Geld. Lager sind begrenzt – Lagerhaus bauen oder Überschuss über das Kontor verkaufen.<br>
     <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
@@ -124,6 +130,10 @@
     <dt>Tarnung</dt><dd>Hochfliegende Drohnen sind für den Gegner unsichtbar und unangreifbar – außer im Radarkreis einer Flugabwehr (9 Felder) oder kurz nachdem sie gefeuert haben. Für euch gilt dasselbe bei feindlichen Drohnen.</dd>
     <dt>Pioniere</dt><dd>In der Kaserne ausbilden. Sie bauen alles aus dem Reiter Verteidigung vor Ort (geplant = gestrichelter Rahmen) und räumen feindliche Minen in ihrer Nähe.</dd>
     <dt>Panzermine</dt><dd>Grüne Scheibe = eigene Mine. Für Feinde unsichtbar; nur Fahrzeuge lösen sie aus. Entdeckte feindliche Minen haben einen roten Ring.</dd>
+    <dt>▦ Käfig</dt><dd>Fahrzeuge nahe dem Fahrzeugwerk wählen und nachrüsten: Drohnen richten nur noch 30 % Schaden an, Lenkwaffen 70 %, das Fahrzeug wird etwas langsamer.</dd>
+    <dt>Störsender</dt><dd>Fahrzeug mit Antennen und blauem Störkreis: feindliche FPV-Drohnen darin verlieren die Verbindung und stürzen ab.</dd>
+    <dt>Flakpanzer</dt><dd>Mobile Flugabwehr mit kleinem Radar – begleitet Panzer gegen Drohnen.</dd>
+    <dt>Diplomat & Verträge</dt><dd>Diplomat wählen, Rathaus Kastrovas antippen → Botschaft. Dann im 🤝-Fenster Daueraufträge (jede Minute Ware gegen Ware) vorschlagen. Gelbe gestrichelte Linie = Handelsroute, Planenlaster = Karawane. Bei Krieg werden Verträge und Botschaften aufgelöst.</dd>
     <dt>🛡 Begleiten</dt><dd>Bewaffnete Einheiten wählen, 🛡 tippen, dann eigenen Arbeiter oder Laster antippen – sie folgen ihm und verteidigen ihn.</dd>
     <dt>Kiste über Arbeiter</dt><dd>Er trägt Material (braun = Holz, hell = Stein, grau = Metall) zur Baustelle.</dd>
     <dt>🛣 67 %</dt><dd>Über Betrieben: so viel kommt wegen des Transportwegs im Lager an. Straße oder Lagerhaus in der Nähe hilft.</dd>

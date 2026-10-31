@@ -4,7 +4,7 @@ import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
 import { showOffer } from '../sim/offers';
-import { orderMove } from '../sim/orders';
+import { orderMove, upgradeCage } from '../sim/orders';
 import { available, canPlace, canPlaceDef, enqueue, placeDefense, placeSite } from '../sim/production';
 import { demolish, hauls, orderRoadTo, previewFields, siteLacks } from '../sim/build';
 import { G } from '../sim/state';
@@ -63,6 +63,8 @@ export function aiThink(){
   // --- Forschung ---
   if(findBuilding(pid,'university')&&!p.q.research.length){ const r=p.tech<2?'res2':p.tech<3?'res3':null;
     if(r&&p.pop>(r==='res2'?140:240)&&available(pid,r)&&canAfford(pid,r)&&p.res.money>DEF(r).cost.money+150) enqueue(pid,r); }
+  // --- Gitterkäfige für Fahrzeuge am Werk ---
+  if(p.res.metal>150&&p.res.money>600) upgradeCage(pid,army.filter(u=>u.type==='mbt'||u.type==='ifv'||u.type==='mlrs'));
   // --- Tanklaster ---
   for(const t of trucks) if(!t.hs&&t.mode==='idle') t.hs='seek';
   const refs=countBuildings(pid,'refinery'), queuedTruck=p.q.factory.some(i=>i.type==='truck');

@@ -1,10 +1,11 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, RES, TILE, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, RES, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
-import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatrol, orderReturn, orderStop } from '../sim/orders';
+import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatrol, orderReturn, orderStop, upgradeCage } from '../sim/orders';
 import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
+import { sendDiplomats } from '../sim/trade';
 import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -77,6 +78,7 @@ export function handleTap(w,right,shift){
   G.sel = ent?[ent]:[]; refreshCmds();
 }
 export function command(ent,w,mine){
+  if(ent&&ent.owner===1&&ent.type==='hq'&&mine.some(u=>u.def.diplomat)&&!hostile(0,1)){ const n=sendDiplomats(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8d27a',life:0.6}); msg(`🎩 ${n} Diplomat${n===1?'':'en'} unterwegs zu ${G.players[1].name}.`); return; }
   if(ent&&ent.owner!==0){
     if(hostile(0,ent.owner)){ orderAttack(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#ff5a4a',life:0.5}); return; }
     const r=G.rel[0][ent.owner];
@@ -101,6 +103,8 @@ export function cmd(c){
   const mine=myUnitsSel();
   if(c==='box'){G.boxMode=!G.boxMode;G.amoveMode=false;}
   else if(c==='amove'){ if(mine.length){G.amoveMode=!G.amoveMode;G.boxMode=false;G.escortMode=false;} else msg('Zuerst Einheiten auswählen.'); }
+  else if(c==='cage'){ const n=upgradeCage(0,mine);
+    msg(n>0?`▦ ${n} Fahrzeug${n===1?'':'e'} mit Gitterkäfig nachgerüstet ($${CAGE.cost.money} + ⛏${CAGE.cost.metal} je Fahrzeug): Drohnen richten nur noch ${Math.round(CAGE.drone*100)} % Schaden an, etwas langsamer.`:n===-1?`Käfige nur nahe einem eigenen Fahrzeugwerk (bis ${CAGE.range} Felder).`:n===-2?'Zu wenig Geld oder Metall für die Käfige.':'Alle gewählten Fahrzeuge haben schon Käfige.',n>0?'#9fd88a':'#ffb38a'); }
   else if(c==='lurk'){ const fp=mine.filter(u=>u.def.weapon&&u.def.weapon.kamikaze); const on=!fp.every(u=>u.lurk); orderLurk(fp,on);
     msg(on?`🎯 ${fp.length} FPV-Drohne${fp.length===1?'':'n'} in Lauerstellung: Sie stürzen sich auf Feinde in Sicht.`:'FPV-Drohnen halten still und greifen nur auf Befehl an.'); }
   else if(c==='patrol'){ const sc=mine.filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)); const on=!sc.every(u=>u.patrol); orderPatrol(sc,on);
@@ -124,6 +128,7 @@ export function refreshCmds(){
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
   document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
   const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
+  document.querySelector('[data-c=cage]').classList.toggle('show',!!G&&myUnitsSel().some(u=>u.def.cls==='veh'&&!u.cage));
   const bl=document.querySelector('[data-c=lurk]'), bp=document.querySelector('[data-c=patrol]');
   bl.classList.toggle('show',fpv.length>0); bl.classList.toggle('on',fpv.length>0&&fpv.every(u=>u.lurk));
   bp.classList.toggle('show',scouts.length>0); bp.classList.toggle('on',scouts.length>0&&scouts.every(u=>u.patrol));
@@ -147,6 +152,10 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.weapon&&e.def.weapon.kamikaze) t+=e.lurk?' · 🎯 Lauerstellung':' · hält still (🎯 für Lauerstellung)';
     if(e.kind==='unit'&&e.def.cls==='air'&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
     if(e.kind==='unit'&&e.def.armor==='airHigh'&&e.owner===0) t+=' · getarnt – nur Radar der Flugabwehr entdeckt sie';
+    if(e.kind==='unit'&&e.cage) t+=' · ▦ Gitterkäfig';
+    if(e.kind==='unit'&&e.jammed) t+=' · 📡 gestört!';
+    if(e.kind==='unit'&&e.def.diplomat) t+=e.mission!==undefined&&e.mission!==null?' · auf dem Weg zur Botschaft':' · Rathaus Kastrovas antippen, um eine Botschaft zu eröffnen';
+    if(e.kind==='unit'&&e.def.caravan) t+=` · Ladung ${e.cargoAmt} ${RES[e.cargoRes].icon} → ${G.players[e.dest?e.dest.owner:0].short}`;
     if(e.kind==='unit'&&e.def.pioneer) t+=e.clearing?' · räumt eine Mine':e.working?' · baut':e.pjob?' · auf dem Weg zum Bauplatz':' · wartet auf Aufträge (Verteidigung planen)';
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';

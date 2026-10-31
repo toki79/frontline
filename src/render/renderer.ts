@@ -1,9 +1,10 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { hash, idx, inMap } from '../core/util';
-import { BUILDINGS, FACTIONS, FEAT, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
+import { BUILDINGS, FACTIONS, FEAT, JAM, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, siteLacks, siteWorkers } from '../sim/build';
+import { tradeRoutes } from '../sim/trade';
 import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
@@ -34,6 +35,9 @@ export function render(){
     for(const d of [[1,0],[-1,0],[0,1],[0,-1]]) if(on(x+d[0],y+d[1])) dirs.push(d);
     for(const d of [[1,1],[1,-1],[-1,1],[-1,-1]]) if(on(x+d[0],y+d[1])&&!on(x+d[0],y)&&!on(x,y+d[1])) dirs.push(d);
     drawRoad(c,x*TILE,y*TILE,dirs,TILE,r===1,pass); }
+  // Handelsrouten der eigenen Verträge
+  for(const r of tradeRoutes()){ if(r.c.a!==0||!knownBuilding(r.b)) continue;
+    c.strokeStyle='rgba(232,200,90,.45)'; c.lineWidth=2; c.setLineDash([10,8]); c.lineDashOffset=-G.t*12; c.beginPath(); c.moveTo(r.a.x*TILE,r.a.y*TILE); c.lineTo(r.b.x*TILE,r.b.y*TILE); c.stroke(); c.setLineDash([]); c.lineDashOffset=0; }
   if(G.placing&&isDefType(G.placing)){ c.fillStyle='rgba(120,240,120,.2)';
     for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++) if(canPlaceDef(0,G.placing,x,y)) c.fillRect(x*TILE+1,y*TILE+1,TILE-2,TILE-2);
     if(G.hover){ const x=Math.floor(G.hover.x),y=Math.floor(G.hover.y); c.strokeStyle=canPlaceDef(0,G.placing,x,y)?'#9ff07a':'#ff6a5a'; c.lineWidth=2; c.strokeRect(x*TILE+1,y*TILE+1,TILE-2,TILE-2); } }
@@ -93,8 +97,14 @@ export function render(){
       c.fillStyle='#000a'; c.fillRect(b.tx*TILE+2,b.ty*TILE+TILE-5,TILE-4,3); c.fillStyle='#d8c040'; c.fillRect(b.tx*TILE+2,b.ty*TILE+TILE-5,(TILE-4)*k2,3); }
     if(b.hp<b.maxHp*0.5&&Math.random()<0.08) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.6,y:b.y+(Math.random()-.5)*b.h*0.6,r:0.3,life:1.4});
   }
+  const selSet0=new Set(G.sel);
   for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
     drawUnitShape(c,u.type,f.col,f.dark,u.x*TILE,u.y*TILE,u.angle,u.tur,u.working?-1:u.hp/u.maxHp);
+    if(u.cage){ c.save(); c.translate(u.x*TILE,u.y*TILE); c.rotate(u.angle); const L=u.def.size*TILE*0.95, W2=u.def.size*TILE*0.7;
+      c.strokeStyle='rgba(60,58,50,.9)'; c.lineWidth=0.8; c.strokeRect(-L/2-1.5,-W2/2-1.5,L+3,W2+3);
+      c.beginPath(); for(let k=-L/2;k<=L/2;k+=3.5){ c.moveTo(k,-W2/2-1.5); c.lineTo(k+1.5,W2/2+1.5); } c.stroke(); c.restore(); }   // Gitterkäfig
+    if(u.jammed){ c.strokeStyle='rgba(140,200,255,.8)'; c.lineWidth=1; c.beginPath(); c.arc(u.x*TILE,u.y*TILE,7+Math.random()*3,0,7); c.stroke(); }
+    if(u.def.jam&&(u.owner===0||selSet0.has(u))){ c.strokeStyle='rgba(140,200,255,.18)'; c.setLineDash([4,4]); c.beginPath(); c.arc(u.x*TILE,u.y*TILE,JAM.radius*TILE,0,7); c.stroke(); c.setLineDash([]); }
     if(u.carry){ const col={wood:'#9a6a3a',stone:'#c4bca8',metal:'#8a96a4'}[u.carry.res]||'#ccc'; c.fillStyle='#000a'; c.fillRect(u.x*TILE-5,u.y*TILE-10,10,7); c.fillStyle=col; c.fillRect(u.x*TILE-4,u.y*TILE-9,8,5); }
     if(u.def.harvester&&u.cargo>0){c.fillStyle='#1a1410';c.fillRect(u.x*TILE-6,u.y*TILE+9,12,3);c.fillStyle='#e8c84a';c.fillRect(u.x*TILE-6,u.y*TILE+9,12*u.cargo/u.def.harvester.cap,3);}
   }

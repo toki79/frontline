@@ -1,5 +1,5 @@
 import { dist, fmt, idx, inMap } from '../core/util';
-import { BANDITS, DAMAGE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { BANDITS, CAGE, DAMAGE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -63,6 +63,7 @@ export function applyDamage(t,dmg,type,src){
   let m=DAMAGE[type][t.armor]; if(m===undefined) m=1;
   if(t.kind==='unit'&&t.def.cls==='inf') m*=1-coverAt(t.x,t.y);
   if(t.kind==='unit'&&t.owner<2&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen
+  if(t.cage&&CAGE[type]) m*=CAGE[type];                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
   t.hp-=dmg*m*(0.85+Math.random()*0.3);
   if(src) onAttacked(t,src);
@@ -92,7 +93,8 @@ export function loot(e,src){
   if(e.kind==='building'&&(e.def.def||e.site)) return;
   const V=G.players[vo], K=G.players[ko], got: Record<string,number>={};
   if(e.type==='camp'){ for(const k in BANDITS.loot) got[k]=BANDITS.loot[k]+Math.floor(V.res[k]||0); V.res={money:0,food:0,wood:0,stone:0,metal:0,oil:0}; }
-  else if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7); }
+  else if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7);
+    if(e.def.caravan&&e.cargoAmt){ got[e.cargoRes]=Math.floor(e.cargoAmt*TRADE.loot); if(vo===0) msg(`⚠ Eine Handelskarawane wurde überfallen (${e.cargoAmt} ${RES[e.cargoRes].icon} verloren).`,'#ff8a7a'); } }
   else {
     const share=e.type==='hq'?0.4:0.15, cap=e.type==='hq'?900:250;
     for(const k of ['money','food','wood','stone','metal','oil']){ let a=Math.floor(Math.min((V.res[k]||0)*share,cap));

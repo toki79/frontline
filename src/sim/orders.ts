@@ -1,5 +1,6 @@
 import { dist, idx, inMap } from '../core/util';
-import { MAP_W } from '../data/config';
+import { CAGE, MAP_W } from '../data/config';
+import { G } from '../sim/state';
 import { setPath } from '../sim/pathfinding';
 import { dockOf } from '../sim/units';
 import { nearestPassable, passable } from '../sim/world';
@@ -31,6 +32,15 @@ export function orderStop(units){for(const u of units){u.mode='idle';u.escort=nu
 /** Drohnen: Lauerstellung (FPV) bzw. Aufklärungsflug (Spionage/Reaper) umschalten */
 export function orderLurk(units,on){ for(const u of units) if(u.def.weapon&&u.def.weapon.kamikaze){ u.lurk=on; if(on&&!u.post) u.post={x:u.x,y:u.y}; } }
 export function orderPatrol(units,on){ for(const u of units) if(u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)){ u.patrol=on; u.mode=on?'patrol':'idle'; u.target=null; u.path=null; u.guard={x:u.x,y:u.y}; } }
+/** Gitterkäfig nachrüsten (Fahrzeuge nahe einem eigenen Fahrzeugwerk). Ergebnis: Anzahl, -1 = kein Werk in der Nähe, -2 = zu wenig Geld/Metall */
+export function upgradeCage(pid,units){
+  const p=G.players[pid], cand=units.filter(u=>!u.dead&&u.owner===pid&&u.def.cls==='veh'&&!u.cage);
+  if(!cand.length) return 0;
+  const near=cand.filter(u=>G.buildings.some(b=>!b.dead&&!b.site&&b.owner===pid&&b.type==='factory'&&dist(b.x,b.y,u.x,u.y)<=CAGE.range));
+  if(!near.length) return -1;
+  let n=0; for(const u of near){ if(p.res.money<CAGE.cost.money||p.res.metal<CAGE.cost.metal) break; p.res.money-=CAGE.cost.money; p.res.metal-=CAGE.cost.metal; u.cage=true; n++; }
+  return n||-2;
+}
 /** Begleitschutz: bewaffnete Einheiten folgen einem eigenen Arbeiter/Laster und verteidigen ihn */
 export function orderEscort(units,t){ let n=0; for(const u of units){ if(!u.def.weapon||u===t) continue; u.mode='escort'; u.escort=t; u.target=null; u.path=null; u.repathT=0; n++; } return n; }
 export function orderHarvest(trucks,tile){for(const u of trucks){u.mode='harvest';u.hs='toOil';u.oilTile=tile;u.target=null;setPath(u,tile%MAP_W+0.5,((tile/MAP_W)|0)+0.5);}}

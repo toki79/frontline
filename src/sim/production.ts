@@ -38,7 +38,7 @@ export function cancelItem(pid,type){
 }
 export function updateProduction(pid,dt){
   const p=G.players[pid], f=(p.use>p.power?0.5:1)*(p.broke?ECON.brokeFactor:1);
-  for(const qn of ['hq','barracks','factory','droneshop','research']){
+  for(const qn of ['hq','kontor','barracks','factory','droneshop','research']){
     const q=p.q[qn]; if(!q.length) continue;
     const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;   // ohne Zufahrt ruht die Produktion
     const it=q[0]; it.t+=dt*f;

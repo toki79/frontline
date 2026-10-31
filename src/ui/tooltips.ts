@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -62,6 +62,10 @@ export function tipFor(k){
     if(d.harvester) L.push(`Fasst ${d.harvester.cap} Öl pro Fahrt. Tippe ein Ölfeld an, um ihn dorthin zu schicken.`);
     if(d.weapon&&d.weapon.minRange) L.push(`Mindestreichweite ${d.weapon.minRange} – kann nahe Ziele nicht treffen.`);
     if(d.weapon&&d.weapon.range>d.sight) L.push(`🔭 Reichweite ${d.weapon.range} Felder, aber selbst sieht er nur ${d.sight}: Ziele dahinter müssen gerade aufgeklärt sein (Drohnen, Späher, eigene Truppen).`);
+    if(d.cls==='veh') L.push(`▦ Nahe dem Fahrzeugwerk mit Gitterkäfig nachrüstbar ($${CAGE.cost.money} + ⛏${CAGE.cost.metal}): Drohnen richten dann nur ${Math.round(CAGE.drone*100)} % Schaden an, Lenkwaffen ${Math.round(CAGE.missile*100)} %, aber ${Math.round((1-CAGE.speed)*100)} % langsamer.`);
+    if(d.jam) L.push(`📡 Störfeld ${JAM.radius} Felder: feindliche FPV-Drohnen darin verlieren die Verbindung und stürzen ab. Unbewaffnet – Begleitschutz für Panzer.`);
+    if(d.radar) L.push(`Radar ${d.radar} Felder: entdeckt getarnte Hochflieger in der Nähe.`);
+    if(k==='drone') L.push('Billig, aber tödlich für Fahrzeuge: 3–4 Treffer zerstören einen Kampfpanzer. Gegenmittel: Gitterkäfige, Störsender, Flakpanzer, Flugabwehr.');
     if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
     if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder kurz nachdem sie feuert). Dann treffen nur Flugabwehr und schwach Maschinenkanonen.');
     else if(d.cls==='air') L.push('Fliegt tief: Gewehre, Maschinenkanonen und Flugabwehr können sie abschießen.');

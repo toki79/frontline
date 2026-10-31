@@ -17,6 +17,10 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
       c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
+  } else if(type==='diplomat'){   // Diplomat: Anzug und Hut
+    c.rotate(ang); c.fillStyle='rgba(0,0,0,.28)'; c.beginPath(); c.arc(1.5,1.5,3.4,0,7); c.fill();
+    c.fillStyle='#2a2a30'; c.strokeStyle='#111'; c.lineWidth=1; c.beginPath(); c.arc(0,0,3.6,0,7); c.fill(); c.stroke();
+    c.fillStyle=col; c.beginPath(); c.arc(0,0,2.2,0,7); c.fill(); c.fillStyle='#e8e0c8'; c.fillRect(2,-0.8,2.5,1.6);
   } else if(type==='worker'||type==='pioneer'){
     // Bauarbeiter: gelber Helm, beim Arbeiten schwingt der Hammer (hpf<0 = arbeitet)
     const work=hpf<0, t=G?G.t:0;
@@ -28,6 +32,17 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; c.beginPath(); c.arc(0,0,3.8,0,7); c.fill(); c.stroke();
     if(type==='pioneer'){ c.fillStyle='#5a6236'; c.strokeStyle='#2a2e18'; c.beginPath(); c.arc(0,0,2.7,0,7); c.fill(); c.stroke(); c.fillStyle='#e0c040'; c.fillRect(-1,-3.6,2,1.6); }
     else { c.fillStyle='#f2c230'; c.strokeStyle='#8a6a10'; c.beginPath(); c.arc(0,0,2.5,0,7); c.fill(); c.stroke(); }
+  } else if(type==='spaag'||type==='jammer'){
+    c.rotate(ang);
+    c.fillStyle='rgba(0,0,0,.3)'; rr(c,-9,-5,21,12,3); c.fill();
+    c.fillStyle='#2b2b26'; c.fillRect(-10,-7,20,3); c.fillRect(-10,4,20,3);
+    c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.1; rr(c,-10,-6,20,12,2.5); c.fill(); c.stroke();
+    if(type==='spaag'){ c.rotate(tur-ang); c.fillStyle=dark; c.fillRect(1,-3.2,12,1.6); c.fillRect(1,1.6,12,1.6);
+      c.fillStyle=col; rr(c,-5,-4.5,10,9,2); c.fill(); c.strokeStyle=dark; c.stroke();
+      c.strokeStyle='#cfd8d0'; c.lineWidth=1.2; c.beginPath(); c.arc(-2,0,3.2,-1.2,1.2); c.stroke(); }   // Radarschüssel
+    else { c.fillStyle='#4a4d42'; c.fillRect(-7,-4,9,8); c.strokeStyle='#1d1d1a'; c.lineWidth=1.3;
+      c.beginPath(); c.moveTo(-3,0); c.lineTo(-3,-9); c.moveTo(-6,-7); c.lineTo(0,-7); c.moveTo(-5,-5); c.lineTo(-1,-5); c.stroke();   // Antennen
+      const t=G?G.t:0; c.strokeStyle=`rgba(140,200,255,${0.25+0.25*Math.sin(t*6)})`; c.beginPath(); c.arc(-3,-9,4+((t*8)%6),0,7); c.stroke(); }
   } else if(type==='ifv'||type==='mbt'){
     const big=type==='mbt', L=big?24:20, Wd=big?16:13;
     c.rotate(ang);
@@ -69,6 +84,13 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     c.fillStyle='#bcd6e6'; c.fillRect(8,-3.5,1.5,7);
     c.rotate(tur-ang); c.fillStyle='#4a4d42'; c.strokeStyle='#22231f'; c.fillRect(-9,-5,13,10); c.strokeRect(-9,-5,13,10);
     c.fillStyle='#1d1d1a'; for(let i=0;i<3;i++)for(let j=0;j<2;j++) c.beginPath(), c.arc(-6+i*4,-2.5+j*5,1.3,0,7), c.fill();
+  } else if(type==='caravan'){   // Handelskarawane: Planenlaster mit Kisten
+    c.rotate(ang);
+    c.fillStyle='rgba(0,0,0,.3)'; rr(c,-10,-4.5,22,11,2); c.fill();
+    c.fillStyle='#2b2b26'; for(const wx of [-8,-2,7]){c.fillRect(wx,-6.5,3.5,2);c.fillRect(wx,4.5,3.5,2);}
+    c.fillStyle='#b9a77a'; c.strokeStyle='#5e5236'; c.lineWidth=1; rr(c,-11,-5.5,16,11,2); c.fill(); c.stroke();
+    c.strokeStyle='#8a7a52'; c.beginPath(); for(const k of [-7,-3,1]){ c.moveTo(k,-5.5); c.lineTo(k,5.5); } c.stroke();
+    c.fillStyle=col; c.strokeStyle=dark; rr(c,6,-5,6,10,1.5); c.fill(); c.stroke();
   } else if(type==='truck'){
     c.rotate(ang);
     c.fillStyle='rgba(0,0,0,.3)'; rr(c,-10,-4.5,22,11,2); c.fill();

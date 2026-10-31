@@ -1,9 +1,10 @@
 import { fmt } from '../core/util';
-import { REGION, RES } from '../data/config';
+import { REGION, RES, TRADE } from '../data/config';
 import { rr } from '../render/draw';
 import { TRADES, aiQuotes, marketOpen, marketTrend, trade, tradeAI, tradeTerms } from '../sim/market';
 import { G } from '../sim/state';
 import { findBuilding, setWar, spawnUnit, updateRel } from '../sim/world';
+import { cancelContract, evalContract, hasEmbassy, proposeContract } from '../sim/trade';
 import { $ } from '../ui/dom';
 import { costHtml } from '../ui/format';
 import { msg } from '../core/events';
@@ -55,6 +56,7 @@ export function renderDiplo(){
           if(q.side==='buy') h+=btn(`ai_buy_${q.res}`,`Verkaufen: ${q.amt} ${ic} → $${q.price}${q.urgent?' 🔥':''}`,p.res[q.res]>=q.amt);
           else h+=btn(`ai_sell_${q.res}`,`Kaufen: ${q.amt} ${ic} für $${q.price}`,p.res.money>=q.price); }
         h+='</div><div class="barl"><span>Preise richten sich nach Kastrovas Vorrat und Engpass. 🔥 = dringend gesucht. Handel verbessert die Beziehung.</span></div>'; } }
+    h+=contractHtml();
     h+='<h4>Beziehung</h4><div class="row">';
     if(G.war){ h+=btn('peace1','Frieden anbieten',true)+btn('peace1t','Frieden + $400',p.res.money>=400); }
     else { h+=btn('gift1','Geschenk ($200)',p.res.money>=200)+btn('food1','Nahrung schenken (🌾100)',p.res.food>=100)+btn('war1','Krieg erklären',true,'#5a221c'); }
@@ -84,6 +86,23 @@ export function renderDiplo(){
     h+='</div></div>'; }
   $('#diploBody').innerHTML=h;
 }
+// ---------- Handelsverträge ----------
+export const cg={give:'food',ga:100,get:'metal',ra:50};
+function contractHtml(){
+  const p=G.players[0]; let h='<h4>📜 Handelsverträge</h4>';
+  const mine=G.contracts.filter(c=>c.a===0&&c.b===1);
+  for(const c of mine) h+=`<div class="barl"><span>Jede Minute: ${c.give.amt} ${RES[c.give.res].icon} → gegen ${c.get.amt} ${RES[c.get.res].icon} · ${c.done} Lieferungen${c.miss[0]||c.miss[1]?` · Ausfälle ${c.miss[0]}/${c.miss[1]}`:''}</span>${btn('cx_'+c.id,'Kündigen',true,'#4a2a22')}</div>`;
+  if(!hasEmbassy(0,1)) return h+'<div class="barl"><span>Für Verträge braucht ihr eine <b>Botschaft</b>: Diplomat im Handelskontor ausbilden, auswählen und das Rathaus Kastrovas antippen.</span></div>';
+  if(G.war) return h+'<div class="barl"><span>Im Krieg keine Verträge.</span></div>';
+  if(!findBuilding(0,'kontor')) return h+'<div class="barl"><span>Ohne eigenes Handelskontor fahren keine Karawanen.</span></div>';
+  const rs=['food','wood','stone','metal','oil'], sel=(k,v,cur,lab)=>btn(`cg_${k}_${v}`,lab,true,cur===v?'#4a6a2a':undefined);
+  h+='<div class="barl"><span>Neuer Vertrag – wir liefern jede Minute:</span></div><div class="row">'+rs.map(r=>sel('give',r,cg.give,RES[r].icon)).join('')+TRADE.amounts.map(a=>sel('ga',a,cg.ga,String(a))).join('')+'</div>';
+  h+='<div class="barl"><span>… und bekommen dafür:</span></div><div class="row">'+rs.map(r=>sel('get',r,cg.get,RES[r].icon)).join('')+TRADE.amounts.map(a=>sel('ra',a,cg.ra,String(a))).join('')+'</div>';
+  const e=evalContract(1,{res:cg.give,amt:cg.ga},{res:cg.get,amt:cg.ra});
+  h+=`<div class="barl"><span>${e.ok?'✓ Kastrova würde wohl zustimmen':'✗ Kastrova lehnt ab: '+e.reasons.join(', ')} (Bewertung ${Math.round(e.ratio*100)} %)</span></div><div class="row">${btn('cg_propose','📜 Vertrag vorschlagen',p.res[cg.give]>=cg.ga)}</div>`;
+  h+='<div class="barl"><span>Karawanen fahren zwischen den Handelshäusern und können von Räubern oder im Krieg überfallen werden – Begleitschutz (🛡) hilft. Wer zweimal nicht liefert, verliert den Vertrag.</span></div>';
+  return h;
+}
 export function peaceChance(tribute){
   const ai=G.ai; let s=(ai.need?-1:0)+(ai.lead?-1.2:0)+(ai.ratio<1?1:0)+(ai.ratio<0.6?0.8:0)+(ai.lootSince>150?0.6:0)+G.aiAtt/50+(tribute?1:0)+(G.t-ai.lastCombat>60?0.4:0);
   return s>=0.5;
@@ -93,6 +112,12 @@ export function diploAction(a){
   if(a.startsWith('ai_')){ const [,side,res]=a.split('_'); const rr=tradeAI(side==='buy'?'buy':'sell',res);
     r={ok:side==='buy'?'Marschall Varek: „Genau das brauchten wir. Ein gutes Geschäft für beide.“':'Marschall Varek: „Abgemacht. Die Lieferung ist unterwegs.“',krieg:'Kein Handel im Krieg.',kein:'Das Angebot gilt nicht mehr.',arm:'Dafür reichen eure Vorräte nicht.',pleite:'Marschall Varek: „Unsere Kasse ist leer.“'}[rr];
     $('#reply').textContent=r; renderDiplo(); return; }
+  if(a.startsWith('cg_')){ const [,k,v]=a.split('_');
+    if(k==='propose'){ const res=proposeContract(0,1,{res:cg.give,amt:cg.ga},{res:cg.get,amt:cg.ra}) as any;
+      r=res.ok?`Marschall Varek: „Abgemacht. Jede Minute ${cg.ga} ${RES[cg.give].icon} gegen ${cg.ra} ${RES[cg.get].icon}.“`:`Marschall Varek: „Nein.“ (${res.reasons.join(', ')})`; }
+    else { if(k==='give'||k==='get') cg[k]=v; else cg[k]=Number(v); }
+    $('#reply').textContent=r; renderDiplo(); return; }
+  if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); $('#reply').textContent='Vertrag gekündigt.'; renderDiplo(); return; }
   if(a.startsWith('t_')){ const k=a.slice(2); r=trade(0,k)?'Händler der Miliz: „Gutes Geschäft.“':'Händler der Miliz: „Dafür reicht es nicht.“'; $('#reply').textContent=r; renderDiplo(); return; }
   switch(a){
     case 'gift1': p.res.money-=200; G.aiAtt=Math.min(100,G.aiAtt+12); r='Marschall Varek: „Kastrova nimmt Eure Aufmerksamkeit zur Kenntnis.“'; break;

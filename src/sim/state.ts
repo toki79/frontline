@@ -19,9 +19,10 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
     wood:new Float32Array(MAP_W*MAP_H), rock:new Float32Array(MAP_W*MAP_H), road:new Uint8Array(MAP_W*MAP_H), roadOwner:new Uint8Array(MAP_W*MAP_H), featOwner:new Uint8Array(MAP_W*MAP_H), fplan:new Uint8Array(MAP_W*MAP_H), fplanOwner:new Uint8Array(MAP_W*MAP_H), mineSeen:new Uint8Array(MAP_W*MAP_H), roadDirty:true, terrChanged:[],
     units:[], buildings:[], projectiles:[], fx:[], scorch:[],
     players: FACTIONS.map((f,i)=>({id:i, ...f, res:{money:0,food:0,wood:0,stone:0,metal:0,oil:0}, pop:0, cap:0, foodRate:0, power:0, use:0,
-              q:{hq:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
+              q:{hq:[], kontor:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
     rel:[['-','neutral','neutral','feind'],['neutral','-','neutral','feind'],['neutral','neutral','-','feind'],['feind','feind','feind','-']],
     war:false, aiAtt:0, offer:null,
+    contracts:[], embassy:[[false,false,false,false],[false,false,false,false]],
     known:[[true,false,false,false],[false,true,false,false],[true,true,true,true],[true,true,true,true]],   // Erstkontakt: wer kennt wen?
     militiaAlly:-1, militiaWar:[false,false], attitude:[0,0], mercCooldown:0, market:{sellOil:0,buyFood:0,buyMetal:0},
     milSpawnT:20, milRaidT:40, aiHintShown:false,

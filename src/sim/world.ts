@@ -23,6 +23,7 @@ export function setWar(on,by?){
   if(G.war===on) return; G.war=on; updateRel();
   if(on){
     G.aiAtt=Math.min(G.aiAtt,-20);
+    if(G.embassy&&(G.embassy[0][1]||G.embassy[1][0])){ G.embassy[0][1]=G.embassy[1][0]=false; msg('🏛 Die Botschaften wurden geschlossen.','#ffb38a'); }
     msg(by===0?'Ihr habt Kastrova den Krieg erklärt.':'⚔ Kastrova hat Aldoria den Krieg erklärt!','#ff8a7a');
   } else {
     msg('Frieden mit Kastrova geschlossen.','#9fd88a');
@@ -122,7 +123,7 @@ export function updateVision(){
     for(const b of G.buildings) if(!b.dead&&seesFor(pid,b.owner)) reveal(b.x,b.y,(b.def.sight||4)+Math.max(b.w,b.h)/2);
   }
   // Tarnung: Radar der Flugabwehr (fertig) erfasst Hochflieger im Umkreis; wer feuert, verrät sich kurz
-  const radars=G.buildings.filter(b=>!b.dead&&!b.site&&b.def.radar);
+  const radars=[...G.buildings.filter(b=>!b.dead&&!b.site&&b.def.radar), ...G.units.filter(u=>!u.dead&&u.def.radar)];
   for(const u of G.units){ if(u.dead||u.def.armor!=='airHigh') continue; const rev=G.t<(u.revealT||-1);
     u.det=[0,1,2,3].map(pid=>rev||radars.some(r=>r.owner===pid&&Math.hypot(r.x-u.x,r.y-u.y)<=r.def.radar)); }
   for(const b of G.buildings) if(!b.dead&&!b.seen&&inSightRect(b)) b.seen=true;

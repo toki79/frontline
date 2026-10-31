@@ -1,5 +1,5 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { DRONE, FEAT, LEASH, MAP_H, MAP_W } from '../data/config';
+import { CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
@@ -7,6 +7,7 @@ import { detected, hostile, nearestPassable, passable, tileCost } from '../sim/w
 import { msg } from '../core/events';
 import { updateWorker } from '../sim/build';
 import { checkMine, updatePioneer } from '../sim/pioneers';
+import { updateCaravan, updateDiplomat } from '../sim/trade';
 
 /* =====================================================================
    Einheiten-Update
@@ -43,9 +44,16 @@ export function updateUnit(u,dt){
       }
     }
   }
+  if(d.weapon&&d.weapon.kamikaze){   // Störsender in der Nähe: Verbindung weg, Drohne taumelt und stürzt ab
+    u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }
+    if(u.jammed){ u.target=null; if(Math.random()<dt*3){ u.path=[{x:u.x+(Math.random()-.5)*2,y:u.y+(Math.random()-.5)*2}]; u.pathI=0; }
+      if(Math.random()<dt*JAM.crashPerSec){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.3,life:0.35}); u.dead=true; if(u.owner===0){ G.stats.lost++; msg('📡 Eine FPV-Drohne ist im Störfeld abgestürzt.','#ffb38a'); } G.sel=G.sel.filter(s=>s!==u); return; } }
+  }
   if(d.harvester) updateHarvest(u,dt);
   if(d.worker) updateWorker(u,dt);
   if(d.pioneer) updatePioneer(u,dt);
+  if(d.caravan) updateCaravan(u);
+  if(d.diplomat) updateDiplomat(u);
   if(u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15&&d.cls!=='air'&&(u.healChk=(u.healChk||0)-dt)<=0){ u.healChk=1; u.home=homeTurf(u); }
   if(u.home&&u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.015*dt);   // Versorgung zu Hause
   if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt (Schweben braucht wenig)
@@ -74,7 +82,7 @@ export function updateUnit(u,dt){
       if(d.weapon&&d.weapon.kamikaze&&u.target){p.x=u.target.x;p.y=u.target.y;}
       const dx=p.x-u.x, dy=p.y-u.y, L=Math.hypot(dx,dy);
       const ti=idx(clamp(Math.floor(u.x),0,MAP_W-1),clamp(Math.floor(u.y),0,MAP_H-1));
-      const c=tileCost(ti,d.cls); let spd=d.speed/(c===Infinity?1:c);
+      const c=tileCost(ti,d.cls); let spd=d.speed/(c===Infinity?1:c)*(u.cage?CAGE.speed:1);
       if(d.upkeep&&G.players[u.owner].fuelShort) spd*=0.5;                        // Treibstoffmangel
       if(d.cls==='veh'&&G.feat[ti]===FEAT.WIRE) G.feat[ti]=0;                      // Fahrzeuge walzen Draht platt
       if(d.cls==='veh'&&G.feat[ti]===FEAT.MINE){ checkMine(u,ti); if(u.dead) return; }

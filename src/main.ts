@@ -17,6 +17,7 @@ import { HUD_TIPS, tipFor, init as initTooltips } from './ui/tooltips';
 import { init as initDialogs } from './ui/dialogs';
 import { init as initMenus, startGame } from './ui/menus';
 import { init as initMessages } from './ui/messages';
+import { autosave } from './ui/saves';
 
 let last = performance.now();
 function frame(now: number) {
@@ -34,6 +35,7 @@ function frame(now: number) {
     G.uiT -= dt; if (G.uiT <= 0) { G.uiT = 0.2; updatePanel(); refreshCmds(); }
     G.advT = (G.advT || 0) - dt; if (G.advT <= 0 && !G.paused) { G.advT = 1; updateAdvisor(); }
     G.miniT -= dt; if (G.miniT <= 0) { G.miniT = 0.15; renderMini(); }
+    autosave();
   }
   requestAnimationFrame(frame);
 }

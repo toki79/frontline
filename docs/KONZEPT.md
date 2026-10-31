@@ -34,6 +34,11 @@ Spionagedrohnen klären auf Wunsch selbstständig auf, FPV-Drohnen lauern an ihr
 22 Felder, aber nur gegen aufgeklärte Ziele. Verteidigung wird geplant und von Pionieren gebaut; Panzerminen sind
 für Feinde unsichtbar und treffen nur Fahrzeuge.
 
+## Gegenmittel & Verträge
+Billige FPV-Drohnen zerstören teure Panzer – geschützt wird durch Gitterkäfige, Störsender, Flakpanzer und Begleitung.
+Handelsverträge setzen eine Botschaft (Diplomat) und ein Handelskontor voraus; Karawanen auf Handelsrouten können
+überfallen werden. Spielstände: 3 Plätze + Autosave im Browser (sim/save.ts serialisiert, ui/saves.ts speichert).
+
 ## KI (Kastrova)
 Kein Sprachmodell, sondern Regeln mit Bewertung: Bedarf, Kräfteverhältnis, Vorsprung des Gegners, Haltung.
 Eskalation: **Marktanfrage → Forderung → Überfall** (gezielt aufs fehlende Gut) → Friedensangebot nach Beute.

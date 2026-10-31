@@ -10,6 +10,7 @@ import { updateAdvisor } from '../ui/advisor';
 import { diploAction, renderDiplo } from '../ui/diplomacy';
 import { $ } from '../ui/dom';
 import { hideTip } from '../ui/tooltips';
+import { init as initSaves, renderSaves } from '../ui/saves';
 
 /* =====================================================================
    Menüs
@@ -39,11 +40,12 @@ $('#goalTxt').textContent=String(ECON.target);
 $$('#diffRow button').forEach(b=>b.addEventListener('click',()=>{diffSel=b.dataset.d;$$('#diffRow button').forEach(x=>x.classList.toggle('on',x===b));}));
 $('#bStart').addEventListener('click',()=>{ $('#start').classList.add('hidden'); startGame(diffSel,$('#optFog').checked,$('#optRace').checked?'race':'endless'); });
 $('#bResume').addEventListener('click',()=>{ $('#start').classList.add('hidden'); if(G) G.paused=!!G.offer; });
-$('#bMenu').addEventListener('click',()=>{ if(!G) return; G.paused=true; $('#bResume').style.display='block'; $('#start').classList.remove('hidden'); });
+$('#bMenu').addEventListener('click',()=>{ if(!G) return; G.paused=true; $('#bResume').style.display='block'; renderSaves(); $('#start').classList.add('ingame'); $('#start').classList.remove('hidden'); });
+initSaves(()=>{ $('#start').classList.add('hidden'); $('#end').classList.add('hidden'); $('#bResume').style.display='block'; if(G) G.paused=false; });
 $('#bDiplo').addEventListener('click',openDiplo);
 $('#bHelp').addEventListener('click',()=>{ hideTip(); if(G&&!G.over) G.paused=true; $$('.goalN').forEach(e=>e.textContent=ECON.target); $('#help').classList.remove('hidden'); });
 $('#bHelpClose').addEventListener('click',()=>{ $('#help').classList.add('hidden'); if(G) G.paused=!!G.offer; });
 $('#bDiploClose').addEventListener('click',()=>{ $('#diplo').classList.add('hidden'); if(G) G.paused=false; updateAdvisor(); });
 $('#diploBody').addEventListener('click',e=>{const b=e.target.closest('button[data-a]'); if(b&&!b.disabled) diploAction(b.dataset.a);});
-$('#bAgain').addEventListener('click',()=>{ $('#end').classList.add('hidden'); $('#bResume').style.display='none'; $('#start').classList.remove('hidden'); setG(null); });
+$('#bAgain').addEventListener('click',()=>{ $('#start').classList.remove('ingame'); $('#end').classList.add('hidden'); $('#bResume').style.display='none'; $('#start').classList.remove('hidden'); setG(null); });
 }

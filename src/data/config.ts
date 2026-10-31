@@ -102,7 +102,7 @@ export const DAMAGE = {
   shell:      {none:0.35, light:1.0, heavy:1.0,  building:0.9,  fort:0.55, air:0, airHigh:0},
   missile:    {none:0.15, light:1.0, heavy:0.9,  building:0.6,  fort:0.35, air:0, airHigh:0},
   rocket:     {none:0.6,  light:0.7, heavy:0.35, building:1.0,  fort:0.6,  air:0, airHigh:0},
-  drone:      {none:0.7,  light:1.3, heavy:1.0,  building:0.5,  fort:0.35, air:0, airHigh:0},
+  drone:      {none:0.7,  light:2.0, heavy:2.4,  building:0.5,  fort:0.35, air:0, airHigh:0},   // Kamikaze von oben: billig, aber tödlich für Fahrzeuge
   flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:1.6},
   mine:       {none:0.3,  light:1.3, heavy:1.0,  building:0,    fort:0,    air:0,   airHigh:0},
 };
@@ -139,6 +139,14 @@ export const UNITS = {
           weapon:{type:'autocannon', dmg:15, range:5, rof:0.5}, prod:'factory', req:[], desc:'Schnell, gut gegen Infanterie'},
   mbt:   {name:'Kampfpanzer', cls:'veh', cost:{money:450, metal:120, oil:70, pop:4}, time:20, hp:650, upkeep:0.1, combat:true, armor:'heavy', speed:1.55, sight:7, size:0.72,
           weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge'},
+  spaag: {name:'Flakpanzer', cls:'veh', tech:1, cost:{money:400, metal:70, oil:30, pop:3}, time:12, hp:300, upkeep:0.06, combat:true, armor:'light', speed:2.0, sight:8, size:0.62, radar:6,
+          weapon:{type:'flak', dmg:20, range:6.5, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
+  jammer:{name:'Störsender', cls:'veh', tech:1, cost:{money:350, metal:40, oil:20, pop:2}, time:10, hp:220, upkeep:0.04, armor:'light', speed:1.9, sight:7, size:0.6, jam:true,
+          prod:'factory', req:[], desc:'Elektronische Kampfführung: feindliche FPV-Drohnen in der Nähe verlieren die Verbindung und stürzen ab'},
+  diplomat:{name:'Diplomat', cls:'inf', cost:{money:200, pop:1}, time:10, hp:50, armor:'none', speed:1.45, sight:5, size:0.3, diplomat:true,
+          prod:'kontor', req:[], desc:'Reist zum Rathaus einer anderen Macht und eröffnet dort eine Botschaft – Voraussetzung für Handelsverträge'},
+  caravan:{name:'Handelskarawane', cls:'veh', cost:{money:0}, time:0, hp:260, armor:'light', speed:1.8, sight:5, size:0.62, caravan:true,
+          prod:null, desc:'Bringt Waren eines Handelsvertrags ans Ziel – kann überfallen werden'},
   truck: {name:'Tanklaster', cls:'veh', cost:{money:400, metal:30, pop:2}, time:10, hp:420, armor:'light', speed:1.7, sight:5, size:0.62,
           harvester:{cap:350, rate:70, unload:200}, prod:'factory', req:['refinery'], desc:'Fördert Öl, bringt es zur Raffinerie'},
   mlrs:  {name:'Raketenwerfer', cls:'veh', tech:2, cost:{money:550, metal:100, oil:60, pop:4}, time:18, hp:260, armor:'light', speed:1.4, sight:7, size:0.66, upkeep:0.08, combat:true,
@@ -192,6 +200,23 @@ export const FACTIONS = [
   {name:'Grenzmiliz von Belgor', short:'Miliz',    leader:'Hauptmann Dorin', col:'#c9a640', dark:'#6a5317'},
   {name:'Räuberbanden',          short:'Räuber',   leader:'–',               col:'#8a8a82', dark:'#3a3a34'},
 ];
+// ---------- Schutz teurer Waffen ----------
+export const CAGE = {
+  cost:{money:80, metal:20},   // Gitterkäfig je Fahrzeug, nachrüsten nahe dem Fahrzeugwerk
+  range: 8,
+  drone: 0.3, missile: 0.7, rocket: 0.85,   // Schadensfaktoren mit Käfig
+  speed: 0.9,
+};
+export const JAM = { radius: 5.5, crashPerSec: 0.45 };   // Störsender: FPV-Drohnen im Umkreis verlieren die Verbindung
+// ---------- Handelsverträge ----------
+export const TRADE = {
+  period: 60,           // Sekunden zwischen zwei Lieferungen
+  amounts: [50,100,200],
+  margin: 1.1,          // die Gegenseite will mindestens 10 % Vorteil (nach ihrem Bedarf bewertet)
+  missLimit: 2,         // so viele ausgefallene Lieferungen, dann kündigt die Gegenseite
+  maxContracts: 3,
+  loot: 0.7,            // Anteil der Ladung, den ein Angreifer bei einer zerstörten Karawane erbeutet
+};
 // ---------- Drohnen ----------
 export const DRONE = {
   hoverDrain: 0.3,      // Akkuverbrauch beim Schweben (Anteil vom Flug)
@@ -215,7 +240,7 @@ export const DIFFICULTY = {
   mittel: {incomeMul:1.0,  grace:200, think:1.0, aggr:1.0},
   schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35},
 };
-export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','drone','ifv','at','mlrs','reaper','drone','mbt'];
+export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','spaag','drone','ifv','at','jammer','mlrs','reaper','drone','mbt'];
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
 // Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt. Der fünfte ist normal.
 export const REGION = {

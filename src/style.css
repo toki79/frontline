@@ -124,3 +124,8 @@ button:disabled{opacity:.4;cursor:default}
   #stack{bottom:calc(146px + var(--sab))}#mini{width:96px;height:96px}#log{font-size:11.5px;max-width:48vw}
   #panel.min~#cmds{bottom:calc(38px + var(--sab))}#panel.min~#stack{bottom:calc(80px + var(--sab))}
 }
+
+#saves .slot{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:13px}
+#saves .slot span{flex:1}
+#saves .slot button{padding:6px 10px;font-size:15px}
+#start.ingame .intro{display:none}
