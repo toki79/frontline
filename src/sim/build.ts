@@ -32,6 +32,7 @@ export function findWorking(pid,type){ return G.buildings.find(b=>b.owner===pid&
 export function completeSite(b){
   if(!b.site||b.dead) return;
   const d=b.def, pid=b.owner;
+  if(b.dlv){ const p=G.players[pid]; for(const m in b.dlv) p.res[m]+=b.dlv[m]; b.dlv=null; }   // Reste zurück ins Lager
   b.site=false; b.progress=1; b.born=G.t; b.hp=Math.min(b.maxHp,Math.max(b.hp,b.maxHp*0.95));
   G.qDirty=true; G.roadDirty=true; recalcPower(pid);
   if(d.spawn) spawnUnit(pid,d.spawn,b);
@@ -45,7 +46,7 @@ export function siteWorkers(b){ let n=0; for(const u of G.units) if(!u.dead&&u.j
 export function demolish(pid,b){
   if(!b||b.dead||b.owner!==pid||b.type==='hq'||b.kind!=='building') return false;
   const c=costOf(b.type), p=G.players[pid];
-  if(b.site){ p.res.money+=c.money||0; for(const m of MATS) p.res[m]+=Math.floor((b.used&&b.used[m])||0); }   // Baustelle: Geld und verbautes Material zurück
+  if(b.site){ p.res.money+=c.money||0; for(const m of MATS) p.res[m]+=Math.floor(((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0)); }   // Baustelle: Geld und verbautes Material zurück
   else for(const r in c){ if(r==='pop') continue; p.res[r]+=Math.floor(c[r]*CONSTRUCTION.demolishRefund); }
   b.dead=true;
   for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.occ[idx(x,y)]===b.id) G.occ[idx(x,y)]=0;
@@ -173,35 +174,67 @@ export function orderRoadTo(pid,b){
 }
 
 // ---------- Bauarbeiter ----------
+// Arbeiter holen Holz, Stein und Metall im Rathaus/Lagerhaus und tragen es zur Baustelle (je Gang CONSTRUCTION.carry).
+// Straßen: Stein holen, dann Feld für Feld bauen. Weite Wege und fehlende Straßen bremsen also auch das Bauen.
 const roadStone=()=>costOf('road').stone||0;
-/** Fehlt einer Baustelle gerade Material? (Name des Rohstoffs oder null) */
+const tileX=i=>i%MAP_W+0.5, tileY=i=>((i/MAP_W)|0)+0.5;
+/** nächste Sammelstelle (Rathaus/Lagerhaus) zu einem Punkt */
+export function nearestDepot(pid,x,y){ let best=null,bd=1e9; for(const d of depots(pid)){ const dd=distTo({x,y},d); if(dd<bd){bd=dd;best=d;} } return best; }
+/** Material, das gerade zu einer Baustelle unterwegs ist */
+function incoming(b,m){ let n=0; for(const w of G.units) if(!w.dead&&w.job&&w.job.kind==='haul'&&w.job.b===b&&w.job.m===m) n+=w.job.amt; return n; }
+/** noch zu holende Menge eines Baustoffs */
+function stillNeeded(b,m){ const c=costOf(b.type); if(!c[m]) return 0; return c[m]-((b.used&&b.used[m])||0)-((b.dlv&&b.dlv[m])||0)-incoming(b,m); }
+/** kann an der Baustelle gearbeitet werden? (jeder nötige Baustoff liegt vor Ort oder ist schon verbaut) */
+function buildable(b){ const c=costOf(b.type); for(const m of MATS) if(c[m]&&((b.used&&b.used[m])||0)<c[m]-0.01&&((b.dlv&&b.dlv[m])||0)<0.01) return false; return true; }
+/** Fehlt einer Baustelle Material im Lager? (Rohstoff oder null) */
 export function siteLacks(b){ const p=G.players[b.owner], c=costOf(b.type);
-  for(const m of MATS) if(c[m]&&((b.used&&b.used[m])||0)<c[m]-0.01&&p.res[m]<0.5) return m; return null; }
+  for(const m of MATS) if(c[m]&&stillNeeded(b,m)>0.01&&((b.dlv&&b.dlv[m])||0)<0.01&&p.res[m]<1) return m; return null; }
+/** Baustoffe vor Ort / gebraucht (für die Anzeige) */
+export function siteStock(b){ const c=costOf(b.type), out=[]; for(const m of MATS) if(c[m]) out.push({m,have:((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0),need:c[m]}); return out; }
 function jobValid(j,pid){
-  if(j.kind==='site') return !j.b.dead&&j.b.site&&j.b.owner===pid;
-  return G.road[j.i]===1&&G.roadOwner[j.i]===pid+1;
+  if(j.kind==='site'||j.kind==='haul') return !j.b.dead&&j.b.site&&j.b.owner===pid;
+  if(j.kind==='road') return G.road[j.i]===1&&G.roadOwner[j.i]===pid+1;
+  return true;   // return
 }
-function jobKey(j){ return j.kind==='site'?j.b.id:'r'+j.i; }
 function findJob(u){
-  const pid=u.owner, load=new Map();
-  for(const w of G.units) if(!w.dead&&w!==u&&w.owner===pid&&w.job){ const k=jobKey(w.job); load.set(k,(load.get(k)||0)+1); }
+  const pid=u.owner, p=G.players[pid], load=new Map(), roadTaken=new Set();
+  for(const w of G.units) if(!w.dead&&w!==u&&w.owner===pid&&w.job){ if(w.job.kind==='site') load.set(w.job.b.id,(load.get(w.job.b.id)||0)+1); if(w.job.kind==='road') roadTaken.add(w.job.i); }
+  const carry=u.carry;
   let best=null, bs=1e9;
-  for(const b of G.buildings){ if(b.dead||b.owner!==pid||!b.site) continue; const n=load.get(b.id)||0; if(n>=CONSTRUCTION.maxWorkers) continue;
-    if(siteLacks(b)) continue;   // wartet auf Material
-    const s=distTo(u,b)-8+n*2; if(s<bs){ bs=s; best={kind:'site',b}; } }
-  if(G.players[pid].res.stone>=roadStone()) for(let i=0;i<G.road.length;i++){ if(G.road[i]!==1||G.roadOwner[i]!==pid+1||load.has('r'+i)) continue;
-    const s=dist(u.x,u.y,i%MAP_W+0.5,((i/MAP_W)|0)+0.5); if(s<bs){ bs=s; best={kind:'road',i}; } }
+  const consider=(s,j)=>{ if(s<bs){ bs=s; best=j; } };
+  for(const b of G.buildings){ if(b.dead||b.owner!==pid||!b.site) continue;
+    // bauen
+    if(buildable(b)&&(load.get(b.id)||0)<CONSTRUCTION.maxWorkers) consider(distTo(u,b)-8+(load.get(b.id)||0)*2,{kind:'site',b});
+    // Material bringen
+    for(const m of MATS){ const need=stillNeeded(b,m); if(need<0.5) continue;
+      if(carry&&carry.res===m){ consider(distTo(u,b)-12,{kind:'haul',b,m,amt:Math.min(carry.amt,need),phase:'deliver'}); continue; }
+      if(p.res[m]<1) continue;
+      const d=nearestDepot(pid,b.x,b.y); if(!d) continue;
+      consider(distTo(u,d)+distTo(d,b)*0.5-6,{kind:'haul',b,m,amt:Math.min(CONSTRUCTION.carry,need,Math.floor(p.res[m])),phase:'fetch',d}); }
+  }
+  // Straßen
+  const hasStone=carry&&carry.res==='stone'&&carry.amt>=roadStone();
+  if(hasStone||p.res.stone>=roadStone()) for(let i=0;i<G.road.length;i++){ if(G.road[i]!==1||G.roadOwner[i]!==pid+1||roadTaken.has(i)) continue;
+    consider(dist(u.x,u.y,tileX(i),tileY(i))-(hasStone?14:0),{kind:'road',i,phase:hasStone?'go':'fetch'}); }
+  // übrig gebliebene Last zurückbringen
+  if(!best&&carry){ const d=nearestDepot(pid,u.x,u.y); if(d) best={kind:'return',d}; }
   return best;
+}
+/** Laufziel zu einem Gebäude: freies Randfeld, möglichst nicht von anderen Arbeitern belegt */
+function goToBuilding(u,b){
+  let best=null, bd=1e9;
+  for(const i of ringTiles(b.tx,b.ty,b.w,b.h)){ const x=i%MAP_W, y=(i/MAP_W)|0; if(!passable(x,y,'inf')) continue;
+    let crowd=0; for(const w of G.units) if(!w.dead&&w!==u&&w.spot===i) crowd++;
+    const d=dist(u.x,u.y,x+0.5,y+0.5)+crowd*3+Math.random()*0.5; if(d<bd){ bd=d; best=i; } }
+  if(best===null) return false;
+  u.spot=best; setPath(u,tileX(best),tileY(best)); return true;
 }
 function goToJob(u){
   const j=u.job;
-  if(j.kind==='road'){ setPath(u,j.i%MAP_W+0.5,((j.i/MAP_W)|0)+0.5); return; }
-  const b=j.b; let best=null, bd=1e9;
-  for(const i of ringTiles(b.tx,b.ty,b.w,b.h)){ const x=i%MAP_W, y=(i/MAP_W)|0; if(!passable(x,y,'inf')) continue;
-    let crowd=0; for(const w of G.units) if(!w.dead&&w!==u&&w.job&&w.job.b===b&&w.spot===i) crowd++;
-    const d=dist(u.x,u.y,x+0.5,y+0.5)+crowd*3+Math.random()*0.5; if(d<bd){ bd=d; best=i; } }
-  if(best===null){ u.job=null; return; }
-  u.spot=best; setPath(u,best%MAP_W+0.5,((best/MAP_W)|0)+0.5);
+  if(j.kind==='road'){ if(j.phase==='fetch'){ j.d=nearestDepot(u.owner,tileX(j.i),tileY(j.i)); if(!j.d||!goToBuilding(u,j.d)) u.job=null; } else setPath(u,tileX(j.i),tileY(j.i)); return; }
+  if(j.kind==='return'){ if(j.d.dead||!goToBuilding(u,j.d)) u.job=null; return; }
+  const target=j.kind==='haul'&&j.phase==='fetch'?j.d:j.b;
+  if(!target||target.dead||!goToBuilding(u,target)) u.job=null;
 }
 /** Arbeiter einer Baustelle zuweisen (Spielerbefehl) */
 export function assignWorkers(units,b){
@@ -222,31 +255,51 @@ export function updateWorker(u,dt){
     if(hq&&!u.path&&distTo(u,hq)>4.5){ const p=nearestPassable(hq.x+(Math.random()-.5)*4,hq.ty+hq.h+1+Math.random()*2,'inf'); if(p) setPath(u,p.x+0.5,p.y+0.5); }
     return;
   }
-  const j=u.job, tx=j.kind==='road'?j.i%MAP_W+0.5:j.b.x, ty=j.kind==='road'?((j.i/MAP_W)|0)+0.5:j.b.y;
-  const at = j.kind==='site' ? distTo(u,j.b)<0.95 : dist(u.x,u.y,tx,ty)<0.45;
+  const j=u.job, p=G.players[u.owner];
+  // Ziel dieses Abschnitts
+  const tgt = j.kind==='road'&&j.phase!=='fetch' ? null : j.kind==='road'||j.kind==='return' ? j.d : j.kind==='haul'&&j.phase==='fetch' ? j.d : j.b;
+  const at = tgt ? (!tgt.dead&&distTo(u,tgt)<0.95) : dist(u.x,u.y,tileX(j.i),tileY(j.i))<0.45;
   if(!at){
     if(!u.path||u.pathI>=u.path.length){ u.repathT-=dt; if(u.repathT<=0){ u.repathT=1; if(++u.jobTries>5){ u.job=null; u.jobTries=0; return; } goToJob(u); } }
     return;
   }
-  u.path=null; u.working=true; u.jobTries=0;
+  u.path=null; u.jobTries=0;
+  if(j.kind==='return'){ p.res[u.carry.res]+=u.carry.amt; u.carry=null; u.job=null; return; }
+  if(j.kind==='haul'){
+    if(j.phase==='fetch'){
+      const a=Math.min(j.amt,Math.floor(p.res[j.m])); if(a<=0){ u.job=null; return; }
+      if(u.carry&&u.carry.res!==j.m){ p.res[u.carry.res]+=u.carry.amt; u.carry=null; }   // anderes Material abgeben
+      p.res[j.m]-=a; u.carry={res:j.m,amt:(u.carry?u.carry.amt:0)+a}; j.amt=Math.min(u.carry.amt,stillNeeded(j.b,j.m)+j.amt); j.phase='deliver'; goToJob(u); return; }
+    // abliefern
+    const b=j.b, a=Math.min(u.carry?u.carry.amt:0, Math.max(0,stillNeeded(b,j.m)+j.amt));
+    b.dlv=b.dlv||{}; b.dlv[j.m]=(b.dlv[j.m]||0)+a; u.carry.amt-=a; if(u.carry.amt<=0.01) u.carry=null;
+    u.job=null; u.thinkT=0; return;
+  }
+  if(j.kind==='road'&&j.phase==='fetch'){
+    const a=Math.min(CONSTRUCTION.carry-(u.carry&&u.carry.res==='stone'?u.carry.amt:0),Math.floor(p.res.stone));
+    if(u.carry&&u.carry.res!=='stone'){ p.res[u.carry.res]+=u.carry.amt; u.carry=null; }
+    if(a>0){ p.res.stone-=a; u.carry={res:'stone',amt:(u.carry?u.carry.amt:0)+a}; }
+    if(!u.carry||u.carry.amt<roadStone()){ u.job=null; return; }
+    j.phase='go'; goToJob(u); return; }
+  // arbeiten
+  u.working=true;
+  const tx=j.kind==='road'?tileX(j.i):j.b.x, ty=j.kind==='road'?tileY(j.i):j.b.y;
   u.angle=Math.atan2(ty-u.y,tx-u.x);
   if(Math.random()<dt*1.5) fxAdd({k:'smoke',x:u.x+Math.cos(u.angle)*0.4,y:u.y+Math.sin(u.angle)*0.4,r:0.12,life:0.6});
-  const p=G.players[u.owner];
   if(j.kind==='site'){
-    const b=j.b, k=Math.min(dt/(b.def.time*CONSTRUCTION.workTime),1-(b.progress||0)), c=costOf(b.type);
-    // Material anteilig aus dem Lager holen – fehlt etwas, ruht die Baustelle
-    b.used=b.used||{};
-    for(const m of MATS) if(c[m]&&p.res[m]<c[m]*k){ b.waitMat=m; u.working=false; u.job=null; u.thinkT=2; return; }
-    b.waitMat=null;
-    for(const m of MATS) if(c[m]){ p.res[m]-=c[m]*k; b.used[m]=(b.used[m]||0)+c[m]*k; }
+    const b=j.b, c=costOf(b.type); b.used=b.used||{}; b.dlv=b.dlv||{};
+    let k=Math.min(dt/(b.def.time*CONSTRUCTION.workTime),1-(b.progress||0));
+    for(const m of MATS) if(c[m]&&b.used[m]<c[m]-0.01) k=Math.min(k,(b.dlv[m]||0)/c[m]);   // nur so weit, wie Material vor Ort ist
+    if(k<=1e-6&&(b.progress||0)<0.9999){ u.working=false; u.job=null; u.thinkT=0; return; }
+    for(const m of MATS) if(c[m]){ const a=Math.min(c[m]*k,b.dlv[m]||0); b.dlv[m]=(b.dlv[m]||0)-a; b.used[m]=(b.used[m]||0)+a; }
     b.progress=Math.min(1,(b.progress||0)+k); b.hp=Math.min(b.maxHp,b.hp+b.maxHp*0.9*k);
     if(b.progress>=0.9999) completeSite(b);
   } else {
-    if(u.roadI!==j.i){   // neues Feld: Stein aus dem Lager holen
-      if(p.res.stone<roadStone()){ u.working=false; u.job=null; u.thinkT=2; return; }
-      p.res.stone-=roadStone(); u.roadI=j.i; u.roadT=0; }
+    if(u.roadI!==j.i){   // neues Feld: Stein vom getragenen Vorrat nehmen
+      if(!u.carry||u.carry.res!=='stone'||u.carry.amt<roadStone()){ u.working=false; j.phase='fetch'; goToJob(u); return; }
+      u.carry.amt-=roadStone(); if(u.carry.amt<=0.01) u.carry=null; u.roadI=j.i; u.roadT=0; }
     u.roadT+=dt;
-    if(u.roadT>=CONSTRUCTION.roadWork){ u.roadT=0; u.roadI=-1; G.road[j.i]=2; G.roadDirty=true; u.job=null; }
+    if(u.roadT>=CONSTRUCTION.roadWork){ u.roadT=0; u.roadI=-1; G.road[j.i]=2; G.roadDirty=true; u.job=null; u.thinkT=0; }
   }
 }
 

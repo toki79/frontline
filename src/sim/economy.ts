@@ -1,4 +1,5 @@
-import { ECON, EXPORT, MAP_H, MAP_W, STORAGE, T } from '../data/config';
+import { ECON, EXPORT, MAP_H, MAP_W, MOOD, STORAGE, T } from '../data/config';
+import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
 import { G } from '../sim/state';
 import { refreshQuality } from '../sim/world';
@@ -56,12 +57,29 @@ export function updateEconomy(pid,dt){
   p.upkeep={soldiers,fuel};
   p.foodRate=foodProd-eat;
   p.res.food+=p.foodRate*dt;
-  p.res.money+=p.pop*ECON.taxPerHead*dt*mul;
+  // ---- Zufriedenheit: jedes Versäumnis drückt die Stimmung ----
+  const why=[], pen=(c,amt,txt)=>{ if(c&&amt>=0.02){ why.push({txt,amt}); return amt; } return 0; };
+  let target=1;
+  target-=pen(p.res.food<=0,MOOD.hunger,'Hunger');
+  target-=pen(p.res.food>0&&p.foodRate<0,MOOD.foodFalling,'Nahrung wird knapp');
+  target-=pen(!powOk,MOOD.power,'Stromausfall');
+  target-=pen(p.broke,MOOD.broke,'Kasse leer – Löhne bleiben aus');
+  target-=pen(p.pop>p.cap+1,MOOD.crowded,'zu wenig Wohnraum');
+  target-=pen((p.growQ??1)<0.9,MOOD.housing*(0.9-(p.growQ??1)),'schlechte Wohnlage (Lärm, Enge)');
+  target-=pen(!!p.lastAttack&&G.t-p.lastAttack.t<60,MOOD.attacked,'Angriffe auf die Stadt');
+  { const core=G.buildings.filter(b=>!b.dead&&b.owner===pid&&(b.type==='hq'||b.def.cap));
+    target-=pen(G.buildings.some(c=>!c.dead&&c.type==='camp'&&core.some(h=>dist(c.x,c.y,h.x,h.y)<MOOD.banditR)),MOOD.bandits,'Räuber in Stadtnähe'); }
+  target-=pen(G.war,MOOD.war,'Krieg');
+  p.moodWhy=why; p.moodTarget=Math.max(0,target);
+  if(p.happy===undefined) p.happy=MOOD.start;
+  p.happy+=(p.moodTarget-p.happy)*Math.min(1,MOOD.speed*dt);
+  const taxF=Math.min(1.1,MOOD.taxBase+MOOD.taxPer*p.happy);
+  p.res.money+=p.pop*ECON.taxPerHead*taxF*dt*mul;
   // Handelskontore: verkaufen Überschüsse über der Reserve
   let cap=0, exp=0, expBy={}; for(const b of G.buildings) if(b.owner===pid&&b.def.export&&works(b)) cap+=b.def.export*(powOk?1:0.5);
   if(cap>0) for(const r of EXPORT.order){ const over=p.res[r]-EXPORT.reserve[r]; if(over<=0) continue; const a=Math.min(over,cap*dt); if(a<=0) continue;
     p.res[r]-=a; const m=a*EXPORT.price[r]*mul; p.res.money+=m; exp+=m; expBy[r]=(expBy[r]||0)+a/dt; cap-=a/dt; if(cap<=0) break; }
-  p.rate={money:p.pop*ECON.taxPerHead*mul, export:exp/dt, expBy, food:p.foodRate, foodProd, eat, metal:metalProd, oil:oilProd, wood:woodProd, stone:stoneProd, mines, minesEmpty, linked, noAccess, upkeep, wages, admin};
+  p.rate={money:p.pop*ECON.taxPerHead*taxF*mul, taxF, export:exp/dt, expBy, food:p.foodRate, foodProd, eat, metal:metalProd, oil:oilProd, wood:woodProd, stone:stoneProd, mines, minesEmpty, linked, noAccess, upkeep, wages, admin};
   // Lager: was keinen Platz hat, verdirbt bzw. geht verloren
   p.full=p.full||{};
   for(const r of STORAGE.res){ const over=p.res[r]-p.store; p.full[r]=over>=-1;
@@ -79,13 +97,16 @@ export function updateEconomy(pid,dt){
   } else if(p.pop>p.cap){
     p.pop=Math.max(p.cap,p.pop-1*dt); p.growth=-1; p.growBlock='wohnraum';
   } else if(p.pop<p.cap){
-    let g=ECON.growBase+p.pop*ECON.growRate;
+    let g=(ECON.growBase+p.pop*ECON.growRate)*Math.min(1.2,p.happy*1.25);   // zufriedene Städte wachsen schneller
     g*=p.growQ; if(p.growQ<0.95) p.growBlock='laerm';
     if(p.foodRate<0){ g*=0.35; p.growBlock='nahrung'; }
     if(!powOk){ g*=0.5; p.growBlock=p.growBlock||'strom'; }
     p.growth=g;
     p.pop=Math.min(p.cap,p.pop+g*dt);
   } else if((p.growBlock='wohnraum')&&pid===0&&G.t-p.capMsg>90){p.capMsg=G.t;msg('Kein Wohnraum mehr – baue Wohnhäuser, damit die Stadt wächst.','#d2bd62');}
+  // Abwanderung bei großer Unzufriedenheit
+  if(p.happy<MOOD.emigrate&&p.pop>ECON.minPop){ const lost=p.pop*MOOD.emigrateRate*(1-p.happy/MOOD.emigrate)*dt; p.pop=Math.max(ECON.minPop,p.pop-lost); p.growth-=lost/dt; p.growBlock='unzufrieden';
+    if(pid===0&&G.t-(p.emiMsg||-99)>45){ p.emiMsg=G.t; msg(`😠 Die Einwohner sind unzufrieden (${Math.round(p.happy*100)} %) und wandern ab! Grund: ${(p.moodWhy||[]).sort((a,b)=>b.amt-a.amt).map(w=>w.txt).slice(0,2).join(', ')}.`,'#ff8a7a'); } }
   // Stadtstufen (Meilensteine) – das Spiel läuft weiter
   const rk=rankOf(p.pop); if(p.rank===undefined) p.rank=rk;
   if(rk>p.rank){ p.rank=rk; const nm=ECON.ranks[rk][1];

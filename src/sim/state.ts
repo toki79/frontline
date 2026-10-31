@@ -20,7 +20,7 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
     units:[], buildings:[], projectiles:[], fx:[], scorch:[],
     players: FACTIONS.map((f,i)=>({id:i, ...f, res:{money:0,food:0,wood:0,stone:0,metal:0,oil:0}, pop:0, cap:0, foodRate:0, power:0, use:0,
               q:{hq:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
-    rel:[['-','neutral','neutral'],['neutral','-','neutral'],['neutral','neutral','-']],
+    rel:[['-','neutral','neutral','feind'],['neutral','-','neutral','feind'],['neutral','neutral','-','feind'],['feind','feind','feind','-']],
     war:false, aiAtt:0, offer:null,
     militiaAlly:-1, militiaWar:[false,false], attitude:[0,0], mercCooldown:0, market:{sellOil:0,buyFood:0,buyMetal:0},
     milSpawnT:20, milRaidT:40, aiHintShown:false,
@@ -31,7 +31,7 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
   { // zwei Rohstoffe reich, zwei knapp, einer normal – Kastrova genau umgekehrt
     const rs=[...REGION.res]; for(let i=rs.length-1;i>0;i--){ const j=Math.floor(G.rng()*(i+1)); [rs[i],rs[j]]=[rs[j],rs[i]]; }
     const rich=rs.slice(0,2), scarce=rs.slice(2,4);
-    G.profile=[{rich,scarce},{rich:scarce,scarce:rich},{rich:[],scarce:[]}]; }
+    G.profile=[{rich,scarce},{rich:scarce,scarce:rich},{rich:[],scarce:[]},{rich:[],scarce:[]}]; }
   genMap();
   setupStart();
   updateRel();

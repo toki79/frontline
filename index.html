@@ -19,7 +19,7 @@
   <div class="tb"><button id="bHelp" title="Symbole &amp; Hilfe">❓</button><button id="bDiplo">🤝<span class="lbl"> Diplomatie</span></button><button id="bMenu">⏸<span class="lbl"> Menü</span></button></div>
 </div>
 <div id="popbar">
-  <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span></div>
+  <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span><span id="happy" data-tip="happy">😊</span></div>
   <div class="pb" data-tip="popAi"><span class="nm">👥 Kastrova</span><b id="popAi">0</b><i><em id="popAiBar" style="background:#cc4a3c"></em></i><span id="stance" data-tip="stance"></span></div>
 </div>
 <div id="log"></div>
@@ -34,6 +34,7 @@
   <button data-c="stop">■<small>Stopp</small></button>
   <button data-c="all">◎<small>Alle</small></button>
   <button data-c="desel">✕<small>Abwählen</small></button>
+  <button data-c="escort" class="ctx">🛡<small>Begleiten</small></button>
   <button data-c="road" class="ctx">🛣<small>Straße</small></button>
   <button data-c="demolish" class="ctx">🗑<small>Abriss</small></button>
 </div>
@@ -56,7 +57,9 @@
   <button class="big" id="bStart">Neues Spiel starten</button>
   <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
   <div class="help">
-    <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Geld zahlst du beim Setzen, Holz, Stein und Metall holen die Arbeiter erst beim Bauen – fehlt es, wartet die Baustelle. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Betriebe liefern zum Rathaus oder Lagerhaus: je weiter der Weg, desto weniger kommt an – <b>Straßen</b> verkürzen ihn. Lass Platz: Höfe brauchen Äcker (am besten grüne Wiese), Häuser Freiraum, und Feuer springt über.<br>
+    <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Geld zahlst du beim Setzen, Holz, Stein und Metall <b>tragen die Arbeiter</b> aus Rathaus oder Lagerhaus zur Baustelle – weite Wege bremsen, fehlt Material, wartet die Baustelle. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Betriebe liefern zum Rathaus oder Lagerhaus: je weiter der Weg, desto weniger kommt an – <b>Straßen</b> verkürzen ihn. Lass Platz: Höfe brauchen Äcker (am besten grüne Wiese), Häuser Freiraum, und Feuer springt über.<br>
+    <b>Räuber</b> hausen in abgelegenen Lagern und überfallen unbegleitete Arbeiter, Laster und Außenposten – Soldaten wählen, <b>🛡 Begleiten</b>, Schützling antippen. Ein ausgehobenes Lager bringt Beute.<br>
+    <b>Zufriedenheit 😊:</b> Hunger, Stromausfall, leere Kasse, schlechte Wohnlage, Angriffe und Räuber in Stadtnähe verärgern die Einwohner – weniger Steuern, langsameres Wachstum, unter 35 % wandern sie ab.<br>
     <b>Rohstoffe sind ungleich verteilt:</b> Jede Stadt hat zwei Rohstoffe reichlich und zwei kaum. Was fehlt, muss gehandelt oder erobert werden.<br>
     <b>Haushalt:</b> Gebäude, Soldaten und die Stadtverwaltung kosten laufend Geld. Lager sind begrenzt – Lagerhaus bauen oder Überschuss über das Kontor verkaufen.<br>
     <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
@@ -109,6 +112,11 @@
     <dt>Straßen</dt><dd>Gestrichelt = geplant (kostenlos), Schotter = gebaut (2 🪨 je Feld beim Bau). Auf Straßen sind alle fast doppelt so schnell. <b>Transport:</b> Höfe, Holzfäller, Steinbrüche und Minen liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus); je länger der Weg, desto weniger kommt an. Straßen zählen nur ein Fünftel des Weges – das lohnt sich vor allem bei weiten Strecken. Gebäude wählen → 🛣 Straße plant den Weg.</dd>
     <dt>Grüne Wiese</dt><dd>Sattes Grün mit Blüten. Bauernhöfe auf Wiese bringen vollen Ertrag, auf karger Steppe nur 40 %.</dd>
     <dt>Äcker</dt><dd>Gestreifte Felder um Bauernhöfe. Ein Hof bewirtschaftet bis zu 14 freie Felder im Umkreis von 2 – Wiesen zuerst. Jedes zugebaute Feld kostet Ernte.</dd>
+    <dt>😊 88 %</dt><dd>Zufriedenheit. Antippen zeigt, was die Leute stört. Sie folgt langsam – Versäumnisse rächen sich mit Verzögerung.</dd>
+    <dt>Räuberlager</dt><dd>Zelte mit Lagerfeuer. Räuber greifen alles in ihrer Umgebung an und überfallen nahe Gebäude. Zerstören bringt Beute.</dd>
+    <dt>🛡 Begleiten</dt><dd>Bewaffnete Einheiten wählen, 🛡 tippen, dann eigenen Arbeiter oder Laster antippen – sie folgen ihm und verteidigen ihn.</dd>
+    <dt>Kiste über Arbeiter</dt><dd>Er trägt Material (braun = Holz, hell = Stein, grau = Metall) zur Baustelle.</dd>
+    <dt>🛣 67 %</dt><dd>Über Betrieben: so viel kommt wegen des Transportwegs im Lager an. Straße oder Lagerhaus in der Nähe hilft.</dd>
     <dt>Wartet auf Holz</dt><dd>Über einer Baustelle: das Material fehlt im Lager. Holzfäller/Steinbruch bauen oder am Markt kaufen.</dd>
     <dt>Dichte Bebauung</dt><dd>Wohnhäuser ohne Freiraum drumherum haben schlechtere Wohnqualität. Brennt ein Gebäude nieder, springt das Feuer auf direkt angrenzende Gebäude über.</dd>
     <dt>🗑 Abriss</dt><dd>Eigenes Gebäude wählen → Abriss (zweimal tippen). Baustellen werden voll erstattet, fertige Gebäude zu 30 %.</dd>

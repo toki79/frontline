@@ -49,6 +49,13 @@ export function updateUnit(u,dt){
     if(G.buildings.some(b=>!b.dead&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9)) u.battery=Math.min(d.battery,(u.battery??d.battery)+dt*4); else u.battery=(u.battery??d.battery)-dt;
     if(u.battery<=0){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.25,life:0.3}); u.dead=true; if(u.owner===0){G.stats.lost++; msg('Eine Drohne ist mit leerem Akku abgestürzt.','#ffb38a');} G.sel=G.sel.filter(s=>s!==u); return; }
   }
+  if(u.mode==='escort'){   // Begleitschutz: dicht beim Schützling bleiben, Ziele nicht zu weit verfolgen
+    const e=u.escort;
+    if(!e||e.dead){ u.mode='idle'; u.escort=null; u.guard={x:u.x,y:u.y}; }
+    else { if(u.target&&dist(u.target.x,u.target.y,e.x,e.y)>7) u.target=null;
+      if(!u.target&&dist(u.x,u.y,e.x,e.y)>2.2){ u.repathT-=dt; if(!u.path||u.repathT<=0){ u.repathT=0.8; setPath(u,e.x+(Math.random()-.5),e.y+(Math.random()-.5)); } }
+      else if(!u.target&&u.path&&dist(u.x,u.y,e.x,e.y)<1.4) u.path=null; }
+  }
   if(!u.target&&!u.path){
     u.repathT-=dt;
     if((u.mode==='amove'||u.mode==='move')&&u.goal&&dist(u.x,u.y,u.goal.x,u.goal.y)>0.9&&u.repathT<=0){u.repathT=1.5;setPath(u,u.goal.x,u.goal.y);}

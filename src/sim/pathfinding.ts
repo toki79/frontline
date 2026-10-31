@@ -16,7 +16,7 @@ export function findPath(sx,sy,gx,gy,cls){
   const hfun=(x,y)=>{const dx=Math.abs(x-gx),dy=Math.abs(y-gy);return Math.max(dx,dy)+0.414*Math.min(dx,dy);};
   PF.g[start]=0; PF.stamp[start]=st; PF.from[start]=-1; push(hfun(sx,sy),start);
   let best=start, bestH=hfun(sx,sy), n=0;
-  while(heap.length&&n<7000){
+  while(heap.length&&n<20000){
     const [,cur]=pop(); if(PF.closed[cur]===st) continue; PF.closed[cur]=st; n++;
     if(cur===goal){best=cur;break;}
     const cx=cur%MAP_W, cy=(cur/MAP_W)|0, hh=hfun(cx,cy); if(hh<bestH){bestH=hh;best=cur;}

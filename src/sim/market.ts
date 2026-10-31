@@ -1,6 +1,7 @@
 import { clamp } from '../core/util';
 import { BASEVAL, LOT, REGION } from '../data/config';
 import { G, isRich, isScarce } from '../sim/state';
+import { siteLacks } from '../sim/build';
 import { countBuildings, findBuilding } from '../sim/world';
 
 /* =====================================================================
@@ -42,7 +43,7 @@ export function needLevel(pid,res){
     if(!countBuildings(pid,'factory')) n-=0.8; }   // ohne Fahrzeugwerk wird Öl kaum gebraucht
   if(res==='wood'||res==='stone'){ const src=res==='wood'?'lumber':'quarry', ok=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===pid&&b.type===src&&!b.empty);
     if(!ok) n+=0.7; if(p.res[res]<120) n+=0.6; if(p.res[res]>(p.store||800)*0.7&&ok) n-=1;
-    if(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.site&&b.waitMat===res)) n+=0.6; }
+    if(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.site&&siteLacks(b)===res)) n+=0.6; }
   if(isScarce(pid,res)) n+=0.6; if(isRich(pid,res)) n-=0.6;
   return clamp(n,-1.5,2.5);
 }

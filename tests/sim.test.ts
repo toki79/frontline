@@ -5,7 +5,8 @@ import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt } from '../src/sim/world';
 import { destroy } from '../src/sim/combat';
-import { CONSTRUCTION, STORAGE, T } from '../src/data/config';
+import { orderEscort, orderMove } from '../src/sim/orders';
+import { CONSTRUCTION, MAP_H, MAP_W, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
 import { idx } from '../src/core/util';
@@ -100,7 +101,7 @@ describe('Simulation', () => {
     // Steinbruch irgendwo mit Felsen, möglichst weit weg
     let q = null; const hq = findBuilding(0, 'hq');
     const spots = [];
-    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) if (canPlace(0, 'quarry', x, y)) spots.push([x, y]);
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (canPlace(0, 'quarry', x, y)) spots.push([x, y]);
     spots.sort((a, b) => (b[0] - hq.x) ** 2 + (b[1] - hq.y) ** 2 - ((a[0] - hq.x) ** 2 + (a[1] - hq.y) ** 2));
     q = placeSite(0, 'quarry', spots[0][0], spots[0][1]);
     expect(q).toBeTruthy();
@@ -194,6 +195,45 @@ describe('Simulation', () => {
     for (let d = 4; d < 8 && !ok; d++) ok = placeDefense(0, 'trench', Math.floor(hq.x) + d, Math.floor(hq.y) - d);
     expect(ok).toBe(true);
     expect(G.players[0].res.money).toBe(m - 30);
+  });
+
+  it('Bauarbeiter tragen Material zur Baustelle', () => {
+    newGame('mittel');
+    const s = siteNearHq('farm');
+    let carried = false;
+    for (let i = 0; i < 20 * 60 && s.site; i++) { update(0.05); if (G.units.some(u => u.owner === 0 && u.carry && u.carry.res === 'wood')) carried = true; }
+    expect(carried).toBe(true);
+    expect(s.site).toBe(false);
+  });
+
+  it('Räuber: Lager auf der Karte, greifen unbegleitete Arbeiter an', () => {
+    newGame('mittel');
+    const camps = G.buildings.filter(b => b.type === 'camp');
+    expect(camps.length).toBeGreaterThanOrEqual(4);
+    run(2);
+    const c = camps[0];
+    expect(G.units.filter(u => u.owner === 3 && u.camp === c.id).length).toBeGreaterThan(0);
+    const w = spawnAt(0, 'worker', c.x + 3, c.y + 3); w.mode = 'move';
+    run(25);
+    expect(w.dead || w.hp < w.maxHp).toBe(true);
+  });
+
+  it('Begleitschutz: Soldaten folgen dem Arbeiter', () => {
+    newGame('mittel');
+    const w = G.units.find(u => u.owner === 0 && u.def.worker), s = G.units.find(u => u.owner === 0 && u.type === 'inf');
+    expect(orderEscort([s], w)).toBe(1);
+    orderMove([w], w.x + 6, w.y - 4);
+    run(10);
+    expect(Math.hypot(s.x - w.x, s.y - w.y)).toBeLessThan(3.5);
+  });
+
+  it('Zufriedenheit: Hunger drückt Stimmung und Steuern', () => {
+    newGame('mittel');
+    const p = G.players[0];
+    run(5); const h0 = p.happy;
+    p.res.food = 0; run(40);
+    expect(p.happy).toBeLessThan(h0 - 0.1);
+    expect(p.rate.taxF).toBeLessThan(1);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

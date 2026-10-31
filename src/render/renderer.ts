@@ -3,7 +3,7 @@ import { hash, idx, inMap } from '../core/util';
 import { BUILDINGS, FACTIONS, MAP_H, MAP_W, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
-import { haulEff, previewFields, siteLacks, siteWorkers } from '../sim/build';
+import { haulEff, hauls, previewFields, siteLacks, siteWorkers } from '../sim/build';
 import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
@@ -93,6 +93,7 @@ export function render(){
   }
   for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
     drawUnitShape(c,u.type,f.col,f.dark,u.x*TILE,u.y*TILE,u.angle,u.tur,u.working?-1:u.hp/u.maxHp);
+    if(u.carry){ const col={wood:'#9a6a3a',stone:'#c4bca8',metal:'#8a96a4'}[u.carry.res]||'#ccc'; c.fillStyle='#000a'; c.fillRect(u.x*TILE-5,u.y*TILE-10,10,7); c.fillStyle=col; c.fillRect(u.x*TILE-4,u.y*TILE-9,8,5); }
     if(u.def.harvester&&u.cargo>0){c.fillStyle='#1a1410';c.fillRect(u.x*TILE-6,u.y*TILE+9,12,3);c.fillStyle='#e8c84a';c.fillRect(u.x*TILE-6,u.y*TILE+9,12*u.cargo/u.def.harvester.cap,3);}
   }
   for(const p of G.projectiles){ if(tileVis(p.x,p.y)<2) continue; c.save(); c.translate(p.x*TILE,p.y*TILE); c.rotate(p.a||0);
@@ -126,6 +127,7 @@ export function render(){
       if(b.quality<0.95){ c.fillStyle=`rgba(80,78,70,${(1-b.quality)*0.55})`; c.fillRect(b.tx*TILE+1,b.ty*TILE+1,b.w*TILE-2,b.h*TILE-2); }
       if(b.owner===0){ const w=b.w*TILE-8; c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w,4); c.fillStyle='#7fb3ff'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w*(b.resid||0)/b.def.cap,4); }
     }
+    if(b.owner===0&&!b.site&&hauls(b)&&(b.eff??1)<0.9){ c.font='bold 10px sans-serif'; const t='🛣 '+Math.round(b.eff*100)+' %'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-15,tw+6,13); c.fillStyle=b.eff<0.5?'#ff8a6a':'#e8c86a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-5); }
     if(b.site&&b.owner===0&&siteLacks(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const m=siteLacks(b), t='wartet auf '+({wood:'Holz',stone:'Stein',metal:'Metall'}[m]); const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#ff9a6a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
     else if(b.site&&b.owner===0&&!siteWorkers(b)&&(G.t*2|0)%2){ c.font='bold 10px sans-serif'; const t='wartet auf Arbeiter'; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE-17,tw+6,13); c.fillStyle='#e8c84a'; c.fillText(t,b.x*TILE-tw/2,b.ty*TILE-7); }
     if(b.owner===2||(s&&b.owner!==0)||(b.empty&&b.owner===0&&!b.site)){c.fillStyle='#000a';c.font='bold 10px sans-serif';const t=b.empty?'erschöpft':b.def.name;const tw=c.measureText(t).width;c.fillRect(b.x*TILE-tw/2-3,b.ty*TILE+b.h*TILE+2,tw+6,13);c.fillStyle=G.players[b.owner].col;c.fillText(t,b.x*TILE-tw/2,b.ty*TILE+b.h*TILE+12);}

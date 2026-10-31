@@ -3,9 +3,9 @@ import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
 import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, RES, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
-import { orderAttack, orderHarvest, orderMove, orderReturn, orderStop } from '../sim/orders';
+import { orderAttack, orderEscort, orderHarvest, orderMove, orderReturn, orderStop } from '../sim/orders';
 import { placeDefense, placeSite } from '../sim/production';
-import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteWorkers } from '../sim/build';
+import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { hostile, knownBuilding, visibleUnit } from '../sim/world';
@@ -21,7 +21,7 @@ export const endPtr=e=>{
   if(input.pinch){ if(input.pts.size<2) input.pinch=null; input.drag=null; return; }
   const dr=input.drag; input.drag=null; if(!dr) return;
   if(!dr.moved){ handleTap(toWorld(e.clientX,e.clientY), dr.mouse&&dr.button===2, dr.shift); }
-  else if(dr.mode==='paint'){ const w=toWorld(e.clientX,e.clientY), i=idx(clamp(Math.floor(w.x),0,63),clamp(Math.floor(w.y),0,63)); if(i!==G.lastPaint) handleTap(w,false,false); }
+  else if(dr.mode==='paint'){ const w=toWorld(e.clientX,e.clientY), i=idx(clamp(Math.floor(w.x),0,MAP_W-1),clamp(Math.floor(w.y),0,MAP_H-1)); if(i!==G.lastPaint) handleTap(w,false,false); }
   else if(dr.mode==='box'&&input.box){ boxSelect(input.box,dr.shift); }
   input.box=null;
 };
@@ -56,6 +56,11 @@ export function handleTap(w,right,shift){
   }
   const ent=pickEntity(w), mine=myUnitsSel();
   if(right){ if(mine.length) command(ent,w,mine); return; }
+  if(G.escortMode&&mine.length){
+    if(ent&&ent.kind==='unit'&&ent.owner===0&&!mine.includes(ent)){ const n=orderEscort(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#7fb0ea',life:0.6});
+      msg(`🛡 ${n} Einheit${n===1?'':'en'} begleite${n===1?'t':'n'} jetzt: ${ent.def.name}.`,'#9fd88a'); }
+    else msg('Zum Begleiten einen eigenen Arbeiter, Laster oder eine andere Einheit antippen.','#ffb38a');
+    G.escortMode=false; refreshCmds(); return; }
   if(G.amoveMode&&mine.length){ orderMove(mine,w.x,w.y,'amove'); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ff7a5a',life:0.5}); G.amoveMode=false; refreshCmds(); return; }
   if(ent&&ent.owner===0){
     if(ent.kind==='building'&&ent.site&&mine.some(u=>u.def.worker)){ assignWorkers(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5}); return; }
@@ -94,10 +99,11 @@ export function cmd(c){
   if(!G) return;
   const mine=myUnitsSel();
   if(c==='box'){G.boxMode=!G.boxMode;G.amoveMode=false;}
-  else if(c==='amove'){ if(mine.length){G.amoveMode=!G.amoveMode;G.boxMode=false;} else msg('Zuerst Einheiten auswählen.'); }
+  else if(c==='amove'){ if(mine.length){G.amoveMode=!G.amoveMode;G.boxMode=false;G.escortMode=false;} else msg('Zuerst Einheiten auswählen.'); }
+  else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
-  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.placing=null;}
+  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;}
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
     msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
   else if(c==='demolish'){ const b=selBuilding(); if(b){
@@ -110,7 +116,9 @@ export function selBuilding(){ const s=G.sel.filter(e=>!e.dead); return s.length
 export function refreshCmds(){
   document.querySelector('[data-c=box]').classList.toggle('on',!!(G&&G.boxMode));
   document.querySelector('[data-c=amove]').classList.toggle('on',!!(G&&G.amoveMode));
-  const sb=G&&selBuilding();
+  const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
+  document.querySelector('[data-c=escort]').classList.toggle('show',armed);
+  document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
   document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&(sb.eff??1)<0.97));
@@ -121,14 +129,17 @@ export function updateInfo(){
   if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing); el.textContent=`${d.name} bauen: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ✕ Abwählen beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
   if(G.amoveMode){el.textContent='Angriffsbewegung: Ziel antippen';return;}
+  if(G.escortMode){el.textContent='Begleiten: eigenen Arbeiter oder Laster antippen – die Auswahl bleibt bei ihm und verteidigt ihn';return;}
   if(G.boxMode){el.textContent='Rahmen aufziehen, um Einheiten zu wählen';return;}
   const s=G.sel.filter(e=>!e.dead); if(!s.length){el.textContent='';return;}
   if(s.length===1){const e=s[0], f=G.players[e.owner];
     let t=`${e.def.name} · Zustand ${Math.ceil(e.hp)}/${e.maxHp}`+(e.owner!==0?` · ${f.short} (${G.rel[0][e.owner]})`:'');
+    if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
+    if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;
     if(e.kind==='building'&&e.readyT&&G.t<e.readyT) t+=` · im Bau (${Math.ceil(e.readyT-G.t)} s)`;
-    if(e.kind==='building'&&e.site){ const n=siteWorkers(e), lk=siteLacks(e); t=`🏗 Baustelle: ${e.def.name} · ${Math.floor((e.progress||0)*100)} % · ${lk?'⚠ wartet auf '+RES[lk].name:n?n+' Arbeiter am Werk':'wartet auf Bauarbeiter'}`+(e.owner===0?' · Arbeiter wählen und Baustelle antippen schickt sie hin':''); el.textContent=t; return; }
-    if(e.kind==='unit'&&e.def.worker) t+=e.working?' · arbeitet':e.job?' · auf dem Weg zur Arbeit':' · wartet auf Aufträge';
+    if(e.kind==='building'&&e.site){ const n=siteWorkers(e), lk=siteLacks(e); t=`🏗 Baustelle: ${e.def.name} · ${Math.floor((e.progress||0)*100)} % · ${lk?'⚠ wartet auf '+RES[lk].name:n?n+' Arbeiter am Werk':'Arbeiter bringen Material'} · `+siteStock(e).map(s=>`${RES[s.m].icon} ${Math.floor(s.have)}/${s.need}`).join(' ')+(e.owner===0?' · Arbeiter wählen und Baustelle antippen schickt sie hin':''); el.textContent=t; return; }
+    if(e.kind==='unit'&&e.def.worker) t+=(e.working?' · arbeitet':e.job?(e.job.kind==='haul'||e.job.kind==='road'&&e.job.phase==='fetch'?' · holt Material':' · auf dem Weg zur Arbeit'):' · wartet auf Aufträge')+(e.carry?` · trägt ${Math.floor(e.carry.amt)} ${RES[e.carry.res].icon}`:'');
     if(e.kind==='building'&&e.haul!==undefined&&(e.def.wood||e.def.stone||e.def.metal||e.type==='farm')) t+=` · Transportweg ${e.haul===Infinity?'–':f1(e.haul)} → Leistung ${Math.round((e.eff??1)*100)} %`+((e.eff??1)<0.97&&e.owner===0?' (🛣 Straße oder Lagerhaus in der Nähe hilft)':'');
     if(e.kind==='building'&&e.fire>0) t+=' · 🔥 brennt!';
     if(e.kind==='building'&&e.type==='farm'&&e.fields!==undefined) t+=` · Äcker ${e.fields}/${DENSITY.farmFields} (Ertrag ${Math.round((e.fieldF??1)*100)} %)`;

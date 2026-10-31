@@ -1,5 +1,5 @@
 import { dist, fmt, idx, inMap } from '../core/util';
-import { DAMAGE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { BANDITS, DAMAGE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -87,7 +87,8 @@ export function loot(e,src){
   if(!src) return; const ko=src.owner, vo=e.owner; if(ko===vo) return;
   if(e.kind==='building'&&(e.def.def||e.site)) return;
   const V=G.players[vo], K=G.players[ko], got: Record<string,number>={};
-  if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7); }
+  if(e.type==='camp'){ for(const k in BANDITS.loot) got[k]=BANDITS.loot[k]+Math.floor(V.res[k]||0); V.res={money:0,food:0,wood:0,stone:0,metal:0,oil:0}; }
+  else if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7); }
   else {
     const share=e.type==='hq'?0.4:0.15, cap=e.type==='hq'?900:250;
     for(const k of ['money','food','wood','stone','metal','oil']){ let a=Math.floor(Math.min((V.res[k]||0)*share,cap));
@@ -119,6 +120,8 @@ export function destroy(e,src){
     if(e.owner===0&&e.type!=='wall') msg((e.site?'Baustelle verloren: ':'Gebäude verloren: ')+e.def.name,'#ff8a7a');
     if(e.owner===1&&src&&src.owner===0&&e.type!=='wall') msg('Feindliches Gebäude zerstört: '+e.def.name,'#9fd88a');
     if(e.type==='bunker') msg('Der Milizbunker ist gefallen – der Markt ist geschlossen.','#d6b45a');
+    if(e.type==='camp'&&src&&src.owner===0) msg('🏴 Räuberlager ausgehoben! Die Gegend ist jetzt sicherer.','#9fd88a');
+    if(e.type==='camp'&&src&&src.owner===1) msg('Kastrova hat ein Räuberlager ausgehoben.','#d6b45a');
     checkVictory();
   } else {
     const big=e.def.cls==='veh'; if(e.def.cls==='air') fxAdd({k:'boom',x:e.x,y:e.y,r:0.3,life:0.3});

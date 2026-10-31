@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, HAUL, MOOD, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -81,12 +81,16 @@ export const HUD_TIPS: Record<string, ()=>string> = {
   stone:()=>{const p=G.players[0],r=p.rate||{stone:0},n=countBuildings(0,'quarry');return `<b>🪨 Stein: ${fmt(p.res.stone)}</b><br>+${f1(r.stone||0)}/s aus ${n} Steinbr${n===1?'uch':'üchen'}.<br><span class="dim">Steinbruch direkt an hellen Felsbrocken bauen. Gebraucht für Straßen (${DEF('road').cost.stone} je Feld), Kraftwerk, Raffinerie, Fahrzeugwerk, Universität und Stellungen. </span>${regionNote('stone')}`;},
   metal:()=>{const p=G.players[0],r=p.rate||{metal:0,mines:0,minesEmpty:0};return `<b>⛏ Metall: ${fmt(p.res.metal)}</b><br>Förderung +${f1(r.metal)}/s aus ${r.mines-r.minesEmpty} aktiven Minen${r.minesEmpty?` (${r.minesEmpty} erschöpft)`:''}.<br><span class="dim">Minen nur direkt an grauen Erzfelsen. Gebraucht für Panzer, Fahrzeugwerk, MK-Stellung, Panzerabwehr.</span>${regionNote('metal')}`;},
   oil:()=>{const p=G.players[0],n=G.units.filter(u=>u.owner===0&&u.def.harvester).length,rf=countBuildings(0,'refinery');return `<b>🛢 Öl: ${fmt(p.res.oil)}</b><br>+${f1(p.rate?p.rate.oil||0:0)}/s aus ${rf} Raffinerie${rf===1?'':'n'} (je max. 3/s) · ${n} Tanklaster. Mehr Laster als die Raffinerie verarbeiten kann, bringen nichts – dann warten sie. Öl braucht man für Fahrzeuge; Überschuss am Milizmarkt verkaufen (zurzeit 100 🛢 → $${tradeTerms(0,'sellOil').get.money}; jeder Verkauf drückt den Preis).<br><span class="dim">Raffinerie bauen → Tanklaster fördert automatisch.</span>${regionNote('oil')}`;},
-  pop:()=>{const p=G.players[0];const why={hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];
+  pop:()=>{const p=G.players[0];const why={unzufrieden:'Unzufriedenheit – Einwohner wandern ab!',hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];
     return `<b>👥 Einwohner: ${Math.floor(p.pop)} von ${p.cap} Wohnraum</b><br>${G.mode==='race'?`Siegziel: ${ECON.target} Einwohner (Balken).`:`Stadtstufe: <b>${ECON.ranks[rankOf(p.pop)][1]}</b> · Balken = Weg zur nächsten Stufe (${nextMilestone(p.pop)}).`} Wachstum zurzeit ${p.growth>=0?'+':''}${f1((p.growth||0)*60)} pro Minute.<br>Neue Bewohner ziehen zuerst in die ruhigsten Häuser.${why?`<br><span style="color:#ffb38a">${why}</span>`:''}<br><span class="dim">Soldaten kosten Einwohner. Zerstörte Wohnhäuser vertreiben Bewohner.</span>`;},
   popAi:()=>{const A=G.players[1];return `<b>👥 Kastrova: ${Math.floor(A.pop)} Einwohner</b><br>${G.mode==='race'?`Wer zuerst ${ECON.target} erreicht, gewinnt.`:`Stadtstufe: ${ECON.ranks[rankOf(A.pop)][1]}.`} Liegt ihr deutlich vorn, wird Kastrova misstrauisch und rüstet auf.`;},
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
   stance:()=>G.war?'<b>⚔ Krieg mit Kastrova</b><br>Einheiten greifen sich gegenseitig an. Zerstörte Gebäude bringen dem Angreifer Beute. Frieden über 🤝 anbieten.':'<b>Frieden mit Kastrova</b><br>Niemand schießt. Kastrova kann aber Forderungen stellen oder den Krieg erklären, wenn ihr zu schnell wachst oder schwach seid.',
 };
+HUD_TIPS.happy=()=>{ const p=G.players[0], h=p.happy??0.8, why=(p.moodWhy||[]).slice().sort((a,b)=>b.amt-a.amt);
+  return `<b>Zufriedenheit: ${Math.round(h*100)} %</b> (Ziel ${Math.round((p.moodTarget??h)*100)} %)<br>`+
+    (why.length?'Was die Leute stört: '+why.map(w=>`${w.txt} (−${Math.round(w.amt*100)})`).join(', '):'Alles in Ordnung – die Leute sind zufrieden.')+
+    `<br><span class="dim">Wirkt auf Steuern (zurzeit ×${f1(p.rate?p.rate.taxF||1:1)}) und Wachstum. Unter ${Math.round(MOOD.emigrate*100)} % wandern Einwohner ab. Die Stimmung folgt langsam: Versäumnisse rächen sich, Verbesserungen wirken mit Verzögerung.</span>`; };
 // Lagerplatz an alle Rohstoff-Tipps anhängen, Unterhalt an den Geld-Tipp
 for(const r of STORAGE.res){ const f=HUD_TIPS[r]; if(!f) continue;
   HUD_TIPS[r]=()=>{ const p=G.players[0], full=p.res[r]>=p.store-1;

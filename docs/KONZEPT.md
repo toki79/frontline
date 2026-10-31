@@ -22,6 +22,11 @@
 6. **Soldaten** werden aus der Bevölkerung rekrutiert; Fahrzeuge brauchen laufend Öl; Fahrzeuglimit je Werk.
 7. **Ziel:** Endlos (Stadtstufen Dorf → Weltstadt) oder Wettlauf auf 500 Einwohner; Niederlage nur militärisch.
 
+## Räuber & Zufriedenheit
+Räuberlager in abgelegenen Gebieten bewachen ihr Umland und überfallen Außenposten – Arbeiter und Laster brauchen dort
+Begleitschutz (🛡). Die **Zufriedenheit** fasst Versäumnisse zusammen (Hunger, Strom, leere Kasse, Wohnlage, Angriffe,
+Räuber, Krieg) und wirkt verzögert auf Steuern, Wachstum und Abwanderung.
+
 ## KI (Kastrova)
 Kein Sprachmodell, sondern Regeln mit Bewertung: Bedarf, Kräfteverhältnis, Vorsprung des Gegners, Haltung.
 Eskalation: **Marktanfrage → Forderung → Überfall** (gezielt aufs fehlende Gut) → Friedensangebot nach Beute.

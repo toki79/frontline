@@ -6,16 +6,17 @@
    TERRAIN, DAMAGE, DIFFICULTY, ECON, CONSTRUCTION. Neue Einheit = neuer
    Eintrag (+ Zeichnung in render/draw.ts).
    ===================================================================== */
-export const TILE = 32, MAP_W = 64, MAP_H = 64, BUILD_RADIUS = 5, LEASH = 6;
+export const TILE = 32, MAP_W = 96, MAP_H = 96, BUILD_RADIUS = 5, LEASH = 6;
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
 export const VEH_PER_FACTORY = 4;     // Kampffahrzeuge je Fahrzeugwerk
 export const DRONES_PER_SHOP = 6;     // Drohnen je Drohnenwerkstatt
 export const NOISE_R = 4;
 // ---------- Bauen ----------
 export const CONSTRUCTION = {
-  workTime: 4.5,        // Bauzeit = time × workTime bei EINEM Arbeiter (mehr Arbeiter = schneller)
+  workTime: 8,          // Bauzeit = time × workTime bei EINEM Arbeiter (mehr Arbeiter = schneller)
+  carry: 10,            // so viel Holz/Stein/Metall trägt ein Arbeiter pro Gang
   maxWorkers: 3,        // so viele Arbeiter können gleichzeitig an einer Baustelle arbeiten
-  roadWork: 3,          // Sekunden Arbeit pro Straßenfeld (Stein wird beim Bau verbraucht)
+  roadWork: 4,          // Sekunden Arbeit pro Straßenfeld (Stein tragen die Arbeiter selbst heran)
   roadSpeed: 0.55,      // Bewegungskosten auf Straßen (kleiner = schneller)
   roadRadius: 12,       // Straßen dürfen so weit von eigenen Gebäuden entfernt liegen
   startWorkers: 3,
@@ -27,9 +28,9 @@ export const CONSTRUCTION = {
 // Betriebe liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an.
 // Leistung = 1 / (1 + max(0, Weg − free) / half). Straßen zählen nur mit roadCost je Feld.
 export const HAUL = {
-  free: 3,              // so viele Weg-Felder kosten nichts
-  half: 10,             // weitere Felder, bei denen die Leistung auf die Hälfte fällt
-  roadCost: 0.2,        // ein Straßenfeld zählt so viel wie 0,2 Felder Gelände
+  free: 2,              // so viele Weg-Felder kosten nichts
+  half: 6,              // weitere Felder, bei denen die Leistung auf die Hälfte fällt (8 Felder ohne Straße = 50 %)
+  roadCost: 0.15,       // ein Straßenfeld zählt so viel wie 0,15 Felder Gelände
   min: 0.25,            // schlechteste Leistung
 };
 // ---------- Dichte Bebauung ----------
@@ -41,6 +42,20 @@ export const DENSITY = {
   fireTime: 10,         // Sekunden, die ein Gebäude brennt
   fireDps: 0.04,        // Brandschaden je Sekunde (Anteil der Lebenspunkte)
   fireSpread: 0.06,     // Wahrscheinlichkeit je Sekunde, dass ein Brand auf ein angrenzendes Gebäude überspringt
+};
+// ---------- Zufriedenheit: Versäumnisse haben Folgen ----------
+export const MOOD = {
+  start: 0.8,
+  hunger: 0.45, foodFalling: 0.12, power: 0.15, broke: 0.25, crowded: 0.12,
+  housing: 0.6,         // × (0,9 − Wohnqualität), wenn die Wohnlage schlecht ist
+  attacked: 0.2,        // Angriff auf Stadt oder Einheiten in den letzten 60 s
+  bandits: 0.12,        // Räuberlager in Stadtnähe
+  banditR: 16,
+  war: 0.08,
+  speed: 0.03,          // so schnell nähert sich die Stimmung ihrem Zielwert (je Sekunde)
+  taxBase: 0.5, taxPer: 0.6,   // Steuern × (0,5 + 0,6 × Zufriedenheit), max. 1,1
+  emigrate: 0.35,       // darunter wandern Einwohner ab
+  emigrateRate: 0.006,  // Anteil der Einwohner je Sekunde bei Zufriedenheit 0
 };
 // ---------- Lager ----------
 export const STORAGE = {
@@ -123,6 +138,8 @@ export const UNITS = {
           weapon:{type:'missile', dmg:75, range:6.5, rof:5}, prod:'droneshop', req:[], desc:'Hochfliegende Kampfdrohne mit Lenkraketen'},
   militia:{name:'Milizionäre', cls:'inf', cost:{money:150}, time:0, hp:75, armor:'none', speed:1.3, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:8, range:4, rof:0.95}, prod:null, desc:'Kämpfer der Grenzmiliz'},
+  bandit: {name:'Räuber', cls:'inf', cost:{money:0}, time:0, hp:70, armor:'none', speed:1.35, sight:6, size:0.4,
+          weapon:{type:'bullet', dmg:7, range:4, rof:1.0}, prod:null, desc:'Überfällt Arbeiter, Laster und Außenposten'},
   // Drohnen und Raketenwerfer: siehe drawUnitShape
 };
 // ---------- Gebäude ----------
@@ -153,13 +170,26 @@ export const BUILDINGS = {
             weapon:{type:'flak', dmg:24, range:8, rof:0.4, airOnly:true}},
   bunker:  {name:'Milizbunker',   w:2,h:2, hp:1400, power:0,   cost:{}, time:0, buildable:false, sight:7,
             weapon:{type:'bullet', dmg:13, range:5.5, rof:0.5}},
+  camp:    {name:'Räuberlager',   w:2,h:2, hp:900,  power:0,   cost:{}, time:0, buildable:false, sight:6, desc:'Unterschlupf einer Räuberbande – zerstören bringt Beute'},
 };
 // ---------- Parteien ----------
 export const FACTIONS = [
   {name:'Republik Aldoria',      short:'Aldoria',  leader:'Ihr',             col:'#4f86d6', dark:'#1d3f73'},
   {name:'Föderation Kastrova',   short:'Kastrova', leader:'Marschall Varek', col:'#cc4a3c', dark:'#6e1d15'},
   {name:'Grenzmiliz von Belgor', short:'Miliz',    leader:'Hauptmann Dorin', col:'#c9a640', dark:'#6a5317'},
+  {name:'Räuberbanden',          short:'Räuber',   leader:'–',               col:'#8a8a82', dark:'#3a3a34'},
 ];
+// ---------- Räuber ----------
+export const BANDITS = {
+  camps: [[9,13],[15,27],[26,40],[3,36]],   // Lager im Entwurfsmaß (64er-Karte, Aldoria-Seite), werden gespiegelt
+  guard: 3,             // Räuber je Lager zu Beginn
+  max: 6,               // höchstens so viele je Lager (wächst mit der Zeit)
+  spawn: 35,            // Sekunden bis Nachschub
+  territory: 9,         // in diesem Umkreis ums Lager wird jeder angegriffen
+  raidRange: 18,        // Überfälle auf Gebäude bis zu dieser Entfernung
+  raidEvery: [150,240], // Sekunden zwischen Überfällen (zufällig)
+  loot: {money:500, wood:120, stone:80, metal:40},   // Beute beim Zerstören eines Lagers
+};
 // ---------- KI ----------
 // incomeMul: Wirtschaftsbonus der KI, grace: Sekunden ohne Aggression, aggr: Angriffslust
 export const DIFFICULTY = {

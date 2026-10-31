@@ -7,7 +7,7 @@ export function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
    ===================================================================== */
 export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
   c.save(); c.translate(x,y);
-  if(type==='inf'||type==='at'||type==='militia'){
+  if(type==='inf'||type==='at'||type==='militia'||type==='bandit'){
     const n=Math.max(1,Math.ceil(hpf*3-0.01)), offs=[[4,0],[-3,-5],[-3,5]];
     c.rotate(ang);
     for(let i=0;i<n;i++){const [ox,oy]=offs[i];
@@ -15,7 +15,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       const tube=type==='at'&&i===0;
       c.strokeStyle='#1d1d1a'; c.lineWidth=tube?2.8:1.3; c.beginPath(); c.moveTo(ox-(tube?4:0),oy+1.6); c.lineTo(ox+(tube?8:7),oy+1.6); c.stroke();
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
-      c.fillStyle=type==='militia'?'#5a4a2c':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
+      c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
   } else if(type==='worker'){
     // Bauarbeiter: gelber Helm, beim Arbeiten schwingt der Hammer (hpf<0 = arbeitet)
@@ -135,6 +135,15 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       c.lineWidth=1; c.beginPath(); c.moveTo(20,H-24); c.lineTo(20,H-16+Math.sin(tt*1.5)*3); c.stroke();
       box(10,H-12,12,8,col,dark);
       if(extra) { c.fillStyle='rgba(0,0,0,.4)'; c.fillRect(1,1,W-2,H-2); }
+      break;
+    case 'camp':   // Räuberlager: Zelte, Lagerfeuer, Palisade
+      c.fillStyle='#6a5a3e'; c.fillRect(1,1,W-2,H-2);
+      c.strokeStyle='#4a3a22'; c.lineWidth=2; c.setLineDash([3,2]); c.strokeRect(2,2,W-4,H-4); c.setLineDash([]);
+      for(const [tx2,ty2,s2] of [[10,12,9],[W-12,14,8],[14,H-12,8]]){ c.fillStyle='#8a7a5a'; c.beginPath(); c.moveTo(tx2-s2,ty2+s2*0.7); c.lineTo(tx2,ty2-s2*0.7); c.lineTo(tx2+s2,ty2+s2*0.7); c.closePath(); c.fill();
+        c.strokeStyle='#3a3020'; c.lineWidth=1; c.stroke(); c.fillStyle='#2a2216'; c.fillRect(tx2-1.5,ty2+s2*0.1,3,s2*0.6); }
+      { const fl=0.7+0.3*Math.sin(tt*9); c.fillStyle='#3a3530'; c.beginPath(); c.arc(W-14,H-13,5,0,7); c.fill();
+        c.fillStyle=`rgba(255,${Math.floor(140+60*fl)},40,.95)`; c.beginPath(); c.arc(W-14,H-14,3.2*fl,0,7); c.fill(); }
+      c.fillStyle=dark; c.fillRect(W/2-1,4,2,10); c.fillStyle='#222'; c.fillRect(W/2+1,4,7,5);
       break;
     case 'power':
       for(const [cx,cy,r] of [[W*0.3,H*0.36,12],[W*0.68,H*0.62,11]]){c.fillStyle='rgba(0,0,0,.3)';c.beginPath();c.arc(cx+2,cy+2,r,0,7);c.fill();

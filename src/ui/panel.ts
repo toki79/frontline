@@ -92,6 +92,7 @@ export function updatePanel(){
   $('#rOil').textContent=fmt(p.res.oil);
   const pw=$('#power'); pw.textContent=`⚡ ${p.use}/${p.power}`; pw.classList.toggle('low',p.use>p.power);
   $('#popMe').textContent=`${Math.floor(p.pop)}/${p.cap}`;
+  { const h=p.happy??0.8, el=$('#happy'); el.textContent=`${h>=0.75?'😊':h>=0.5?'😐':h>=0.35?'😟':'😠'} ${Math.round(h*100)} %`; el.classList.toggle('low',h<0.5); }
   const goalMe=G.mode==='race'?ECON.target:nextMilestone(p.pop), goalAi=G.mode==='race'?ECON.target:nextMilestone(A.pop);
   $('#popMeBar').style.width=Math.min(100,p.pop/goalMe*100)+'%';
   $('#popAi').textContent=Math.floor(A.pop);

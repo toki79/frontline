@@ -46,6 +46,10 @@ export function advise(){
     if(w){ const m=siteLacks(w), src=m==='wood'?'lumber':m==='stone'?'quarry':'mine';
       T.push({p:62,txt:`<b>Baustelle ${w.def.name} wartet auf ${RES[m].name}.</b> ${G.profile[0].scarce.includes(m)?`Eure Region hat kaum ${RES[m].name} – kauft es am Markt oder bei Kastrova.`:`Baue ${BUILDINGS[src].name} oder kaufe ${RES[m].name} am Markt.`}`,act:G.profile[0].scarce.includes(m)||has(src)?{label:'🤝 Kaufen',fn:openDiplo}:B(src)}); } }
   if(G.road.some((r,i)=>r===1&&G.roadOwner[i]===1)&&p.res.stone<2) T.push({p:41,txt:'<b>Straßenbau steht:</b> Für jedes Straßenfeld brauchen die Arbeiter Stein.',act:has('quarry')||G.profile[0].scarce.includes('stone')?{label:'🤝 Stein kaufen',fn:openDiplo}:B('quarry')});
+  if((p.happy??1)<0.55&&p.moodWhy&&p.moodWhy.length){ const w=p.moodWhy.slice().sort((a,b)=>b.amt-a.amt)[0];
+    T.push({p:p.happy<0.4?88:58,txt:`<b>Die Einwohner sind unzufrieden (${Math.round(p.happy*100)} %).</b> Hauptgrund: ${w.txt}. Das kostet Steuern und Wachstum${p.happy<0.4?' – erste Familien wandern ab':''}.`}); }
+  { const c=G.buildings.find(c=>!c.dead&&c.type==='camp'&&G.buildings.some(b=>!b.dead&&b.owner===0&&!b.def.def&&Math.hypot(c.x-b.x,c.y-b.y)<16));
+    if(c) T.push({p:34,txt:'<b>Räuberlager in der Nähe.</b> Räuber überfallen unbegleitete Arbeiter, Laster und Außenposten. Schick Truppen (◎ Alle, dann Lager antippen) oder begleite Arbeiter mit 🛡.',act:{label:'◎ Truppen wählen',fn:()=>cmd('all')}}); }
   if(p.broke) T.push({p:82,txt:'<b>Die Kasse ist leer!</b> Unterhalt, Sold und Verwaltung übersteigen die Einnahmen – Betriebe laufen nur halb so schnell. Weniger Truppen, Überflüssiges abreißen, mehr Einwohner oder Handel.',act:{label:'🤝 Handeln',fn:openDiplo}});
   { const full=['food','wood','stone','metal','oil'].filter(r=>p.res[r]>=p.store-1);
     if(full.length) T.push({p:37,txt:`<b>Lager voll:</b> ${full.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} (${fmt(p.store)}). Was nicht hineinpasst, geht verloren. Ein Lagerhaus schafft Platz, ein Handelskontor macht Überschuss zu Geld.`,act:has('kontor')?B('depot'):B('kontor')}); }

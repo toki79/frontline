@@ -4,7 +4,7 @@ Browser-Echtzeitstrategie im Grenztal von Belgor: Städtebau, Wirtschaft, Handel
 Zwei fiktive Nationen – die **Republik Aldoria** (Spieler) und die **Föderation Kastrova** (KI) – bauen ihre Städte auf.
 Mitten im Fluss hält die neutrale **Grenzmiliz** die Insel mit dem Markt.
 
-Läuft im Browser auf PC und iPhone (Touch-Steuerung). Keine Engine, keine Grafiken – alles wird per Canvas 2D gezeichnet.
+Läuft im Browser auf PC und iPhone (Touch-Steuerung). Karte 96×96 Felder. Keine Engine, keine Grafiken – alles wird per Canvas 2D gezeichnet.
 
 ## Schnellstart
 
@@ -44,6 +44,7 @@ src/
     loop.ts             update(dt) – ein Simulationsschritt
   ai/kastrova.ts        KI: Lage einschätzen → bauen, handeln, forschen, verteidigen, fordern, überfallen
   ai/militia.ts         Grenzmiliz
+  ai/bandits.ts         Räuberlager: Gebiet bewachen, Überfälle
   render/               Canvas-Zeichnung: draw.ts (Formen), renderer.ts (Karte, Nebel, Minikarte), terrain.ts, camera.ts
   ui/                   Bauleiste, Eingabe (Maus/Touch), Info-Texte, Berater, Diplomatie, Menüs, Dialoge
   main.ts               Verdrahtung und Hauptschleife
