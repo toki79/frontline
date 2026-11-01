@@ -11,12 +11,28 @@ import { costHtml } from '../ui/format';
 import { refreshCmds } from '../ui/input';
 import { msg } from '../core/events';
 import { hideTip, showTip, tipFor } from '../ui/tooltips';
+import { openTree } from '../ui/tree';
 
 /* =====================================================================
    Bauleiste
    ===================================================================== */
-export const ui: any={tab:'bau',btns:{}};
+export const ui: any={tab:'bau',btns:{},cat:{}};
+// Kategorien je Reiter (Filter-Chips über den Bauknöpfen)
+export const CATS = {
+  bau: [['alle','Alle'],['wohnen','🏠 Wohnen',['house','block']],['versorgung','🌾 Nahrung & ⚡ Strom',['farm','greenhouse','power','npp']],
+        ['rohstoffe','⛏ Rohstoffe',['lumber','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
+        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär',['barracks','factory','droneshop']],
+        ['hightech','🎓 Wissen & Hightech',['university','datacenter','enrich','silo']]],
+  truppen: [['alle','Alle'],['zivil','👷 Zivil',['worker','volunteer','diplomat','truck']],['inf','🪖 Infanterie',['inf','at']],
+        ['fahrz','🚜 Fahrzeuge',['ifv','mbt','mlrs','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','spy','reaper']]],
+  vert: [['alle','Alle'],['pio','👷 Pioniere & Sperren',['pioneer','wall','wire','trench','atmine']],['stell','🎯 Stellungen',['sentry','turret','flak','gbunker']]],
+  forsch: [['alle','Alle'],['offen','Offen'],['fertig','✓ Erforscht']],
+};
 export function setTab(t){ui.tab=t;$$('.tabs [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));buildPanel();}
+function renderChips(){
+  const cs=CATS[ui.tab]||[], cur=ui.cat[ui.tab]||'alle';
+  $('#chips').innerHTML=cs.map(([k,l])=>`<button data-cat="${k}" class="${k===cur?'on':''}">${l}</button>`).join('')+(ui.tab==='forsch'?'<button data-tree="1">🌳 Baum zeigen</button>':'');
+}
 export function drawIcon(cvs,type){
   const c=cvs.getContext('2d'); c.clearRect(0,0,84,84); c.save(); c.scale(2,2);
   const f=FACTIONS[0];
@@ -29,11 +45,18 @@ export function drawIcon(cvs,type){
   c.restore();
 }
 export function buildPanel(){
-  const box=$('#items'); box.innerHTML=''; ui.btns={};
-  const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
+  const box=$('#items'); box.innerHTML=''; ui.btns={}; renderChips();
+  let list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
             : ui.tab==='forsch' ? [...Object.keys(RESEARCH), 'nuke']
             : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak','gbunker']
             : ['worker','volunteer',...Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored&&k!=='worker'&&k!=='volunteer')];
+  // Filter nach Kategorie, dann sortieren: verfügbar zuerst, gesperrt danach, Erforschtes ans Ende
+  const cat=(CATS[ui.tab]||[]).find(c=>c[0]===(ui.cat[ui.tab]||'alle'));
+  if(cat&&cat[2]) list=list.filter(k=>cat[2].includes(k));
+  if(G&&ui.tab==='forsch'){ const p=G.players[0]; if(cat&&cat[0]==='offen') list=list.filter(k=>!(RESEARCH[k]&&hasTech(p,k))); if(cat&&cat[0]==='fertig') list=list.filter(k=>RESEARCH[k]&&hasTech(p,k)); }
+  if(G){ const p=G.players[0], rank=k=>RESEARCH[k]&&hasTech(p,k)?2:missingReq(0,k).length?1:0;
+    list=list.map((k,i)=>[k,i]).sort((a: any,b: any)=>rank(a[0])-rank(b[0])||a[1]-b[1]).map(a=>a[0]) as string[]; }
+  if(!list.length) box.innerHTML='<div style="padding:20px;color:var(--dim);font-size:13px">Nichts in dieser Kategorie.</div>';
   for(const k of list){
     const d=DEF(k), el=document.createElement('button'); el.className='it';
     el.innerHTML=`<canvas width="84" height="84"></canvas><span class="n">${d.name}</span><span class="c">${costHtml(d.cost)}</span><div class="pr"></div><span class="q"></span><span class="st"></span>`;
@@ -112,5 +135,7 @@ export function init(){
 { const top=$('#top'), set=()=>document.documentElement.style.setProperty('--toph',top.offsetHeight+'px');
   set(); addEventListener('resize',set); if('ResizeObserver' in window) new ResizeObserver(set).observe(top); }
 $$('.tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{setTab(b.dataset.tab);$('#panel').classList.remove('min');}));
+$('#chips').addEventListener('click',e=>{ const t=(e.target as HTMLElement).closest('button') as HTMLElement; if(!t) return;
+  if(t.dataset.tree){ openTree(); return; } ui.cat[ui.tab]=t.dataset.cat; buildPanel(); $('#items').scrollLeft=0; });
 $('#bFold').addEventListener('click',()=>{const p=$('#panel');p.classList.toggle('min');$('#bFold').textContent=p.classList.contains('min')?'▴':'▾';});
 }

@@ -106,7 +106,7 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
   const W=w*TILE,H=h*TILE, tt=G?G.t:0;
   c.save(); c.translate(px,py);
   c.fillStyle='rgba(0,0,0,.32)'; c.fillRect(4,4,W,H);
-  c.fillStyle=type==='farm'?'#7a6842':type==='house'?'#7f8a5a':'#8e8c80'; c.fillRect(1,1,W-2,H-2);
+  c.fillStyle=type==='farm'?'#7a6842':type==='house'?'#7f8a5a':type==='park'?'#5f8a3e':'#8e8c80'; c.fillRect(1,1,W-2,H-2);
   c.strokeStyle='#5e5d55'; c.lineWidth=1; c.strokeRect(1.5,1.5,W-3,H-3);
   const box=(x,y,ww,hh,f,s?)=>{c.fillStyle=f;c.fillRect(x,y,ww,hh);if(s){c.strokeStyle=s;c.strokeRect(x+0.5,y+0.5,ww-1,hh-1);}};
   const roof=(x,y,ww,hh)=>{box(x,y,ww,hh,col,dark);c.fillStyle='rgba(0,0,0,.22)';c.fillRect(x,y+hh/2,ww,hh/2);c.strokeStyle=dark;c.beginPath();c.moveTo(x,y+hh/2);c.lineTo(x+ww,y+hh/2);c.stroke();};
@@ -255,6 +255,40 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
       c.strokeStyle='#e8c230'; c.setLineDash([3,3]); c.beginPath(); c.arc(W/2,H/2,W*0.44,0,7); c.stroke(); c.setLineDash([]);
       if(armed){ c.fillStyle='#e0ded4'; c.beginPath(); c.arc(W/2,H/2+4,4,0,7); c.fill(); c.fillStyle='#c0392b'; c.beginPath(); c.arc(W/2,H/2+4,1.8,0,7); c.fill(); }
       box(W-12,H-8,8,5,col,dark);
+      break; }
+    case 'park':   // Park: Wege, Bäume, Brunnen
+      c.strokeStyle='#c9b98a'; c.lineWidth=4; c.beginPath(); c.moveTo(2,H/2); c.lineTo(W-2,H/2); c.moveTo(W/2,2); c.lineTo(W/2,H-2); c.stroke(); c.lineWidth=1;
+      for(const [tx2,ty2] of [[12,12],[W-12,12],[12,H-12],[W-12,H-12],[20,H/2-12],[W-20,H/2+12]]){ c.fillStyle='#2f5a24'; c.beginPath(); c.arc(tx2,ty2,6,0,7); c.fill(); c.fillStyle='#4a7a34'; c.beginPath(); c.arc(tx2-1.5,ty2-1.5,3.5,0,7); c.fill(); }
+      c.fillStyle='#9ab'; c.beginPath(); c.arc(W/2,H/2,6,0,7); c.fill(); c.fillStyle='#6ab0ff'; c.beginPath(); c.arc(W/2,H/2,3.5+Math.sin(tt*3)*0.6,0,7); c.fill();
+      break;
+    case 'theater':   // Theater: Säulen, roter Vorhang, Kuppel
+      box(4,6,W-8,H-10,'#c9b48a','#6e5e40'); c.fillStyle='#8a2a2a'; c.fillRect(10,H-20,W-20,12);
+      c.fillStyle='#ece5cf'; for(let i=0;i<5;i++) c.fillRect(9+i*(W-22)/4,H-24,3,18);
+      c.fillStyle='#7a8a9a'; c.beginPath(); c.arc(W/2,16,10,Math.PI,0); c.fill(); c.fillStyle=col; c.fillRect(W/2-2,2,4,6);
+      break;
+    case 'pool':   // Schwimmbad: Becken mit Bahnen, Liegewiese
+      c.fillStyle='#6a9a4a'; c.fillRect(2,2,W-4,H-4); box(8,8,W-36,H-16,'#d8d4c8','#8a8678');
+      c.fillStyle='#3a9ad8'; c.fillRect(11,11,W-42,H-22); c.strokeStyle='rgba(255,255,255,.6)'; for(let i=1;i<4;i++){ c.beginPath(); c.moveTo(11,11+i*(H-22)/4); c.lineTo(W-31,11+i*(H-22)/4); c.stroke(); }
+      box(W-24,8,18,H-16,'#b9b2a0','#6a6455'); c.fillStyle=col; c.fillRect(W-20,12,10,5);
+      break;
+    case 'stadium': {   // Stadion: Ränge, Spielfeld, Flutlicht
+      c.fillStyle='#8e8c80'; c.beginPath(); c.ellipse(W/2,H/2,W/2-3,H/2-3,0,0,7); c.fill(); c.strokeStyle='#5e5d55'; c.stroke();
+      c.fillStyle='#a9a596'; c.beginPath(); c.ellipse(W/2,H/2,W/2-10,H/2-10,0,0,7); c.fill();
+      c.fillStyle='#3f8a3a'; c.fillRect(W/2-22,H/2-14,44,28); c.strokeStyle='#e8e8e0'; c.strokeRect(W/2-21.5,H/2-13.5,43,27); c.beginPath(); c.moveTo(W/2,H/2-14); c.lineTo(W/2,H/2+14); c.stroke(); c.beginPath(); c.arc(W/2,H/2,5,0,7); c.stroke();
+      for(const [lx,ly] of [[8,8],[W-8,8],[8,H-8],[W-8,H-8]]){ c.fillStyle='#ffe9a0'; c.beginPath(); c.arc(lx,ly,3,0,7); c.fill(); }
+      c.fillStyle=col; c.fillRect(W/2-5,4,10,5);
+      break; }
+    case 'firest':   // Feuerwache: rotes Tor, Schlauchturm, Löschfahrzeug
+      box(3,6,W-8,H-10,'#a84a3a','#5a2218'); c.fillStyle='#e8e0cf'; c.fillRect(7,H-18,W-26,12); c.fillStyle='#5a2218'; for(let i=1;i<3;i++) c.fillRect(7+i*(W-26)/3,H-18,1.5,12);
+      box(W-14,2,10,22,'#c9c4b4','#6a6455'); c.fillStyle='#d83a2a'; c.fillRect(10,H-14,14,7); c.fillStyle='#ffd36a'; c.fillRect(21,H-14,3,3);
+      c.fillStyle=col; c.fillRect(6,8,8,5);
+      break;
+    case 'derrick': {   // Bohrturm: Gittermast und nickende Pumpe
+      box(3,3,W-6,H-6,'#7a7466','#4a463c');
+      c.strokeStyle='#3a3630'; c.lineWidth=1.6; c.beginPath(); c.moveTo(8,H-6); c.lineTo(W/2-4,6); c.lineTo(W/2+2,H-6); c.moveTo(11,H-14); c.lineTo(W/2,H-14); c.moveTo(14,H-24); c.lineTo(W/2-2,H-24); c.stroke(); c.lineWidth=1;
+      const nod=Math.sin(tt*2.5)*4; c.save(); c.translate(W-18,H/2+4); c.strokeStyle='#2b2b26'; c.lineWidth=3; c.beginPath(); c.moveTo(-10,nod); c.lineTo(10,-nod); c.stroke(); c.lineWidth=1; c.restore();
+      c.fillStyle='#c49a3a'; c.fillRect(W-30,H/2+2+nod,5,7); c.fillStyle='#1a1410'; c.beginPath(); c.arc(W-12,H-10,4,0,7); c.fill();
+      box(W-12,4,8,5,col,dark);
       break; }
     case 'droneshop':
       box(3,5,W-6,H-12,'#6d7258','#3f4229'); c.fillStyle='#4d523c'; c.beginPath(); c.arc(W/2,5,W/2-3,0,Math.PI); c.fill();

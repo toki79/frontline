@@ -22,7 +22,8 @@ export function updateUnit(u,dt){
     u.scanT-=dt;
     if(u.scanT<=0){ u.scanT=0.35+Math.random()*0.2;
       // FPV greifen nur in Lauerstellung selbstständig an; Aufklärer auf Patrouille lassen sich nicht ablenken
-      if(u.mode!=='move'&&u.mode!=='attack'&&u.mode!=='patrol'&&u.mode!=='recharge'&&!(d.weapon.kamikaze&&!u.lurk)){
+      // bewaffnete Hochflieger (Reaper) jagen auch auf Patrouille
+      if(u.mode!=='move'&&u.mode!=='attack'&&(u.mode!=='patrol'||d.armor==='airHigh')&&u.mode!=='recharge'&&!(d.weapon.kamikaze&&!u.lurk)){
         if(!u.target||distTo(u,u.target)>d.weapon.range){const t=findTarget(u,Math.max(d.sight,d.weapon.range)); if(t) u.target=t;}
       }
     }

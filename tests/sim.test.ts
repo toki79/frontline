@@ -7,6 +7,7 @@ import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar,
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
+import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
@@ -555,6 +556,7 @@ describe('Simulation', () => {
   it('Ausbau am Platz: Haus und Hof werden besser, ohne mehr Fläche', () => {
     newGame('mittel');
     const p = G.players[0]; p.res.money = 5000; p.res.wood = 500; p.res.stone = 500; p.res.metal = 200;
+    devOf(0).on = false;                                         // nur Ausbau von Hand
     const h = builtNearHq('house'), f = builtNearHq('farm');
     const cap0 = p.cap;
     expect(startUpgrade(0, h)).toBe(true);
@@ -651,6 +653,48 @@ describe('Simulation', () => {
     expect(G.fallout.length).toBe(0);
   });
 
+  it('Reaper: schwer zu treffen, tödlich für Schützen, jagt auf Patrouille', () => {
+    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    const r = spawnAt(0, 'reaper', 40, 40); const inf = spawnAt(1, 'inf', 43, 40);
+    applyDamage(inf, 70, 'hellfire', r); expect(inf.dead).toBe(true);      // ein Treffer, ein Trupp
+    const hp0 = r.hp; applyDamage(r, 24, 'flak', inf); expect(hp0 - r.hp).toBeLessThan(30);
+    const inf2 = spawnAt(1, 'inf', 44, 41); orderPatrol([r], true);
+    expect(runUntil(() => inf2.dead, 30)).toBe(true);
+  });
+
+  it('Öl: Biokraftstoff aus Nahrung, Bohrturm ohne Ölfeld', () => {
+    newGame('mittel'); const p = G.players[0];
+    p.done = { res2: true, res3: true, fert: true, biofuel: true, deepdrill: true };
+    builtNearHq('power'); builtNearHq('power'); const ref = builtNearHq('refinery'); ref.crude = 0;
+    for (const u of G.units) if (u.owner === 0 && u.def.harvester) u.dead = true;
+    p.res.food = 800; p.res.oil = 0; run(10);
+    expect(p.res.oil).toBeGreaterThan(5); expect(p.res.food).toBeLessThan(800);
+    const o0 = p.res.oil; builtNearHq('derrick'); p.res.food = 0; run(10);
+    expect(p.res.oil).toBeGreaterThan(o0 + 8);
+  });
+
+  it('Alle Gebäude ausbaubar; Bürger bauen nach Priorität und Freigabe aus', () => {
+    newGame('mittel'); const p = G.players[0]; devOf(0).on = false;
+    p.res.money = 9000; p.res.stone = 800; p.res.metal = 300; p.res.wood = 500; p.store = 9000;
+    const pw = builtNearHq('power'); update(0.05); const pow0 = p.power;
+    expect(startUpgrade(0, pw)).toBe(true); expect(runUntil(() => !pw.upg, 90)).toBe(true);
+    expect(p.power).toBeGreaterThan(pow0);                                   // Stufe II: mehr Strom
+    const d = devOf(0); d.on = true; for (const k in d.prio) d.prio[k] = 0; d.prio.stadtleben = 2;
+    const park = builtNearHq('park'), house = builtNearHq('house');
+    d.release.money = 0; run(8); expect(park.upg || park.lvl > 1).toBeFalsy();   // ohne Freigabe nichts
+    d.release.money = 0.75; run(8);
+    expect(!!park.upg || park.lvl > 1).toBe(true); expect(house.upg).toBeFalsy();   // nur freigegebener Bereich
+  });
+
+  it('Stadtleben: fehlende Unterhaltung drückt die Stimmung, Feuerwehr löscht', () => {
+    newGame('mittel'); const p = G.players[0];
+    p.pop = 800; run(2); expect(p.moodWhy.some(w => w.txt.includes('Unterhaltung'))).toBe(true);
+    const fw = builtNearHq('firest'), h = builtNearHq('house'); run(1.5);
+    expect(h.fireCov).toBe(true);
+    h.fire = 10; run(4); expect(h.fire).toBeLessThanOrEqual(0); expect(h.dead).toBeFalsy();
+    expect(fw).toBeTruthy();
+  });
+
   it('Simulation meldet über Ereignisse statt DOM', () => {
     const msgs: string[] = []; on('msg', (t: string) => msgs.push(t));
     newGame('mittel');
@@ -661,5 +705,5 @@ describe('Simulation', () => {
     newGame('mittel');
     run(600);
     expect(G.over).toBe(false);
-  });
+  }, 20000);
 });

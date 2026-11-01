@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { fmt } from '../core/util';
-import { BUILDINGS, ECON, REGION, RES, T } from '../data/config';
+import { BUILDINGS, ECON, FIRE, FUN, REGION, RES, T } from '../data/config';
 import { distTo } from '../sim/combat';
 import { aiQuotes, marketOpen, needLevel } from '../sim/market';
 import { G, regionText } from '../sim/state';
@@ -11,6 +11,7 @@ import { cmd, refreshCmds } from '../ui/input';
 import { siteLacks } from '../sim/build';
 import { emergency } from '../sim/production';
 import { unprotected } from '../sim/fortify';
+import { funCoverage } from '../sim/devplan';
 import { openDiplo } from '../ui/menus';
 import { msg } from '../core/events';
 import { buildClick, setTab } from '../ui/panel';
@@ -53,6 +54,8 @@ export function advise(){
   if(G.t>480){ G.unprotT=(G.unprotT||0)-1; if(G.unprotT<=0){ G.unprotT=10; G.unprotList=unprotected(0); }
     const L=G.unprotList||[]; if(L.length){ const names=[...new Set(L.map(b=>b.def.name.replace(/\u00AD/g,'')))].slice(0,3).join(', ');
       T.push({p:G.war||ai.lead?60:26,txt:`<b>Ungeschützt:</b> ${names}. Sichert wichtige Gebäude und die <b>Zugänge zur Stadt</b> (beim Planen von Verteidigung rot markiert) mit Gräben, Stacheldraht, Stellungen – oder baut Grenzbunker weit draußen.`,act:{label:'🛡 Verteidigung',fn:()=>{setTab('vert');$('#panel').classList.remove('min');}}}); } }
+  { const fc=funCoverage(0); if(fc<0.8) T.push({p:fc<0.5?54:32,txt:`<b>Zu wenig Unterhaltung</b> (${Math.round(fc*100)} % versorgt): Ab ${FUN.free} Einwohnern wollen die Leute Parks, Theater, Schwimmbad oder Stadion – sonst sinken Zufriedenheit und Steuern.`,act:B(has('theater')||p.res.money<1000?'park':'theater')}); }
+  if(p.pop>FIRE.minPop&&!has('firest')) T.push({p:G.t-(p.lastFire??-999)<60?70:30,txt:'<b>Keine Feuerwehr:</b> In der wachsenden Stadt bricht ab und zu Feuer aus – in eng bebauten Vierteln springt es von Haus zu Haus. Eine Feuerwache schützt den Umkreis von 11 Feldern.',act:B('firest')});
   if(G.banditWarn&&G.t<G.banditWarn.t){ const w=G.banditWarn, near=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon&&Math.hypot(u.x-w.x,u.y-w.y)<8).length;
     if(near<2) T.push({p:88,txt:`<b>Räuber im Anmarsch</b> auf euren ${w.name}! ${army?'Schickt eure Schützen hin.':'Ihr habt keine Soldaten – Kaserne bauen und 2 Schützentrupps ausbilden.'}`,act:army?{label:'◎ Truppen wählen',fn:()=>cmd('all')}:has('barracks')?{label:'Schützen ausbilden',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('inf');}}:B('barracks')}); }
   { const c=G.buildings.find(c=>!c.dead&&c.type==='camp'&&G.buildings.some(b=>!b.dead&&b.owner===0&&!b.def.def&&Math.hypot(c.x-b.x,c.y-b.y)<16));

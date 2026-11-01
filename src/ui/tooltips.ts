@@ -1,7 +1,8 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
+import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
 import { missingReq } from '../sim/production';
@@ -13,7 +14,7 @@ import { costHtml, costLong, f1 } from '../ui/format';
 /* =====================================================================
    Info-Texte (Mouseover bzw. Antippen)
    ===================================================================== */
-export const WEAPON_INFO = {bullet:'Gewehre: stark gegen Infanterie, schwach gegen Drohnen', autocannon:'Maschinenkanone: gut gegen Infanterie, leichte Fahrzeuge und Drohnen',
+export const WEAPON_INFO = {hellfire:'Präzisionsraketen von oben: tödlich für Schützentrupps, ordentlich gegen leichte Fahrzeuge', bullet:'Gewehre: stark gegen Infanterie, schwach gegen Drohnen', autocannon:'Maschinenkanone: gut gegen Infanterie, leichte Fahrzeuge und Drohnen',
   shell:'Panzerkanone: stark gegen Fahrzeuge und Gebäude (nicht gegen Drohnen)', missile:'Lenkflugkörper: stark gegen Fahrzeuge (nicht gegen Drohnen)',
   rocket:'Raketensalve: große Reichweite, Flächenschaden, ungenau – stark gegen Gebäude und Gruppen', drone:'Kamikaze: stürzt sich aufs Ziel – stark gegen Fahrzeuge',
   flak:'Flugabwehr: nur gegen Drohnen, dort sehr wirksam'};
@@ -55,7 +56,11 @@ export function tipFor(k){
     if(k==='farm') L.push(`🌾 Bewirtschaftet freie Fläche im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Äcker auf <b>grüner Wiese</b> = voller Ertrag, auf karger Steppe nur ${Math.round(DENSITY.steppeYield*100)} %. Zugebaute Felder fehlen.`);
     if(k==='depot') L.push('Sammelstelle: Betriebe in der Nähe liefern hierhin statt zum Rathaus (kürzere Transportwege).');
     if(k==='depot') L.push(`Lagerplatz: Rathaus ${STORAGE.base}, je Lagerhaus +${STORAGE.depot} für Nahrung, Holz, Stein, Metall und Öl. Was nicht ins Lager passt, geht verloren.`);
-    if(UPGRADES[k]) L.push('⬆ <b>Ausbau am Platz</b> (Gebäude wählen → ⬆ Ausbau): '+UPGRADES[k].slice(1).map((U,i)=>`Stufe ${i+2} ${U.name}: ${U.cap?U.cap+' Wohnraum':'Ertrag ×'+String(U.food).replace('.',',')+' auf denselben Äckern'}, ${costHtml(U.cost)}${U.research?` (nach „${RESEARCH[U.research].name}“)`:''}`).join(' · ')+'. Spart Fläche.');
+    if(UPGRADES[k]) L.push('⬆ <b>Ausbau am Platz</b> (Gebäude wählen → ⬆ Ausbau): '+UPGRADES[k].slice(1).map((U,i)=>`${U.name}: ${upgradeEffect(k,U)}, ${costHtml(U.cost)}${U.research?` (nach „${RESEARCH[U.research].name}“)`:''}`).join(' · ')+'. Spart Fläche, kostet etwas mehr Unterhalt. Bürger bauen auch selbst aus (🏙 Stadtentwicklung).');
+    if(k==='refinery') L.push(`Mit Forschung „Biokraftstoff“: Fehlt Rohöl, macht die Raffinerie aus Nahrung Öl (${BIOFUEL.ratio} 🌾 → 1 🛢, bis ${BIOFUEL.rate} Öl/s), solange mehr als ${BIOFUEL.reserve} Nahrung im Lager sind.`);
+    if(d.fun) L.push(`🎭 Unterhaltung für ${d.fun} Einwohner (ausgebaut mehr). Ab ${FUN.free} Einwohnern braucht jeder Bürger einen Platz – fehlt Unterhaltung, sinkt die Zufriedenheit und damit die Steuern.`);
+    if(d.fireR) L.push(`🚒 Schützt alle Gebäude im Umkreis von ${d.fireR} Feldern: Brände brechen seltener aus, werden ${FIRE.stationQuench+1}× schneller gelöscht, richten halb so viel Schaden an und springen nicht über. Ab ${FIRE.minPop} Einwohnern brennt es ab und zu – besonders in eng bebauten Vierteln.`);
+    if(k==='derrick') L.push('Braucht kein Ölfeld und keine Tanklaster – liefert direkt ins Lager. Ohne Strom nur 30 % Leistung.');
     if(k==='npp') L.push(`☢ Wird es zerstört, kommt es zur Kernschmelze: Verwüstung im Umkreis von ${NUKE.meltdown.radius} Feldern und ${Math.round(NUKE.falloutTime/60)} min Verstrahlung. Nicht an die Front bauen!`);
     if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);
     if(k==='greenhouse') L.push('Braucht keine Äcker – spart viel Fläche gegenüber Bauernhöfen, kostet aber Strom und Unterhalt.');
@@ -80,7 +85,8 @@ export function tipFor(k){
     if(d.emergency) L.push(`🚨 <b>Notstand:</b> nur verfügbar, wenn die Stadt in den letzten ${Math.round(EMERGENCY.window/60)} Minuten angegriffen wurde oder Krieg herrscht. Kostet kein Geld und keinen Sold – auch bei leerer Kasse sofort bereit. Höchstens ${EMERGENCY.maxVolunteers} Trupps; ist es ${Math.round(EMERGENCY.disband/60*10)/10} Minuten ruhig, gehen die Freiwilligen wieder nach Hause.`);
     if(k==='drone') L.push(`Billig, aber tödlich für Fahrzeuge: <b>ein Treffer zerstört Kampfpanzer oder Raketenwerfer</b> (mit Gitterkäfig braucht es 3–4). 📡 Funkreichweite ${DRONE.fpvRange} Felder ab eigenen Gebäuden – sie wirken im Grenzgebiet; Grenzbunker erweitern die Reichweite, erforschte KI um ${DRONE.fpvRangeAI}. Gegenmittel: Käfige, Störsender, Flakpanzer, Flugabwehr.`);
     if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
-    if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder kurz nachdem sie feuert). Dann treffen nur Flugabwehr und schwach Maschinenkanonen.');
+    if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder ganz kurz nachdem sie feuert). Selbst dann tun ihr nur Flugabwehr und kaum Maschinenkanonen etwas.');
+    if(k==='reaper') L.push('🎯 Auf Aufklärungsflug (🛰) oder im Einsatz „Gebiet klären“ jagt sie selbstständig feindliche Schützen – ein Treffer reicht meist für einen Trupp.');
     else if(d.cls==='air') L.push('Fliegt tief: Gewehre, Maschinenkanonen und Flugabwehr können sie abschießen.');
     if(d.sight>=12) L.push(`Sichtweite ${d.sight} Felder – deckt den Nebel des Krieges weit auf.`);
     if(d.battery) L.push(`Akku ${d.battery} s außerhalb der eigenen Stadt, lädt zu Hause wieder. Höchstens ${DRONES_PER_SHOP} je Werkstatt.`);

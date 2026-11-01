@@ -361,5 +361,12 @@ export function updateUpgrades(dt){
   for(const b of G.buildings){ if(b.dead||!b.upg) continue;
     const p=G.players[b.owner]; b.upg.t+=dt*(p.broke?0.5:1);
     if(b.upg.t>=b.upg.time){ const U=nextUpgrade(b); b.lvl=lvlOf(b)+1; b.upg=null; recalcPower(b.owner);
-      if(b.owner===0&&U) msg(`⬆ Ausgebaut: ${U.name} (${U.cap?`${U.cap} Wohnraum`:`Ertrag ×${String(U.food).replace('.',',')}`}).`,'#9fd88a'); } }
+      const mh=Math.round(b.def.hp*(1+0.25*(b.lvl-1))); b.hp+=mh-b.maxHp; b.maxHp=mh;   // stabiler gebaut
+      if(b.owner===0&&U) msg(`⬆ Ausgebaut: ${b.def.name.replace(/\u00AD/g,'')} → ${U.name} (${upgradeEffect(b.type,U)}).`,'#9fd88a'); } }
+}
+/** Wirkung einer Ausbaustufe in Worten */
+export function upgradeEffect(type,U){
+  if(U.cap) return `${U.cap} Wohnraum`; if(U.food) return `Ertrag ×${String(U.food).replace('.',',')}`;
+  const d=BUILDINGS[type], m=String(U.mul).replace('.',','), what=d.cap?'Wohnraum':d.power>0?'Strom':d.fun?'Unterhaltung':d.type==='depot'||type==='depot'?'Lagerplatz':d.export?'Export':d.food?'Nahrung':(d.wood||d.stone||d.metal||d.oilOut||d.refine)?'Förderung':['hq','barracks','factory','droneshop','university','kontor'].includes(type)?'Ausbildung/Forschung':'Leistung';
+  return `${what} ×${m}`;
 }

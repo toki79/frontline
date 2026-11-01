@@ -9,7 +9,7 @@ import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { sendDiplomats } from '../sim/trade';
 import { applyOrder, ORDER_NAME } from '../sim/missions';
 import { issuePending } from '../ui/forces';
-import { startUpgrade, upgradeBlock } from '../sim/build';
+import { startUpgrade, upgradeBlock, upgradeEffect } from '../sim/build';
 import { assignWorkers, canPlaceRoad, cancelRoad, demolish, orderRoadTo, planRoadLine, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -148,7 +148,7 @@ export function cmd(c){
   else if(c==='hold'||c==='clear'){ if(mine.length){ G.orderMode=G.orderMode===c?null:c; G.amoveMode=false; G.escortMode=false; } else msg('Zuerst Einheiten auswählen.'); }
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
     msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
-  else if(c==='upgrade'){ const b=selBuilding(); if(b){ const U=nextUpgrade(b), why=upgradeBlock(0,b);
+  else if(c==='upgrade'){ const b=selOwnBuilding(); if(b){ const U=nextUpgrade(b), why=upgradeBlock(0,b);
     if(why.length) msg(`Ausbau${U?' zu '+U.name:''} nicht möglich: ${why.join(', ')}.`,'#ffb38a');
     else if(startUpgrade(0,b)) msg(`⬆ Ausbau zu ${U.name} begonnen (${U.time} s) – ${costHtml(U.cost)}. Das Gebäude arbeitet währenddessen weiter.`,'#9fd88a'); } }
   else if(c==='demolish'){ const b=selBuilding(); if(b){
@@ -156,6 +156,8 @@ export function cmd(c){
     else { G.demolishArm=null; if(demolish(0,b)) msg(`${b.def.name} ${b.site?'abgebrochen':'abgerissen'}.`); } } }
   refreshCmds();
 }
+/** einzelnes eigenes Gebäude in der Auswahl (auch das Rathaus) */
+export function selOwnBuilding(){ const s=G.sel.filter(e=>!e.dead); return s.length===1&&s[0].kind==='building'&&s[0].owner===0?s[0]:null; }
 /** einzelnes eigenes Gebäude in der Auswahl (nicht das Rathaus) */
 export function selBuilding(){ const s=G.sel.filter(e=>!e.dead); return s.length===1&&s[0].kind==='building'&&s[0].owner===0&&s[0].type!=='hq'?s[0]:null; }
 export function refreshCmds(){
@@ -172,7 +174,7 @@ export function refreshCmds(){
   bp.classList.toggle('show',scouts.length>0); bp.classList.toggle('on',scouts.length>0&&scouts.every(u=>u.patrol));
   document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
-  { const ub=document.querySelector('[data-c=upgrade]'); ub.classList.toggle('show',!!(sb&&UPGRADES[sb.type]&&!sb.site)); ub.classList.toggle('poor',!!(sb&&UPGRADES[sb.type]&&upgradeBlock(0,sb).length)); }
+  { const ob=G&&selOwnBuilding(), ub=document.querySelector('[data-c=upgrade]'); ub.classList.toggle('show',!!(ob&&UPGRADES[ob.type]&&!ob.site&&nextUpgrade(ob))); ub.classList.toggle('poor',!!(ob&&UPGRADES[ob.type]&&upgradeBlock(0,ob).length)); }
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
   { const nb=document.querySelector('[data-c=nuke]'); nb.classList.toggle('show',!!(G&&(G.nukeAim||(sb&&sb.type==='silo'&&!sb.site)))); nb.classList.toggle('on',!!(G&&G.nukeAim)); }
   document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&(sb.eff??1)<0.97));
@@ -220,7 +222,7 @@ export function updateInfo(){
     if(e.owner===0&&e.def.desc) t+=' · '+e.def.desc;
     if(e.def.weapon) t+=' · '+WEAPON_INFO[e.def.weapon.type];
     if(e.kind==='building'&&e.def.cap&&e.quality!==undefined) t+=` · Bewohner ${Math.floor(e.resid||0)}/${capOf(e)} · Wohnqualität ${Math.round(e.quality*100)} %`+(e.noiseSrc&&e.noiseSrc.length?` (Lärm: ${e.noiseSrc.join(', ')})`:'');
-    if(e.kind==='building'&&UPGRADES[e.type]&&!e.site){ const U=nextUpgrade(e); t+=` · Stufe ${lvlOf(e)}/${UPGRADES[e.type].length}`+(e.upg?` · ⬆ Ausbau ${Math.floor(e.upg.t/e.upg.time*100)} %`:U&&e.owner===0?` · ⬆ nächste Stufe ${U.name}: ${U.cap?U.cap+' Wohnraum':'Ertrag ×'+String(U.food).replace('.',',')} für ${costHtml(U.cost)}${U.research&&!G.players[0].done[U.research]?' (braucht Forschung)':''}`:''); }
+    if(e.kind==='building'&&UPGRADES[e.type]&&!e.site){ const U=nextUpgrade(e); t+=` · Stufe ${lvlOf(e)}/${UPGRADES[e.type].length}`+(e.upg?` · ⬆ Ausbau ${Math.floor(e.upg.t/e.upg.time*100)} %`:U&&e.owner===0?` · ⬆ nächste Stufe ${U.name}: ${upgradeEffect(e.type,U)} für ${costHtml(U.cost)}${U.research&&!G.players[0].done[U.research]?' (braucht Forschung)':''}`:''); }
     if(e.kind==='building'&&e.type==='silo'&&e.owner===0) t+=` · ☢ ${G.players[0].nukes||0} Rakete${G.players[0].nukes===1?'':'n'} bereit`+(G.players[0].q.silo.length?` · Bau ${Math.floor(G.players[0].q.silo[0].t/G.players[0].q.silo[0].time*100)} %`:'');
     if(e.kind==='building'&&e.type==='mine') t+=e.empty?' · erschöpft':' · Erz übrig: '+fmt(e.oreTiles.reduce((s,i)=>s+G.ore[i],0));
     el.textContent=t; return;}

@@ -1,4 +1,4 @@
-import { capOf, foodMulOf, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
@@ -7,6 +7,7 @@ import { refreshQuality } from '../sim/world';
 import { clearForest, hauls, works } from '../sim/build';
 import { msg } from '../core/events';
 import { emergency } from '../sim/production';
+import { funCoverage } from '../sim/devplan';
 
 /* =====================================================================
    Volkswirtschaft: Produktion, Verbrauch, Wachstum
@@ -24,10 +25,14 @@ export function updateEconomy(pid,dt){
   let foodProd=0, metalProd=0, oilProd=0, woodProd=0, stoneProd=0, mines=0, minesEmpty=0, linked=0, unlinked=0;
   let upkeep=0, noAccess=0;
   for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid) continue;
-    upkeep+=ECON.upkeep[b.type]||0;
-    const rb=bf*(b.eff??1)*(hasTech(p,'ai')?1+RESEARCH_SPEED.ai:1);   // Transportweg zur Sammelstelle, KI-Optimierung
+    upkeep+=(ECON.upkeep[b.type]||0)*(1+0.5*(lvlOf(b)-1));   // ausgebaute Gebäude kosten mehr Unterhalt
+    const rb=bf*(b.eff??1)*(hasTech(p,'ai')?1+RESEARCH_SPEED.ai:1)*lvlMul(b);   // Transportweg zur Sammelstelle, KI-Optimierung
     if(hauls(b)&&(b.eff??1)<0.7) noAccess++;   // Betriebe mit weitem Transportweg
-    if(b.def.refine&&b.crude>0){ const a=Math.min(b.crude,b.def.refine*bf*dt*(powOk?1:0.5)); b.crude-=a; p.res.oil+=a*mul; oilProd+=a*mul/dt; }
+    if(b.def.refine&&b.crude>0){ const a=Math.min(b.crude,b.def.refine*lvlMul(b)*bf*dt*(powOk?1:0.5)); b.crude-=a; p.res.oil+=a*mul; oilProd+=a*mul/dt; }
+    else if(b.def.refine&&hasTech(p,'biofuel')&&p.res.food>BIOFUEL.reserve){   // Biokraftstoff aus Nahrung
+      const o=Math.min(BIOFUEL.rate*lvlMul(b)*bf*dt*(powOk?1:0.5),(p.res.food-BIOFUEL.reserve)/BIOFUEL.ratio); p.res.food-=o*BIOFUEL.ratio; p.res.oil+=o*mul; oilProd+=o*mul/dt; b.bio=true; }
+    else if(b.def.refine) b.bio=false;
+    if(b.def.oilOut){ const o=b.def.oilOut*rb*(powOk?1:0.3)*dt*mul; p.res.oil+=o; oilProd+=o/dt; }   // Bohrturm
     if(b.def.wood){   // Holzfäller: fällt den Wald Feld für Feld
       if(!b.forest||!b.forest.length||G.wood[b.forest[0]]<=0) b.forest=forestNear(b);
       if(b.forest.length){ const i=b.forest[0], a=Math.min(G.wood[i],b.def.wood*rb*dt); G.wood[i]-=a; p.res.wood+=a*mul; woodProd+=a*mul/dt; b.empty=false;
@@ -38,7 +43,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; } else if(!b.empty){ b.empty=true; if(pid===0) msg('Ein Steinbruch ist erschöpft – baue einen neuen an anderen Felsen.','#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1)*foodMulOf(b):1)*(b.type==='hq'?1:inFallout(b));   // Bauern arbeiten auch ohne Lohn weiter
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1):1)*foodMulOf(b)*(b.type==='hq'?1:inFallout(b));   // Bauern arbeiten auch ohne Lohn weiter
     if(b.def.metal){ let got=0;
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
       mines++; if(b.empty) minesEmpty++;
@@ -77,6 +82,8 @@ export function updateEconomy(pid,dt){
   { const core=G.buildings.filter(b=>!b.dead&&b.owner===pid&&(b.type==='hq'||b.def.cap));
     target-=pen(G.buildings.some(c=>!c.dead&&c.type==='camp'&&core.some(h=>dist(c.x,c.y,h.x,h.y)<MOOD.banditR)),MOOD.bandits,'Räuber in Stadtnähe'); }
   target-=pen(G.war,MOOD.war,'Krieg');
+  { const fc=(G.funCov&&G.funCov[pid])??1; target-=pen(fc<1,MOOD.fun*(1-fc),'zu wenig Unterhaltung (Park, Theater, Schwimmbad …)'); }
+  target-=pen(G.t-(p.lastFire??-999)<60,MOOD.fires,'Brände in der Stadt');
   target-=pen(G.t<(p.shockUntil||0),NUKE.shockMood,'Entsetzen über den eigenen Atomschlag');
   target-=pen(G.t<(p.bombedUntil||0),NUKE.victimMood,'Atomschlag auf unser Land');
   target-=pen(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.def.cap&&inFallout(b)<1),NUKE.radiationMood,'Strahlung in Wohngebieten');
@@ -87,7 +94,7 @@ export function updateEconomy(pid,dt){
   const tax=p.pop*ECON.taxPerHead*taxF*mul, adminShare=ECON.adminMax*p.pop/(p.pop+ECON.adminHalf)*(hasTech(p,'computing')?ECON.adminIT:1), admin=tax*adminShare;
   p.res.money+=(tax-admin)*dt;
   // Handelskontore: verkaufen Überschüsse über der Reserve
-  let cap=0, exp=0, expBy={}; for(const b of G.buildings) if(b.owner===pid&&b.def.export&&works(b)) cap+=b.def.export*(powOk?1:0.5);
+  let cap=0, exp=0, expBy={}; for(const b of G.buildings) if(b.owner===pid&&b.def.export&&works(b)) cap+=b.def.export*lvlMul(b)*(powOk?1:0.5);
   if(cap>0) for(const r of EXPORT.order){ const over=p.res[r]-EXPORT.reserve[r]; if(over<=0) continue; const a=Math.min(over,cap*dt); if(a<=0) continue;
     p.res[r]-=a; const m=a*EXPORT.price[r]*mul; p.res.money+=m; exp+=m; expBy[r]=(expBy[r]||0)+a/dt; cap-=a/dt; if(cap<=0) break; }
   p.rate={money:tax, taxF, adminShare, export:exp/dt, expBy, food:p.foodRate, foodProd, eat, metal:metalProd, oil:oilProd, wood:woodProd, stone:stoneProd, mines, minesEmpty, linked, noAccess, upkeep, wages, admin};

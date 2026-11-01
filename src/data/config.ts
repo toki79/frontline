@@ -50,6 +50,19 @@ export const DENSITY = {
   fireDps: 0.04,        // Brandschaden je Sekunde (Anteil der Lebenspunkte)
   fireSpread: 0.06,     // Wahrscheinlichkeit je Sekunde, dass ein Brand auf ein angrenzendes Gebäude überspringt
 };
+// ---------- Stadtentwicklung: Bürger bauen selbst aus (Spieler gibt Prioritäten und Mittel frei) ----------
+export const DEV = {
+  cats: {wohnen:{name:'Wohnen', icon:'🏠', types:['house','block','hq']}, nahrung:{name:'Nahrung', icon:'🌾', types:['farm','greenhouse']},
+         rohstoffe:{name:'Rohstoffe', icon:'⛏', types:['lumber','quarry','mine','refinery','derrick']}, strom:{name:'Strom', icon:'⚡', types:['power','npp']},
+         stadtleben:{name:'Stadtleben', icon:'🎭', types:['park','theater','pool','stadium','firest']}, lager:{name:'Lager & Handel', icon:'📦', types:['depot','kontor']},
+         wissen:{name:'Forschung', icon:'🎓', types:['university','datacenter']}, militaer:{name:'Militär', icon:'🪖', types:['barracks','factory','droneshop']}},
+  think: 6, parallel: 2, parallelPer: 1000,     // gleichzeitige Ausbauten: 2 + 1 je 1000 Einwohner
+  release: [0, 0.25, 0.5, 0.75],                // wählbare Freigaben (Anteil der Vorräte)
+  defaults: {on:true, prio:{wohnen:1, nahrung:1, rohstoffe:1, strom:1, stadtleben:1, lager:1, wissen:1, militaer:0}, release:{money:0.25, wood:0.5, stone:0.5, metal:0.25}},
+};
+// ---------- Stadtleben: Unterhaltung und Feuerwehr ----------
+export const FUN = {free:300};   // so viele Einwohner kommen ohne Unterhaltung aus; darüber braucht jeder einen Platz
+export const FIRE = {outbreak:0.00025, minPop:250, stationR:11, stationQuench:3, stationOutbreak:0.25};   // Brandgefahr je Gebäude und Sekunde (eng bebaut höher); Feuerwehr löscht schnell und verhindert Übergreifen
 // ---------- Zufriedenheit: Versäumnisse haben Folgen ----------
 export const MOOD = {
   start: 0.8,
@@ -59,6 +72,8 @@ export const MOOD = {
   bandits: 0.12,        // Räuberlager in Stadtnähe
   banditR: 16,
   war: 0.08,
+  fun: 0.2,             // fehlende Unterhaltung (× fehlender Anteil), erst ab FUN.free Einwohnern
+  fires: 0.08,          // Brände in der Stadt in der letzten Minute
   speed: 0.03,          // so schnell nähert sich die Stimmung ihrem Zielwert (je Sekunde)
   taxBase: 0.5, taxPer: 0.6,   // Steuern × (0,5 + 0,6 × Zufriedenheit), max. 1,1
   emigrate: 0.35,       // darunter wandern Einwohner ab
@@ -77,7 +92,7 @@ export const ECON = {
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
-           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4},
+           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4, derrick:0.8, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   // Stadtverwaltung: Anteil der Steuern, wächst mit der Stadtgröße, bleibt aber unter adminMax
   // (500 EW ≈ 20 %, 1000 ≈ 30 %, 3000 ≈ 45 %, 10 000 ≈ 55 %) – Wachstum lohnt sich immer, nur weniger
@@ -107,12 +122,13 @@ export const isPlain = t => t===T.GRASS || t===T.MEADOW;
 // air = tieffliegende Drohnen, airHigh = hochfliegende (nur Flugabwehr, schwach Maschinenkanone); 0 heißt: kann dieses Ziel gar nicht bekämpfen
 export const DAMAGE = {
   bullet:     {none:1.0,  light:0.3, heavy:0.08, building:0.15, fort:0.06, air:0.45, airHigh:0},
-  autocannon: {none:0.9,  light:0.8, heavy:0.25, building:0.4,  fort:0.25, air:1.0, airHigh:0.35},
+  autocannon: {none:0.9,  light:0.8, heavy:0.25, building:0.4,  fort:0.25, air:1.0, airHigh:0.12},
+  hellfire:   {none:1.6,  light:1.0, heavy:0.45, building:0.35, fort:0.2,  air:0, airHigh:0},     // Reaper: Präzisionsraketen von oben – tödlich für Schützen
   shell:      {none:0.35, light:1.0, heavy:1.0,  building:0.9,  fort:0.55, air:0, airHigh:0},
   missile:    {none:0.15, light:1.0, heavy:0.9,  building:0.6,  fort:0.35, air:0, airHigh:0},
   rocket:     {none:0.6,  light:0.7, heavy:0.35, building:1.0,  fort:0.6,  air:0, airHigh:0},
   drone:      {none:0.7,  light:5.0, heavy:10,   building:0.5,  fort:0.35, air:0, airHigh:0},   // Kamikaze von oben: ein Treffer zerstört Panzer und Raketenwerfer (Käfig schützt)
-  flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:1.6},
+  flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:0.8},
   mine:       {none:0.3,  light:1.3, heavy:1.0,  building:0,    fort:0,    air:0,   airHigh:0},
 };
 export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.airOnly) return air; return (DAMAGE[w.type][t.armor]||0)>0; };
@@ -166,8 +182,8 @@ export const UNITS = {
           weapon:{type:'drone', dmg:80, range:0.45, rof:1, kamikaze:true, splash:0.7}, prod:'droneshop', req:[], desc:'Tieffliegend, schwebt an ihrem Posten; in Lauerstellung (🎯) stürzt sie sich auf Feinde in Sicht'},
   spy:   {name:'Spionagedrohne', cls:'air', tech:1, cost:{money:220, metal:20, pop:1}, time:6, hp:60, armor:'airHigh', speed:3.4, sight:13, size:0.35, battery:420,
           prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, unbewaffnet, sieht sehr weit – auf Aufklärungsflug (🛰) erkundet sie selbstständig die Karte'},
-  reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:240, armor:'airHigh', speed:2.6, sight:12, size:0.6, battery:480,
-          weapon:{type:'missile', dmg:75, range:6.5, rof:5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, lange Flugzeit, Lenkraketen – auf Aufklärungsflug (🛰) überfliegt sie selbstständig das ganze Tal'},
+  reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:420, armor:'airHigh', speed:2.6, sight:12, size:0.6, battery:480,
+          weapon:{type:'hellfire', dmg:70, range:7.5, rof:3.5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, gepanzert, Präzisionsraketen gegen Schützen – auf Aufklärungsflug (🛰) jagt sie selbstständig feindliche Infanterie'},
   volunteer:{name:'Bürgerwehr', cls:'inf', cost:{pop:4}, time:3, hp:75, armor:'none', speed:1.2, sight:5, size:0.38, emergency:true,
           weapon:{type:'bullet', dmg:7, range:3.8, rof:1.0}, prod:'hq', req:[], desc:'Kostenlose Freiwillige – nur wenn die Stadt angegriffen wird oder Krieg herrscht; löst sich danach wieder auf'},
   militia:{name:'Milizionäre', cls:'inf', cost:{money:150}, time:0, hp:75, armor:'none', speed:1.3, sight:6, size:0.4,
@@ -191,9 +207,15 @@ export const BUILDINGS = {
   npp:     {name:'Kern\u00ADkraftwerk', w:3,h:3, hp:1500, power:600, cost:{money:6000, stone:400, metal:400}, time:40, req:[], research:'physics', noise:0.3, sight:5, desc:'+600 Strom – wird es zerstört, kommt es zur Kernschmelze'},
   enrich:  {name:'Anreicherungs\u00ADanlage', w:3,h:2, hp:900, power:-400, cost:{money:8000, stone:300, metal:600}, time:40, req:[], research:'bomb', noise:0.3, sight:4, desc:'Uran für Atomwaffen – braucht enorm viel Strom'},
   silo:    {name:'Raketen\u00ADsilo', w:2,h:2, hp:1200, power:-50, cost:{money:5000, stone:400, metal:400}, time:30, req:['enrich'], research:'bomb', sight:4, desc:'Baut und startet Atomraketen'},
+  park:    {name:'Park',          w:2,h:2, hp:300,  power:0,   cost:{money:200, wood:20}, time:5, req:[], fun:120, sight:3, desc:'Unterhaltung für 120 Einwohner'},
+  theater: {name:'Theater',       w:2,h:2, hp:600,  power:-15, cost:{money:900, wood:60, stone:150}, time:14, req:[], fun:350, sight:3, desc:'Unterhaltung für 350 Einwohner'},
+  pool:    {name:'Schwimm\u00ADbad',  w:3,h:2, hp:600,  power:-30, cost:{money:1400, stone:200, metal:40}, time:18, req:[], fun:600, sight:3, desc:'Unterhaltung für 600 Einwohner'},
+  stadium: {name:'Stadion',       w:3,h:3, hp:1200, power:-40, cost:{money:3500, stone:500, metal:150}, time:30, req:[], research:'urban', fun:1600, noise:0.2, sight:4, desc:'Unterhaltung für 1600 Einwohner'},
+  firest:  {name:'Feuer\u00ADwache',  w:2,h:2, hp:700,  power:-10, cost:{money:600, wood:40, stone:80}, time:10, req:[], fireR:11, sight:4, desc:'Löscht Brände im Umkreis von 11 Feldern schnell und verhindert, dass sie übergreifen'},
   depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
   mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
+  derrick: {name:'Bohrturm',      w:2,h:2, hp:600,  power:-40, cost:{money:1500, stone:100, metal:150}, time:20, req:[], research:'deepdrill', oilOut:1.2, noise:0.3, sight:4, desc:'Fördert 1,2 Öl/s aus der Tiefe – überall baubar, braucht Strom'},
   refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
   barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:200, wood:40, stone:20}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
   factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:1800, metal:180, stone:160}, time:20, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
@@ -305,11 +327,15 @@ export const RESEARCH = {
   physics:{name:'Kernphysik', icon:'⚛', cost:{money:4000, metal:300}, time:300, need:['res3'], desc:'Kernkraftwerk: +600 Strom – zerstört verstrahlt es die Umgebung'},
   computing:{name:'Informatik', icon:'💻', cost:{money:3000, metal:200}, time:240, need:['res3'], desc:'Rechenzentrum: beschleunigt die Forschung, braucht viel Strom'},
   ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos, +10 Felder Reichweite), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
+  biofuel:{name:'Biokraftstoff', icon:'🌽', cost:{money:1500, metal:80}, time:180, need:['fert'], desc:'Raffinerien machen aus überschüssiger Nahrung Öl, wenn kein Rohöl da ist (2 🌾 → 1 🛢)'},
+  deepdrill:{name:'Tiefbohrung', icon:'🛢', cost:{money:2500, metal:200}, time:240, need:['res3'], desc:'Bohrturm: fördert Öl aus tiefen Lagerstätten – auch wenn die Ölfelder erschöpft sind'},
   bomb:   {name:'Atomwaffenprogramm', icon:'☢', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
 };
+// Biokraftstoff: Nahrung → Öl in der Raffinerie (nur über der Reserve)
+export const BIOFUEL = {ratio:2, rate:1.5, reserve:300};
 export const RESEARCH_SPEED = {datacenter:0.5, maxDatacenters:2, ai:0.15};
 // KI Kastrova: Reihenfolge der Forschung und Mindest-Einwohnerzahl je Schritt
-export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['res3',240],['computing',320],['physics',340],['glass',360],['ai',420],['bomb',480]];
+export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['res3',240],['biofuel',280],['deepdrill',300],['computing',320],['physics',340],['glass',360],['ai',420],['bomb',480]];
 // KI und Atomwaffen: Abschreckung dämpft die Angriffslust, Einsatz nur in der Not
 export const AI_NUKE = {stock:1, reserve:1500, deterAggr:0.15, blackmail:0.5, ratio:0.6, cool:300};
 // ---------- Atomwaffe ----------
@@ -331,12 +357,22 @@ export const UPGRADES = {
   farm:  [null, {name:'Gutshof', food:1.4, cost:{money:240, wood:40, stone:40}, time:30},
                 {name:'Agrarbetrieb', food:1.9, cost:{money:420, stone:60, metal:40}, time:45, research:'fert'}],
 };
+// Alle übrigen Gebäude (außer Verteidigung, Silo, Anreicherung): Stufe II ×1,4 und Stufe III ×1,9 Leistung
+export const LVL_MUL = [1, 1.4, 1.9];
+for(const [k,d] of Object.entries(BUILDINGS) as [string,any][]){
+  if(UPGRADES[k]||d.def||d.buildable===false&&k!=='hq'||['silo','enrich','wall'].includes(k)) continue;
+  const c=d.cost||{}, m=c.money||400;
+  UPGRADES[k]=[null,
+    {name:'Stufe II', mul:1.4, cost:{money:Math.round(Math.max(150,m*0.8)/10)*10, stone:Math.round((40+(c.stone||0)*0.5)/10)*10, ...(c.metal||m>=1000?{metal:Math.round((10+(c.metal||0)*0.5)/10)*10}:{})}, time:Math.max(20,Math.round((d.time||10)*3))},
+    {name:'Stufe III', mul:1.9, cost:{money:Math.round(Math.max(300,m*1.5)/10)*10, stone:Math.round((80+(c.stone||0))/10)*10, metal:Math.round((30+(c.metal||0))/10)*10}, time:Math.max(30,Math.round((d.time||10)*4.5)), research:'res2'}];
+}
 /** Ausbaustufe eines Gebäudes (1 = Grundbau) und die nächste Stufe */
 export const lvlOf = b => b.lvl||1;
 export const nextUpgrade = b => { const U=UPGRADES[b.type]; return U&&U[lvlOf(b)]||null; };
 /** Wohnraum und Ertragsfaktor unter Berücksichtigung der Ausbaustufe */
-export const capOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].cap ? U[l-1].cap : (b.def.cap||0); };
-export const foodMulOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].food ? U[l-1].food : 1; };
+export const lvlMul = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].mul ? U[l-1].mul : 1; };
+export const capOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].cap ? U[l-1].cap : Math.round((b.def.cap||0)*lvlMul(b)); };
+export const foodMulOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].food ? U[l-1].food : lvlMul(b); };
 export const DEF = t => UNITS[t] || BUILDINGS[t] || FEATURES[t] || RESEARCH[t];
 /** Forschungs-Fortschritt einer Partei */
 export const hasTech = (p,k) => !!(p&&p.done&&p.done[k]);

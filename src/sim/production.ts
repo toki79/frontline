@@ -1,5 +1,5 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
@@ -49,7 +49,7 @@ export function updateProduction(pid,dt){
     const q=p.q[qn]; if(!q||!q.length) continue;
     const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;
     const it=q[0];
-    let ff=UNITS[it.type]&&UNITS[it.type].emergency?1:f;   // Bürgerwehr: Freiwillige brauchen kein Geld
+    let ff=(UNITS[it.type]&&UNITS[it.type].emergency?1:f)*lvlMul(producer);   // ausgebaute Werke arbeiten schneller   // Bürgerwehr: Freiwillige brauchen kein Geld
     if(qn==='research'){ ff*=1+RESEARCH_SPEED.datacenter*Math.min(RESEARCH_SPEED.maxDatacenters,G.buildings.filter(b=>b.owner===pid&&b.type==='datacenter'&&!b.dead&&!b.site).length);   // Rechenzentren
       const R=RESEARCH[it.type]; if(R.power&&p.use>p.power) ff=0; it.stalled=ff===0?'⚡ Strommangel – steht still':''; }   // KI und Atomprogramm: nur mit genug Strom
     if(qn==='silo'){ if(!findWorking(pid,'enrich')) ff=0; it.stalled=ff===0?'Anreicherungsanlage arbeitet nicht':''; }

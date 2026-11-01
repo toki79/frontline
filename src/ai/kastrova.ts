@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { FIRE, FUN, TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -11,6 +11,8 @@ import { G } from '../sim/state';
 import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
 import { deterrent, launchNuke } from '../sim/nuke';
+import { funCoverage } from '../sim/devplan';
+import { fireCoverage } from '../sim/city';
 
 /* =====================================================================
    KI Kastrova – handelt nach Bedarf, Stärkeverhältnis und Vorsprung
@@ -64,12 +66,6 @@ export function aiThink(){
   // --- Forschung ---
   const nextRes=aiNextResearch(p);
   if(nextRes&&!p.q.research.length&&available(pid,nextRes)&&canAfford(pid,nextRes)&&p.res.money>DEF(nextRes).cost.money+(RESEARCH[nextRes].level?150:600)) enqueue(pid,nextRes);
-  // --- Ausbau am Platz: spart Fläche (Häuser bei Platzmangel, Höfe bei knapper Nahrung) ---
-  ai.upgT=(ai.upgT||0)-D.think;
-  if(ai.upgT<=0&&p.res.money>700){ ai.upgT=12;
-    const kind=p.pop>=p.cap-30?'house':p.foodRate<2?'farm':p.res.money>2500?(Math.random()<0.5?'house':'farm'):null;
-    const b=kind&&myB.filter(b=>b.type===kind&&!b.site&&!b.upg&&!upgradeBlock(pid,b).length).sort((a,c)=>(a.lvl||1)-(c.lvl||1))[0];
-    if(b) startUpgrade(pid,b); }
   // --- Atomrakete ---
   if(findBuilding(pid,'silo')&&!p.q.silo.length&&(p.nukes||0)<AI_NUKE.stock&&canAfford(pid,'nuke')&&p.res.money>UNITS.nuke.cost.money+AI_NUKE.reserve) enqueue(pid,'nuke');
   aiNukeStrike(pid,ratio,urgent);
@@ -80,6 +76,8 @@ export function aiThink(){
   const refs=countBuildings(pid,'refinery'), queuedTruck=p.q.factory.some(i=>i.type==='truck');
   if(refs&&trucks.length<Math.min(refs*2,3)&&!queuedTruck&&available(pid,'truck')&&canAfford(pid,'truck')&&p.res.money>700) enqueue(pid,'truck');
   // --- Handel am Milizmarkt ---
+  if(marketOpen(pid)&&p.res.money>2500){   // volle Kasse: Baustoffe für Ausbauten zukaufen
+    if(p.res.stone<250) trade(pid,'buyStone'); if(p.res.wood<200) trade(pid,'buyWood'); if(p.res.metal<200) trade(pid,'buyMetal'); }
   if(marketOpen(pid)){
     if(p.res.oil>300) trade(pid,'sellOil');
     if(need==='food'&&ratio<1.2&&p.res.money>400) trade(pid,'buyFood');
@@ -243,11 +241,15 @@ function aiPickMain(p,need,has,ok){
   if((!has('mine')||(need==='metal'))&&ok('mine')) { if(aiCanReachOre(pid)) return 'mine'; }
   if(!has('refinery')) return 'refinery';
   if(p.foodRate<1.2) return food;
+  if(p.pop>FUN.free&&funCoverage(1)<0.85){ for(const t of ['stadium','pool','theater','park']) if(available(1,t)&&p.res.money>BUILDINGS[t].cost.money+(t==='park'?250:600)&&canAfford(1,t)) return t; }   // Stadtleben vor weiteren Höfen
   const rich=t=>p.res.money>BUILDINGS[t].cost.money+250;   // teure Gebäude erst, wenn das Geld da ist (sonst blockieren sie den Aufbau)
   if(!has('factory')&&p.pop>90&&rich('factory')) return 'factory';
   if(has('factory')&&!has('university')&&p.pop>110&&rich('university')) return 'university';
   if(has('factory')&&!has('droneshop')&&p.tech>=1&&p.pop>140&&rich('droneshop')) return 'droneshop';
   const hi=aiPickHighTech(p,has,rich); if(hi) return hi;
+  // Stadtleben: Feuerwache und Unterhaltung
+  if(p.pop>FIRE.minPop&&fireCoverage(1)<0.7&&has('firest')<4&&rich('firest')) return 'firest';
+  if(p.pop>FUN.free-20&&funCoverage(1)<1){ for(const t of ['stadium','pool','theater','park']) if(available(1,t)&&rich(t)) return t; }
   if(p.pop>=p.cap-25) return home;
   if(p.res.money>4500&&has('factory')<2&&p.pop>300) return 'factory';
   if(p.foodRate<2.5) return food;
@@ -267,6 +269,7 @@ function aiPickHighTech(p,has,rich){
   const spare=p.power-p.use;
   if(hasTech(p,'computing')&&!has('datacenter')&&p.pop>320&&rich('datacenter')) return spare>160?'datacenter':hasTech(p,'physics')&&rich('npp')?'npp':'power';
   if(hasTech(p,'physics')&&!has('npp')&&spare<250&&rich('npp')) return 'npp';
+  if(hasTech(p,'deepdrill')&&has('derrick')<2&&p.res.oil<300&&rich('derrick')) return spare>50?'derrick':'power';
   if(hasTech(p,'bomb')&&!has('enrich')&&rich('enrich')) return spare>=420?'enrich':hasTech(p,'physics')&&rich('npp')?'npp':'power';
   if(has('enrich')&&!has('silo')&&rich('silo')) return 'silo';
   return null;

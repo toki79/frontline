@@ -35,7 +35,7 @@ button:disabled{opacity:.4;cursor:default}
 #log{position:absolute;left:calc(8px + var(--sal));top:calc(var(--toph,calc(36px + var(--sat))) + 52px);max-width:min(62vw,430px);pointer-events:none;font-size:12.5px;line-height:1.35}
 #log div{background:#0d0f0acc;border-left:3px solid var(--acc);padding:3px 7px;margin-bottom:3px;border-radius:3px;transition:opacity .6s}
 #mini{position:absolute;right:calc(8px + var(--sar));top:calc(var(--toph,calc(36px + var(--sat))) + 8px);width:124px;height:124px;border:1px solid var(--line);border-radius:4px;background:#000;touch-action:none}
-#cmds{position:absolute;left:calc(6px + var(--sal));bottom:calc(136px + var(--sab));display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;max-width:calc(100vw - 12px - var(--sal) - var(--sar))}
+#cmds{position:absolute;left:calc(6px + var(--sal));bottom:calc(168px + var(--sab));display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;max-width:calc(100vw - 12px - var(--sal) - var(--sar))}
 #cmds::-webkit-scrollbar{display:none}
 #cmds button{flex:none}
 #cmds button{width:52px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:17px;line-height:1;background:var(--panel)}
@@ -48,7 +48,7 @@ button:disabled{opacity:.4;cursor:default}
 #cmds button.nukeb{border-color:#c0392b;color:#ffd36a}
 #cmds button.nukeb.on{background:#5a1a12;border-color:#ff5a4a}
 .it.done{opacity:.55}
-#stack{position:absolute;left:calc(6px + var(--sal));bottom:calc(188px + var(--sab));display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none;max-width:min(440px,calc(100vw - 12px))}
+#stack{position:absolute;left:calc(6px + var(--sal));bottom:calc(220px + var(--sab));display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none;max-width:min(440px,calc(100vw - 12px))}
 #info{font-size:12px;color:#c9c5ae;background:#0d0f0add;padding:3px 7px;border-radius:4px;pointer-events:none}
 #advisor{pointer-events:auto;background:#22261aee;border:1px solid #8a7a3a;border-radius:8px;padding:6px 8px 7px 9px;font-size:12.5px;line-height:1.35;display:flex;gap:8px;align-items:flex-start;box-shadow:0 2px 8px #0008}
 #advisor.hidden{display:none}
@@ -77,6 +77,20 @@ button:disabled{opacity:.4;cursor:default}
 .tabs button.on{background:#3a4428;color:var(--acc)}
 .tabs .sp{flex:1}
 .tabs .hint{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;height:30px;align-items:center;padding:2px 0}
+#chips::-webkit-scrollbar{display:none}
+#chips button{flex:none;font-size:12px;padding:3px 9px;border-radius:14px;background:#1d2217;white-space:nowrap}
+#chips button.on{background:#3a4428;color:var(--acc);border-color:var(--acc)}
+#chips:empty{display:none}
+#treeReply{position:sticky;bottom:-16px;z-index:2}
+#panel.min #chips{display:none}
+#tree .tier{margin:10px 0 4px;font-size:12px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+#tree .tn{display:flex;gap:10px;align-items:flex-start;border:1px solid #3a4430;border-radius:9px;padding:8px 10px;margin:6px 0;background:#161a10;cursor:pointer}
+#tree .tn .ic{font-size:24px;line-height:1}
+#tree .tn .tx{flex:1;font-size:13px;line-height:1.35}
+#tree .tn .tx b{font-size:14px}
+#tree .tn.done{border-color:#4a7a3a;background:#1a2614} #tree .tn.run{border-color:#c9a83a;background:#2a2814} #tree .tn.avail{border-color:#7a9a5a} #tree .tn.lock{opacity:.6}
+#tree .tn .stt{font-size:12px;font-weight:700;white-space:nowrap}
 #items{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;height:96px;padding-top:2px;scrollbar-width:none}
 #items::-webkit-scrollbar{display:none}
 #panel.min #items{display:none}
@@ -129,11 +143,11 @@ button:disabled{opacity:.4;cursor:default}
 .tribres.no{background:#3a1f1a;border:1px solid #8a4a3a;color:#ffc2b0}
 #offer .card{max-width:440px;border-color:#8a6a2a}
 #offerText{font-size:15px;line-height:1.45}
-@media (max-width:600px){ .tabs{gap:2px} .tabs button{padding:3px 7px;font-size:12px} .tabs .hint{display:none} #cmds{gap:4px} #cmds button{width:47px} .tb .lbl{display:none} .res{gap:4px 9px;font-size:13px;flex-wrap:wrap} #mini{top:calc(var(--toph,calc(36px + var(--sat))) + 56px);width:110px;height:110px} .pb i{width:64px} .pb b{width:56px} .pb .nm{width:58px} }
+@media (max-width:600px){ .tabs{gap:2px} .tabs button{padding:3px 7px;font-size:12px} .tabs .hint{display:none} #cmds{gap:4px} #cmds button{width:47px} .tb .lbl{display:none} .tb{gap:4px} .tb button{padding:6px 7px} .res{gap:4px 9px;font-size:13px;flex-wrap:wrap} #mini{top:calc(var(--toph,calc(36px + var(--sat))) + 56px);width:110px;height:110px} .pb i{width:64px} .pb b{width:56px} .pb .nm{width:58px} }
 @media (max-height:500px){
   #items{height:70px}.it{flex-basis:76px;height:66px;padding:2px}.it canvas{width:24px;height:24px}.it .n{font-size:9.5px}.it .c{font-size:9px}
-  .tabs{height:26px}#cmds{bottom:calc(104px + var(--sab))}#cmds button{width:46px;height:38px;font-size:14px}#cmds button small{font-size:8.5px;margin-top:2px}
-  #stack{bottom:calc(146px + var(--sab))}#mini{width:96px;height:96px}#log{font-size:11.5px;max-width:48vw}
+  .tabs{height:26px}#chips{height:26px}#cmds{bottom:calc(132px + var(--sab))}#cmds button{width:46px;height:38px;font-size:14px}#cmds button small{font-size:8.5px;margin-top:2px}
+  #stack{bottom:calc(174px + var(--sab))}#mini{width:96px;height:96px}#log{font-size:11.5px;max-width:48vw}
   #panel.min~#cmds{bottom:calc(38px + var(--sab))}#panel.min~#stack{bottom:calc(80px + var(--sab))}
 }
 
@@ -141,6 +155,13 @@ button:disabled{opacity:.4;cursor:default}
 #saves .slot span{flex:1}
 #saves .slot button{padding:6px 10px;font-size:15px}
 #start.ingame .intro{display:none}
+#dev .drow{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:13.5px;flex-wrap:wrap}
+#dev .drow .dn{flex:1;min-width:110px;line-height:1.25}
+#dev .drow .dn small{display:block;font-size:11px;color:var(--dim)}
+#dev .drow button{font-size:12.5px;padding:6px 9px}
+#dev .drow button.on{border-color:var(--acc);background:#4a4420;color:var(--acc)}
+#dev .stat{display:flex;justify-content:space-between;font-size:13px;margin:3px 0}
+#dev .stat b.bad{color:#ff9a8a} #dev .stat b.good{color:#9fd88a}
 #forces .kinds button{font-size:13px;padding:8px 10px}
 #forces .kinds button.on{border-color:var(--acc);background:#4a4420}
 #forces .frow{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:13px}

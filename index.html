@@ -16,7 +16,7 @@
     <span data-tip="metal">⛏<b id="rMetal">0</b></span>
     <span data-tip="oil">🛢<b id="rOil">0</b></span>
   </div>
-  <div class="tb"><button id="bHelp" title="Symbole &amp; Hilfe">❓</button><button id="bForces">🪖<span class="lbl"> Kräfte</span></button><button id="bDiplo">🤝<span class="lbl"> Diplomatie</span></button><button id="bMenu">⏸<span class="lbl"> Menü</span></button></div>
+  <div class="tb"><button id="bHelp" title="Symbole &amp; Hilfe">❓</button><button id="bDev" title="Stadtentwicklung">🏙<span class="lbl"> Stadt</span></button><button id="bForces">🪖<span class="lbl"> Kräfte</span></button><button id="bDiplo">🤝<span class="lbl"> Diplomatie</span></button><button id="bMenu">⏸<span class="lbl"> Menü</span></button></div>
 </div>
 <div id="popbar">
   <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span><span id="happy" data-tip="happy">😊</span></div>
@@ -26,6 +26,7 @@
 <canvas id="mini" width="124" height="124"></canvas>
 <div id="panel">
   <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><button data-tab="forsch">Forschung</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
+  <div id="chips"></div>
   <div id="items"></div>
 </div>
 <div id="cmds">
@@ -79,6 +80,10 @@
     <b>☢ Atomrakete:</b> Anreicherungsanlage (frisst 400 Strom) + Raketensilo. Schon der Besitz schreckt Kastrova von Forderungen und Krieg ab. Einsatz: Silo wählen → ☢ Start → erkundetes Ziel zweimal antippen. Das Rathaus übersteht den Schlag als Bunker – erobern müssen Truppen. Folgen: Krieg mit allen, Verstrahlung, lange Entsetzen im eigenen Volk.<br>
     <b>Straßen:</b> Startpunkt antippen, dann Endpunkt – der Weg wird geplant. <b>Ausbau:</b> Wohnhaus oder Bauernhof wählen → ⬆ Ausbau (mehr Wohnraum bzw. Ertrag auf derselben Fläche).<br>
     <b>Stadtschutz:</b> Beim Planen von Verteidigung zeigen rote Kreise die <b>Zugänge zur Stadt</b>. <b>Grenzbunker</b> dürfen weit draußen stehen (bis 30 Felder) und halten enorm viel aus. Das Rathaus hat eine eigene MG-Wache.<br>
+    <b>🏙 Stadtentwicklung:</b> Alle Gebäude lassen sich in zwei Stufen ausbauen (×1,4 und ×1,9 Leistung). Die Bürger bauen selbst aus – im Fenster 🏙 legst du Prioritäten je Bereich fest und wie viel deiner Vorräte sie verbauen dürfen.<br>
+    <b>Stadtleben:</b> Ab 300 Einwohnern wollen die Leute Unterhaltung (Park, Theater, Schwimmbad, Stadion), sonst sinkt die Zufriedenheit. In größeren Städten bricht Feuer aus – eine Feuerwache schützt den Umkreis.<br>
+    <b>Öl:</b> Sind die Ölfelder leer, helfen Biokraftstoff (Raffinerie macht Öl aus Nahrung) und der Bohrturm (Tiefbohrung, überall baubar).<br>
+    <b>Übersicht:</b> Über den Bauknöpfen filtern Kategorien (z. B. 🎭 Stadtleben); Verfügbares steht vorn. Im Reiter Forschung zeigt 🌳 den ganzen Forschungsbaum.<br>
     <b>👑 Tribut:</b> Im Fenster 🤝 könnt ihr von Kastrova Geld, Rohstoffe (einmalig oder jede Minute) oder Land fordern. Es gibt nach, wenn es euch fürchtet – Übermacht, Atomrakete, ein verlorener Krieg. Die Anzeige verrät vorher, ob es klappt.<br>
     <b>Notstand:</b> Wird die Stadt angegriffen, kann das Rathaus kostenlos <b>Bürgerwehr</b> aufbieten (Reiter Truppen) – auch bei leerer Kasse. Geld erbeuten Angreifer nur aus Rathaus und Kontor, Betriebe verlieren ihr eigenes Erzeugnis.<br>
     <b>Speichern:</b> Im Menü (⏸) gibt es 3 Speicherplätze; zusätzlich wird jede Minute automatisch gespeichert.<br>
@@ -91,6 +96,19 @@
   </div>
 </div></div>
 
+<div id="tree" class="overlay hidden"><div class="card">
+  <h2>🌳 Forschungsbaum</h2>
+  <div class="sub">Von oben nach unten: Was weiter unten steht, braucht etwas von weiter oben. Antippen startet die Forschung in der Universität. Das Spiel ist pausiert.</div>
+  <div id="treeBody"></div>
+  <div id="treeReply" class="tribres" style="display:none"></div>
+  <button class="big" id="bTreeClose" style="background:#2a3a4a;border-color:#4a6a8a">Zurück ins Spiel</button>
+</div></div>
+<div id="dev" class="overlay hidden"><div class="card">
+  <h2>🏙 Stadtentwicklung</h2>
+  <div class="sub">Die Bürger bauen ihre Gebäude selbst aus. Du legst fest, was ihnen wichtig ist und wie viel deiner Vorräte sie dafür nehmen dürfen. Das Spiel ist pausiert.</div>
+  <div id="devBody"></div>
+  <button class="big" id="bDevClose" style="background:#2a3a4a;border-color:#4a6a8a">Zurück ins Spiel</button>
+</div></div>
 <div id="forces" class="overlay hidden"><div class="card">
   <h2>🪖 Kräfte &amp; Einsätze</h2>
   <div class="sub">Befehl wählen, Kräfte mit −/+ zusammenstellen, dann Ziel antippen. 📍 zeigt eine Einheit auf der Karte. Das Spiel ist pausiert.</div>

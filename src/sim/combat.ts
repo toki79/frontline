@@ -1,6 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { capOf, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -22,7 +22,7 @@ export function findTarget(src,range){
   const far=src.kind==='unit'?src.def.sight+0.5:1e9;   // jenseits der eigenen Sicht nur auf aufgeklärte Ziele (Raketenwerfer)
   for(const e of G.units){ if(e.dead||!hostile(src.owner,e.owner)||!canHit(w,e)||!detected(e,src.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
     if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
-    const sc=d-(drone&&e.def.cls==='veh'?3:0); if(sc<bs){bs=sc;best=e;} }
+    const sc=d-(drone&&e.def.cls==='veh'?3:0)-(w.type==='hellfire'&&e.def.cls==='inf'?4:0); if(sc<bs){bs=sc;best=e;} }   // Reaper jagen Schützen
   if(!w.airOnly) for(const e of G.buildings){ if(e.dead||!hostile(src.owner,e.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
     if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
     const sc=d+1.5+(e.def.def&&!e.def.weapon?3:0); if(sc<bs){bs=sc;best=e;} }   // Mauern nur, wenn sonst nichts da ist
@@ -37,7 +37,7 @@ export function splash(x,y,r,dmg,type,src){
 export function aimPoint(t){ if(t.kind==='building') return {x:t.x+(Math.random()-0.5)*t.w*0.6,y:t.y+(Math.random()-0.5)*t.h*0.6}; return {x:t.x+(Math.random()-0.5)*0.3,y:t.y+(Math.random()-0.5)*0.3}; }
 export function fire(s,t){
   const w=s.def.weapon; s.cd=w.rof*(0.9+Math.random()*0.2);
-  if(s.kind==='unit'&&s.def.armor==='airHigh') s.revealT=G.t+4;   // Abschuss verrät den Hochflieger kurz
+  if(s.kind==='unit'&&s.def.armor==='airHigh') s.revealT=G.t+1.5;   // Abschuss verrät den Hochflieger ganz kurz
   const a=Math.atan2(t.y-s.y,t.x-s.x), ml=s.kind==='unit'?s.def.size*0.75:0.55;
   const mx=s.x+Math.cos(a)*ml, my=s.y+Math.sin(a)*ml, hp=aimPoint(t);
   if(w.salvo){   // Raketenwerfer: Salve auf zufällige Punkte um das Ziel
@@ -63,7 +63,7 @@ export function fire(s,t){
 export function applyDamage(t,dmg,type,src){
   if(t.dead) return;
   let m=DAMAGE[type][t.armor]; if(m===undefined) m=1;
-  if(t.kind==='unit'&&t.def.cls==='inf') m*=1-coverAt(t.x,t.y);
+  if(t.kind==='unit'&&t.def.cls==='inf'&&type!=='hellfire') m*=1-coverAt(t.x,t.y);   // Reaper treffen von oben: Deckung hilft nicht
   if(t.kind==='unit'&&t.owner<2&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
   if(t.cage&&CAGE[type]) m*=CAGE[type];
   if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
@@ -147,15 +147,18 @@ const burns = b => !b.dead && !b.def.def && b.type!=='bunker';
 export function touching(b){ return G.buildings.filter(o=>o!==b&&!o.dead&&burns(o)&&rectDist(o,b.tx,b.ty,b.w,b.h)===0); }
 export function ignite(b){
   if(!burns(b)) return;
-  if(!(b.fire>0)&&b.owner===0&&G.t-(G.fireMsg||-99)>15){ G.fireMsg=G.t; msg(`🔥 Feuer! ${b.def.name} brennt – dicht bebaute Viertel brennen schnell nieder.`,'#ff8a7a'); }
+  if(!(b.fire>0)&&b.owner===0&&G.t-(G.fireMsg||-99)>15){ G.fireMsg=G.t; msg(b.fireCov?`🔥 Feuer: ${b.def.name.replace(/\u00AD/g,'')} – die Feuerwehr rückt aus.`:`🔥 Feuer! ${b.def.name.replace(/\u00AD/g,'')} brennt – ohne Feuerwache brennen dicht bebaute Viertel schnell nieder.`,'#ff8a7a'); }
+  if(b.owner<2) G.players[b.owner].lastFire=G.t;
   b.fire=Math.max(b.fire||0,DENSITY.fireTime);
 }
 export function updateFire(b,dt){
-  b.fire-=dt; b.lastHit=G.t;
-  b.hp-=b.maxHp*DENSITY.fireDps*dt;
+  const fw=b.fireCov;   // Feuerwehr: löscht schnell, weniger Schaden, kein Übergreifen
+  b.fire-=dt*(fw?1+FIRE.stationQuench:1); b.lastHit=G.t;
+  b.hp-=b.maxHp*DENSITY.fireDps*dt*(fw?0.5:1);
+  if(fw&&Math.random()<dt*3) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.5,y:b.y+(Math.random()-.5)*b.h*0.5,r:0.35,life:0.9});
   if(Math.random()<dt*6) fxAdd({k:'flame',x:b.tx+Math.random()*b.w,y:b.ty+Math.random()*b.h,r:0.25+Math.random()*0.2,life:0.7});
   if(Math.random()<dt*2) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.6,y:b.y+(Math.random()-.5)*b.h*0.6,r:0.4,life:1.6,col:1});
-  if(Math.random()<dt*DENSITY.fireSpread) for(const n of touching(b)) if(!(n.fire>0)&&Math.random()<0.5) ignite(n);
+  if(!fw&&Math.random()<dt*DENSITY.fireSpread) for(const n of touching(b)) if(!(n.fire>0)&&Math.random()<0.5) ignite(n);
   if(b.hp<=0) destroy(b,null);
 }
 export function checkVictory(){

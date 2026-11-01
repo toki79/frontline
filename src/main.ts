@@ -18,6 +18,8 @@ import { init as initDialogs } from './ui/dialogs';
 import { init as initMenus, startGame } from './ui/menus';
 import { init as initMessages } from './ui/messages';
 import { init as initForces } from './ui/forces';
+import { init as initDev } from './ui/devui';
+import { init as initTree } from './ui/tree';
 import { autosave } from './ui/saves';
 
 let last = performance.now();
@@ -41,7 +43,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-initForces(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
+initForces(); initDev(); initTree(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
 resize();
 requestAnimationFrame(frame);
 
