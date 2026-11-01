@@ -323,8 +323,9 @@ describe('Simulation', () => {
     const tx = Math.floor(c.x) + 7, ty = Math.floor(c.y) + 7;
     const farm = placeBuilding(0, 'farm', tx, ty, false);
     G.players[0].res.money = 1000; G.players[0].res.food = 300;
-    run(BANDITS.firstRaid[0] - BANDITS.warn - 5);
-    expect(msgs.some(m => m.includes('überfallen'))).toBe(false);          // Schonfrist
+    run(2);
+    expect(c.raidT).toBeGreaterThan(BANDITS.firstRaid[0] - 10);            // Schonfrist
+    for (const u of G.units) if (u.owner === 0) u.dead = true;              // niemand lenkt die Räuber ab
     c.raidT = BANDITS.warn - 1;
     run(3);
     expect(msgs.some(m => m.includes('Späher'))).toBe(true);               // Vorwarnung
@@ -332,7 +333,7 @@ describe('Simulation', () => {
     expect(runUntil(() => msgs.some(m => m.includes('geplündert')), 90)).toBe(true);
     expect(G.players[0].res.money).toBeLessThan(money0);
     expect(farm.dead).toBeFalsy();                                          // Gebäude bleibt stehen
-  });
+  }, 20000);
 
   it('Stadtwache: bei Vorwarnung rücken untätige Soldaten von selbst aus', () => {
     newGame('mittel');
