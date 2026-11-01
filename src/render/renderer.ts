@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { dist, hash, idx, inMap } from '../core/util';
-import { capOf, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
+import { capOf, BANDITS, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, routeRoadBetween, siteLacks, siteWorkers } from '../sim/build';
@@ -9,11 +9,35 @@ import { accessPoints } from '../sim/fortify';
 import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
-import { fxAdd } from '../sim/units';
+import { fpvRange, fxAdd, rangeOf } from '../sim/units';
 import { housingQuality, knownBuilding, tileVis, visibleUnit } from '../sim/world';
 import { ctx, cv, mctx, mini } from '../ui/dom';
 import { input } from '../ui/input';
 
+/** Wirkkreise: Reichweite, Sicht, Radar, Störfeld, Löschbereich, Pflanzbereich, Äcker – mit Beschriftung */
+function drawRanges(c,sel){
+  const seen=new Set<string>();
+  const ring=(x,y,r,col,dash,label,fill?)=>{ const key=`${Math.round(x*2)},${Math.round(y*2)},${r},${label}`; if(seen.has(key)||r<=0) return; seen.add(key);
+    c.save(); if(fill){ c.fillStyle=fill; c.beginPath(); c.arc(x*TILE,y*TILE,r*TILE,0,7); c.fill(); }
+    c.strokeStyle=col; c.lineWidth=2; c.setLineDash(dash?[7,6]:[]); c.beginPath(); c.arc(x*TILE,y*TILE,r*TILE,0,7); c.stroke(); c.setLineDash([]);
+    if(label){ c.font='bold 11px sans-serif'; c.textAlign='center'; const tw=c.measureText(label).width; const ly=y*TILE-r*TILE;
+      c.fillStyle='#000b'; c.fillRect(x*TILE-tw/2-3,ly-8,tw+6,14); c.fillStyle=col; c.fillText(label,x*TILE,ly+3); }
+    c.restore(); };
+  const one=sel.length===1;
+  for(const e of sel){ const d=e.def, w=d.weapon;
+    if(w){ const r=rangeOf(e); ring(e.x,e.y,r,'rgba(255,110,90,.85)',false,one?`Reichweite ${Math.round(r*10)/10}`:'','rgba(255,110,90,.06)');
+      if(w.minRange) ring(e.x,e.y,w.minRange,'rgba(255,170,90,.7)',true,one?`Mindestabstand ${w.minRange}`:''); }
+    if(one&&d.sight) ring(e.x,e.y,(d.sight||4)+(e.kind==='building'?Math.max(e.w,e.h)/2:0),'rgba(235,235,220,.35)',true,'Sicht');
+    if(d.radar) ring(e.x,e.y,d.radar,'rgba(127,176,234,.85)',true,one?`Radar ${d.radar}`:'');
+    if(d.jam) ring(e.x,e.y,JAM.radius,'rgba(140,200,255,.8)',true,one?`Störfeld ${JAM.radius}`:'');
+    if(d.fireR){ const r=d.fireR*(1+0.25*((e.lvl||1)-1)); ring(e.x,e.y,r,'rgba(255,140,60,.85)',false,`Löschbereich ${Math.round(r)}`,'rgba(255,140,60,.05)'); }
+    if(d.forester) ring(e.x,e.y,FOREST.radius+e.w/2,'rgba(120,220,100,.85)',false,`Pflanzbereich ${FOREST.radius}`,'rgba(120,220,100,.06)');
+    if(e.type==='camp') ring(e.x,e.y,BANDITS.territory,'rgba(255,90,74,.8)',true,'Räubergebiet');
+    if(e.type==='farm'){ const R=DENSITY.farmFieldR; c.save(); c.strokeStyle='rgba(232,200,74,.8)'; c.lineWidth=2; c.setLineDash([6,5]); c.strokeRect((e.tx-R)*TILE,(e.ty-R)*TILE,(e.w+2*R)*TILE,(e.h+2*R)*TILE); c.setLineDash([]); c.restore(); }
+    if(d.weapon&&d.weapon.kamikaze&&e.owner===0&&one){ const R=fpvRange(0); let best=null,bd=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===0){ const dd=Math.hypot(b.x-e.x,b.y-e.y); if(dd<bd){bd=dd;best=b;} }
+      if(best) ring(best.x,best.y,R,'rgba(170,140,255,.7)',true,`Funkreichweite ${R}`); }
+  }
+}
 export function render(){
   const c=ctx; c.setTransform(1,0,0,1,0,0); c.fillStyle='#14170f'; c.fillRect(0,0,cv.width,cv.height);
   if(!G) return;
@@ -123,7 +147,9 @@ export function render(){
   }
   for(const p of G.projectiles){ if(tileVis(p.x,p.y)<2) continue; c.save(); c.translate(p.x*TILE,p.y*TILE); c.rotate(p.a||0);
     if(p.delay>0){c.restore();continue;}
-    if(p.type==='shell'){c.fillStyle='#ffe08a';c.fillRect(-4,-1.2,8,2.4);}
+    if(p.type==='ballistic'){ c.restore(); const k=p.k||0, h=Math.sin(k*Math.PI)*Math.min(5,p.d0*0.12); c.save(); c.translate(p.x*TILE,(p.y-h)*TILE); c.rotate(p.a||0); c.fillStyle='#e8e4d8'; c.fillRect(-7,-2,12,4); c.fillStyle='#c0392b'; c.fillRect(4,-2,3,4); c.fillStyle='#ffb040'; c.fillRect(-11,-1.5,4,3); }
+    else if(p.type==='glide'){ c.fillStyle='#3a3e44'; c.fillRect(-5,-1.5,9,3); c.fillRect(-2,-4,3,8); }
+    else if(p.type==='shell'){c.fillStyle='#ffe08a';c.fillRect(-4,-1.2,8,2.4);}
     else if(p.type==='rocket'){c.fillStyle='#e8e2d0';c.fillRect(-5,-1.2,8,2.4);c.fillStyle='#ff9a30';c.fillRect(-8,-1.2,3,2.4);} else {c.fillStyle='#ddd';c.fillRect(-4,-1,7,2);c.fillStyle='#ffb040';c.fillRect(-6,-1,2,2);}
     c.restore(); }
   for(const f of (G.fallout||[])){ if(G.t>=f.until) continue; const a=Math.min(1,(f.until-G.t)/60)*0.28;   // Verstrahlung
@@ -173,6 +199,7 @@ export function render(){
     if(s){c.strokeStyle=u.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=1.5;c.beginPath();c.arc(u.x*TILE,u.y*TILE,R+3,0,7);c.stroke();}
     if(s||u.hp<u.maxHp) hpBar(c,u.x*TILE-R,u.y*TILE-R-7,R*2,u.hp/u.maxHp);
   }
+  drawRanges(c,G.sel.filter(e=>!e.dead).slice(0,12));   // Wirkkreise der Auswahl
   for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; const s=selSet.has(b);
     if(s){c.strokeStyle=b.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=2;c.strokeRect(b.tx*TILE-1,b.ty*TILE-1,b.w*TILE+2,b.h*TILE+2);}
     if(s||b.hp<b.maxHp) hpBar(c,b.tx*TILE+3,b.ty*TILE-6,b.w*TILE-6,b.hp/b.maxHp);

@@ -14,11 +14,12 @@ import { msg } from '../core/events';
    ===================================================================== */
 const GROUPS: [string,string[]][] = [
   ['Infanterie',['inf','at','volunteer','militia']],
-  ['Fahrzeuge',['ifv','mbt','mlrs','spaag','jammer']],
-  ['Drohnen',['drone','spy','reaper']],
+  ['Fahrzeuge',['ifv','mbt','mlrs','tel','spaag','jammer']],
+  ['Drohnen',['drone','swarm','spy','reaper']],
+  ['Luftwaffe',['jet']],
   ['Zivil & Spezial',['worker','pioneer','diplomat','truck','caravan']],
 ];
-const PICKABLE = new Set(['inf','at','volunteer','militia','ifv','mbt','mlrs','spaag','jammer','drone','spy','reaper']);
+const PICKABLE = new Set(['inf','at','volunteer','militia','ifv','mbt','mlrs','tel','spaag','jammer','drone','swarm','spy','reaper','jet']);
 export const fs: {kind: OrderKind, pick: Record<string,number>} = {kind:'hold', pick:{}};
 const KINDS: [OrderKind,string,string][] = [
   ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung'],

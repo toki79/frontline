@@ -31,7 +31,7 @@ export function orderAttack(units,t){
 export function orderStop(units){for(const u of units){u.mode='idle';u.escort=null;u.order=null;u.area=null;u.path=null;u.target=null;u.guard={x:u.x,y:u.y};if(u.def.harvester)u.hs=null;}}
 /** Drohnen: Lauerstellung (FPV) bzw. Aufklärungsflug (Spionage/Reaper) umschalten */
 export function orderLurk(units,on){ for(const u of units) if(u.def.weapon&&u.def.weapon.kamikaze){ u.lurk=on; if(on&&!u.post) u.post={x:u.x,y:u.y}; } }
-export function orderPatrol(units,on){ for(const u of units) if(u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)){ u.patrol=on; u.patrolArea=null; u.mode=on?'patrol':'idle'; u.target=null; u.path=null; u.guard={x:u.x,y:u.y}; } }
+export function orderPatrol(units,on){ for(const u of units) if(u.def.cls==='air'&&!u.def.sortie&&!(u.def.weapon&&u.def.weapon.kamikaze)){ u.patrol=on; u.patrolArea=null; u.mode=on?'patrol':'idle'; u.target=null; u.path=null; u.guard={x:u.x,y:u.y}; } }
 /** Gitterkäfig nachrüsten (Fahrzeuge nahe einem eigenen Fahrzeugwerk). Ergebnis: Anzahl, -1 = kein Werk in der Nähe, -2 = zu wenig Geld/Metall */
 export function upgradeCage(pid,units){
   const p=G.players[pid], cand=units.filter(u=>!u.dead&&u.owner===pid&&u.def.cls==='veh'&&!u.cage);

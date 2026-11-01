@@ -21,11 +21,11 @@ export const ui: any={tab:'bau',btns:{},cat:{}};
 export const CATS = {
   bau: [['alle','Alle'],['wohnen','🏠 Wohnen',['house','block']],['versorgung','🌾 Nahrung & ⚡ Strom',['farm','greenhouse','power','npp']],
         ['rohstoffe','⛏ Rohstoffe',['lumber','forester','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
-        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär',['barracks','factory','droneshop']],
+        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär',['barracks','factory','droneshop','airbase']],
         ['hightech','🎓 Wissen & Hightech',['university','datacenter','enrich','silo']]],
   truppen: [['alle','Alle'],['zivil','👷 Zivil',['worker','volunteer','diplomat','truck']],['inf','🪖 Infanterie',['inf','at']],
-        ['fahrz','🚜 Fahrzeuge',['ifv','mbt','mlrs','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','spy','reaper']]],
-  vert: [['alle','Alle'],['pio','👷 Pioniere & Sperren',['pioneer','wall','wire','trench','atmine']],['stell','🎯 Stellungen',['sentry','turret','flak','gbunker']]],
+        ['fahrz','🚜 Fahrzeuge',['ifv','mbt','mlrs','tel','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','swarm','spy','reaper']],['luft','✈ Luftwaffe',['jet']]],
+  vert: [['alle','Alle'],['pio','👷 Pioniere & Sperren',['pioneer','wall','wire','trench','atmine']],['stell','🎯 Stellungen',['sentry','turret','flak','sam','gbunker']]],
   forsch: [['alle','Alle'],['offen','Offen'],['fertig','✓ Erforscht']],
 };
 export function setTab(t){ui.tab=t;$$('.tabs [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));buildPanel();}
@@ -48,7 +48,7 @@ export function buildPanel(){
   const box=$('#items'); box.innerHTML=''; ui.btns={}; renderChips();
   let list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
             : ui.tab==='forsch' ? [...Object.keys(RESEARCH), 'nuke']
-            : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak','gbunker']
+            : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak','sam','gbunker']
             : ['worker','volunteer',...Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored&&k!=='worker'&&k!=='volunteer')];
   // Filter nach Kategorie, dann sortieren: verfügbar zuerst, gesperrt danach, Erforschtes ans Ende
   const cat=(CATS[ui.tab]||[]).find(c=>c[0]===(ui.cat[ui.tab]||'alle'));

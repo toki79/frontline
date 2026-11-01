@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { AIR, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
 import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
@@ -167,7 +167,7 @@ export function refreshCmds(){
   for(const k of ['hold','clear']){ const b=document.querySelector(`[data-c=${k}]`); b.classList.toggle('show',fight); b.classList.toggle('on',!!(G&&G.orderMode===k)); }
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
   document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
-  const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
+  const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!u.def.sortie&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
   document.querySelector('[data-c=cage]').classList.toggle('show',!!G&&myUnitsSel().some(u=>u.def.cls==='veh'&&!u.cage));
   const bl=document.querySelector('[data-c=lurk]'), bp=document.querySelector('[data-c=patrol]');
   bl.classList.toggle('show',fpv.length>0); bl.classList.toggle('on',fpv.length>0&&fpv.every(u=>u.lurk));
@@ -196,7 +196,9 @@ export function updateInfo(){
   if(s.length===1){const e=s[0], f=G.players[e.owner];
     let t=`${e.def.name} · Zustand ${Math.ceil(e.hp)}/${e.maxHp}`+(e.owner!==0?` · ${f.short} (${G.rel[0][e.owner]})`:'');
     if(e.kind==='unit'&&e.def.weapon&&e.def.weapon.kamikaze) t+=e.lurk?' · 🎯 Lauerstellung':' · hält still (🎯 für Lauerstellung)';
-    if(e.kind==='unit'&&e.def.cls==='air'&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
+    if(e.kind==='unit'&&e.def.sortie) t+=e.mode==='rtb'?' · ✈ fliegt zum Nachladen heim':e.mode==='rearm'?` · ✈ wird neu bewaffnet (${Math.ceil(e.rearmT)} s)`:' · bereit – Ziel antippen';
+    if(e.kind==='unit'&&e.def.swarm) t+=` · 🐝 ${Math.max(1,Math.ceil(e.hp/AIR.swarmHp))} Drohnen`;
+    if(e.kind==='unit'&&e.def.cls==='air'&&!e.def.sortie&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
     if(e.kind==='unit'&&e.def.armor==='airHigh'&&e.owner===0) t+=' · getarnt – nur Radar der Flugabwehr entdeckt sie';
     if(e.kind==='unit'&&e.cage) t+=' · ▦ Gitterkäfig';
     if(e.kind==='unit'&&e.jammed) t+=' · 📡 gestört!';

@@ -54,6 +54,11 @@ export function fire(s,t){
     fxAdd({k:'flash',x:mx,y:my,r:w.type==='bullet'?2.5:4,life:0.06});
     if(w.type==='autocannon') fxAdd({k:'boom',x:hp.x,y:hp.y,r:0.25,life:0.25});
     applyDamage(t,w.dmg,w.type,s);
+  } else if(w.type==='ballistic'||w.type==='glide'){   // schwere Lenkwaffen: Flächenschaden, abfangbar
+    const sp=w.type==='ballistic'?12:7, d0=Math.hypot(t.x-mx,t.y-my);
+    G.projectiles.push({x:mx,y:my,x0:mx,y0:my,t:null,lx:t.x,ly:t.y,type:w.type,dmg:w.dmg,src:s,speed:sp,splash:w.splash,heavy:true,d0,icp:[]});
+    fxAdd({k:'flash',x:mx,y:my,r:w.type==='ballistic'?12:4,life:0.25}); if(w.type==='ballistic') fxAdd({k:'smoke',x:mx,y:my,r:1.0,life:2.5});
+    if(t.owner===0&&w.type==='ballistic'&&G.t-(G.bmMsg||-99)>20){ G.bmMsg=G.t; msg('🚀 Ballistische Rakete im Anflug!','#ff8a7a'); }
   } else {
     G.projectiles.push({x:mx,y:my,t,ox:hp.x-t.x,oy:hp.y-t.y,lx:hp.x,ly:hp.y,type:w.type,dmg:w.dmg,src:s,speed:w.type==='shell'?17:9});
     fxAdd({k:'flash',x:mx,y:my,r:w.type==='shell'?7:4,life:0.1});

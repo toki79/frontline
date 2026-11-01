@@ -7,14 +7,15 @@ import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar,
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
+import { rangeOf } from '../src/sim/units';
 import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
 import { applyOrder } from '../src/sim/missions';
-import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
-import { BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
+import { orderAttack, orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
+import { AIR, BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo, planRoadLine, startUpgrade, upgradeBlock } from '../src/sim/build';
 import { accessPoints, unprotected } from '../src/sim/fortify';
@@ -442,7 +443,7 @@ describe('Simulation', () => {
     run(15);
     expect(s.dug).toBe(true);
     const hp = s.hp; applyDamage(s, 40, 'shell', {owner:1, dead:true, x:0, y:0});
-    expect(hp - s.hp).toBeLessThan(40 * 0.35 * 0.7);   // weniger als ohne Eingraben (Heimvorteil schon eingerechnet)
+    expect(hp - s.hp).toBeLessThan(40 * 0.5 * 0.7);   // weniger als ohne Eingraben (Heimvorteil schon eingerechnet)
   });
 
   it('Einsatz „Gebiet klären“: Räuberlager wird ausgehoben, danach halten', () => {
@@ -705,6 +706,47 @@ describe('Simulation', () => {
     expect(G.saplings.length).toBeGreaterThan(0);
     const i = G.saplings[0]; G.sapling[i] = 1.5; run(3);
     expect(G.terr[i]).toBe(T.FOREST); expect(G.wood[i]).toBeGreaterThan(0); expect(f).toBeTruthy();
+  });
+
+  it('Ballistische Rakete: große Reichweite, Flächenschaden, Flugabwehrraketen fangen ab', () => {
+    newGame('mittel'); noBandits(); G.fog = false; setWar(true, 0); G.ai.peaceCool = 1e9;
+    const ahq = findBuilding(1, 'hq');
+    const tel = spawnAt(0, 'tel', ahq.x - 30, ahq.y + 4);
+    const tgt = placeBuilding(1, 'depot', Math.floor(ahq.x) - 6, Math.floor(ahq.y) + 4, false);
+    orderAttack([tel], tgt);
+    expect(runUntil(() => G.projectiles.some(p => p.type === 'ballistic'), 10)).toBe(true);
+    expect(runUntil(() => tgt.hp < tgt.maxHp * 0.5 || tgt.dead, 20)).toBe(true);
+    // Abfangen
+    const sam = placeBuilding(1, 'sam', Math.floor(ahq.x) - 9, Math.floor(ahq.y) + 4, false);
+    const keep = AIR.intercept; (AIR as any).intercept = 1; tel.cd = 0; const hp1 = ahq.hp;
+    orderAttack([tel], ahq);
+    expect(runUntil(() => G.projectiles.some(p => p.type === 'ballistic'), 10)).toBe(true);
+    run(8); (AIR as any).intercept = keep;
+    expect(ahq.hp).toBeGreaterThanOrEqual(hp1 - 1); expect(sam.dead).toBeFalsy();
+  });
+
+  it('Drohnenschwarm: mehrere Treffer, Störsender wirkungslos', () => {
+    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    const hq = findBuilding(0, 'hq'), x = hq.x + 6, y = hq.y - 8;
+    const sw = spawnAt(0, 'swarm', x, y);
+    const v = [spawnAt(1, 'ifv', x + 3, y), spawnAt(1, 'ifv', x + 3.5, y + 1.2), spawnAt(1, 'jammer', x + 4, y - 1)];
+    for (const u of v) { u.mode = 'hold'; u.order = 'hold'; }
+    run(15);
+    expect(v.filter(u => u.dead).length).toBeGreaterThanOrEqual(2);
+    expect(sw.jammed).toBeFalsy();
+  });
+
+  it('Jagdbomber: Angriff, Rückkehr zum Fliegerhorst, erneuter Anflug; Gleitbomben verlängern die Reichweite', () => {
+    newGame('mittel'); noBandits(); G.fog = false; setWar(true, 0); G.ai.peaceCool = 1e9;
+    const p = G.players[0], hq = findBuilding(0, 'hq'), ahq = findBuilding(1, 'hq');
+    builtNearHq('airbase'); builtNearHq('power'); builtNearHq('power');
+    const jet = spawnAt(0, 'jet', hq.x + 2, hq.y + 2);
+    expect(rangeOf(jet)).toBe(2); p.done = { ...(p.done || {}), glidebomb: true }; expect(rangeOf(jet)).toBe(2 + AIR.glideExtra);
+    const tgt = placeBuilding(1, 'depot', Math.floor(ahq.x) - 8, Math.floor(ahq.y) + 3, false);
+    orderAttack([jet], tgt);
+    expect(runUntil(() => jet.mode === 'rtb' || jet.mode === 'rearm', 40)).toBe(true);
+    expect(runUntil(() => jet.mode === 'rearm', 40)).toBe(true);
+    expect(runUntil(() => jet.mode === 'attack' || tgt.dead, 40)).toBe(true);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

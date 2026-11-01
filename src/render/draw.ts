@@ -76,6 +76,23 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     for(const [rx,ry] of [[-5,-5],[5,-5],[-5,5],[5,5]]){ c.fillStyle='rgba(200,200,200,.45)'; c.beginPath(); c.arc(rx,ry,3.2,0,7); c.fill(); c.strokeStyle='#333'; c.lineWidth=0.8; c.stroke(); }
     c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; rr(c,-3,-2.5,6,5,1.2); c.fill(); c.stroke();
     c.fillStyle='#ffd040'; c.fillRect(2,-1,2,2);
+  } else if(type==='swarm'){   // Drohnenschwarm: kleine Drohnen, Anzahl nach Zustand
+    const t=G?G.t:0, n=Math.max(1,Math.ceil(hpf*8));
+    for(let i=0;i<n;i++){ const a=i*2.4+t*1.5, r=3+((i*7)%5), ox=Math.cos(a)*r, oy=Math.sin(a)*r*0.8-3+Math.sin(t*7+i)*0.8;
+      c.fillStyle='rgba(0,0,0,.2)'; c.beginPath(); c.arc(ox+3,oy+8,1.6,0,7); c.fill();
+      c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=0.8; c.beginPath(); c.arc(ox,oy,2,0,7); c.fill(); c.stroke();
+      c.strokeStyle='rgba(30,30,30,.7)'; c.beginPath(); c.moveTo(ox-2.6,oy-2.6); c.lineTo(ox+2.6,oy+2.6); c.moveTo(ox+2.6,oy-2.6); c.lineTo(ox-2.6,oy+2.6); c.stroke(); }
+  } else if(type==='jet'){   // Jagdbomber: Deltaflügel, Schatten versetzt
+    c.fillStyle='rgba(0,0,0,.22)'; c.save(); c.translate(7,10); c.rotate(ang); c.beginPath(); c.moveTo(11,0); c.lineTo(-8,-8); c.lineTo(-5,0); c.lineTo(-8,8); c.closePath(); c.fill(); c.restore();
+    c.rotate(ang); c.fillStyle='#8a9098'; c.strokeStyle='#3a3e44'; c.lineWidth=1; c.beginPath(); c.moveTo(12,0); c.lineTo(-8,-9); c.lineTo(-5,0); c.lineTo(-8,9); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle=col; c.fillRect(-6,-1.5,12,3); c.fillStyle='#bcd6e6'; c.fillRect(5,-1,3,2); c.fillStyle='#ffb040'; c.fillRect(-9,-1,2,2);
+  } else if(type==='tel'){   // Raketenträger: langer Lkw mit aufgerichteter Rakete
+    c.rotate(ang);
+    c.fillStyle='rgba(0,0,0,.3)'; rr(c,-12,-5,26,12,2); c.fill();
+    c.fillStyle='#2b2b26'; for(const wx of [-10,-5,0,6]){c.fillRect(wx,-7,3.5,2.2);c.fillRect(wx,4.8,3.5,2.2);}
+    c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; rr(c,-13,-5.5,26,11,2); c.fill(); c.stroke();
+    c.fillStyle='#bcd6e6'; c.fillRect(10,-3.5,1.5,7);
+    c.fillStyle='#d8d4c4'; c.strokeStyle='#55534a'; rr(c,-11,-2,18,4,2); c.fill(); c.stroke(); c.fillStyle='#c0392b'; c.fillRect(5,-2,2.5,4);
   } else if(type==='mlrs'){
     c.rotate(ang);
     c.fillStyle='rgba(0,0,0,.3)'; rr(c,-10,-5,23,12,2); c.fill();
@@ -261,6 +278,17 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
       for(let i=0;i<3;i++) for(let j=0;j<2;j++){ c.fillStyle='#4a7a34'; c.beginPath(); c.arc(W-22+i*8,H-18+j*9,3,0,7); c.fill(); }
       c.fillStyle='#8a6a3a'; c.fillRect(8,H-12,16,6); c.fillStyle=col; c.fillRect(W-12,4,8,5);
       break;
+    case 'airbase':   // Fliegerhorst: Startbahn, Hangars, Tower
+      c.fillStyle='#5f6058'; c.fillRect(4,H/2-7,W-8,14); c.strokeStyle='#e8e4d8'; c.setLineDash([8,6]); c.beginPath(); c.moveTo(8,H/2); c.lineTo(W-8,H/2); c.stroke(); c.setLineDash([]);
+      for(const hx of [8,40]){ c.fillStyle='#7a7e74'; c.beginPath(); c.arc(hx+12,14,12,Math.PI,0); c.fill(); c.fillRect(hx,14,24,4); }
+      box(W-24,6,14,18,'#b9b2a0','#6a6455'); c.fillStyle='#4a6a8a'; c.fillRect(W-22,8,10,5);
+      c.fillStyle=col; c.fillRect(W-24,H-12,12,6);
+      break;
+    case 'sam': {   // Flugabwehrraketen: Startgestell mit vier Röhren
+      c.fillStyle='#8a8f7a'; c.beginPath(); c.arc(W/2,H/2,13,0,7); c.fill(); c.strokeStyle='#4f5345'; c.stroke();
+      c.translate(W/2,H/2); c.rotate(tur); c.fillStyle='#4a4d42'; c.fillRect(-4,-7,14,14); c.fillStyle='#e8e4d8'; for(let i=0;i<2;i++)for(let j=0;j<2;j++) c.fillRect(-2+i*0,-6+j*7,12,2.5+0*i);
+      c.fillStyle=col; c.beginPath(); c.arc(-5,0,3.5,0,7); c.fill();
+      break; }
     case 'park':   // Park: Wege, Bäume, Brunnen
       c.strokeStyle='#c9b98a'; c.lineWidth=4; c.beginPath(); c.moveTo(2,H/2); c.lineTo(W-2,H/2); c.moveTo(W/2,2); c.lineTo(W/2,H-2); c.stroke(); c.lineWidth=1;
       for(const [tx2,ty2] of [[12,12],[W-12,12],[12,H-12],[W-12,H-12],[20,H/2-12],[W-20,H/2+12]]){ c.fillStyle='#2f5a24'; c.beginPath(); c.arc(tx2,ty2,6,0,7); c.fill(); c.fillStyle='#4a7a34'; c.beginPath(); c.arc(tx2-1.5,ty2-1.5,3.5,0,7); c.fill(); }

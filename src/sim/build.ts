@@ -367,6 +367,7 @@ export function updateUpgrades(dt){
 /** Wirkung einer Ausbaustufe in Worten */
 export function upgradeEffect(type,U){
   if(U.cap) return `${U.cap} Wohnraum`; if(U.food) return `Ertrag ×${String(U.food).replace('.',',')}`;
-  const d=BUILDINGS[type], m=String(U.mul).replace('.',','), what=d.cap?'Wohnraum':d.power>0?'Strom':d.fun?'Unterhaltung':d.type==='depot'||type==='depot'?'Lagerplatz':d.export?'Export':d.food?'Nahrung':(d.wood||d.stone||d.metal||d.oilOut||d.refine)?'Förderung':['hq','barracks','factory','droneshop','university','kontor'].includes(type)?'Ausbildung/Forschung':'Leistung';
+  const d=BUILDINGS[type], m=String(U.mul).replace('.',','); if(d.fireR) return `Löschbereich +${Math.round((lvlOf({lvl:2})-1)*25)} % und schneller`;
+  const what=d.cap?'Wohnraum':d.power>0?'Strom':d.fun?'Unterhaltung':d.type==='depot'||type==='depot'?'Lagerplatz':d.export?'Export':d.food?'Nahrung':(d.wood||d.stone||d.metal||d.oilOut||d.refine)?'Förderung':['hq','barracks','factory','droneshop','university','kontor'].includes(type)?'Ausbildung/Forschung':'Leistung';
   return `${what} ×${m}`;
 }

@@ -45,7 +45,7 @@ export function cancelItem(pid,type){
 }
 export function updateProduction(pid,dt){
   const p=G.players[pid], f=(p.use>p.power?0.5:1)*(p.broke?ECON.brokeFactor:1)*(hasTech(p,'ai')?1+RESEARCH_SPEED.ai:1);
-  for(const qn of ['hq','kontor','barracks','factory','droneshop','silo','research']){
+  for(const qn of ['hq','kontor','barracks','factory','droneshop','airbase','silo','research']){
     const q=p.q[qn]; if(!q||!q.length) continue;
     const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;
     const it=q[0];

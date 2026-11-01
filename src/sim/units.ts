@@ -1,5 +1,5 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
+import { AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
@@ -23,23 +23,27 @@ export function updateUnit(u,dt){
     if(u.scanT<=0){ u.scanT=0.35+Math.random()*0.2;
       // FPV greifen nur in Lauerstellung selbstständig an; Aufklärer auf Patrouille lassen sich nicht ablenken
       // bewaffnete Hochflieger (Reaper) jagen auch auf Patrouille
-      if(u.mode!=='move'&&u.mode!=='attack'&&(u.mode!=='patrol'||d.armor==='airHigh')&&u.mode!=='recharge'&&!(d.weapon.kamikaze&&!u.lurk)){
-        if(!u.target||distTo(u,u.target)>d.weapon.range){const t=findTarget(u,Math.max(d.sight,d.weapon.range)); if(t) u.target=t;}
+      if(d.swarm&&u.lurk===undefined) u.lurk=true;   // Schwärme suchen sich selbst Ziele
+      if(u.mode!=='move'&&u.mode!=='attack'&&(u.mode!=='patrol'||d.armor==='airHigh')&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'&&!(d.weapon.kamikaze&&!u.lurk)){
+        if(!u.target||distTo(u,u.target)>rangeOf(u)){const t=findTarget(u,Math.max(d.sight,rangeOf(u))); if(t) u.target=t;}
       }
     }
     if(u.target&&d.weapon.minRange&&distTo(u,u.target)<d.weapon.minRange) u.target=null;   // zu nah für Raketen
     if(u.target&&d.weapon.kamikaze&&distTo(u,u.target)<=d.weapon.range+0.15){             // Drohne schlägt ein
       const t=u.target; applyDamage(t,d.weapon.dmg,'drone',u); splash(u.x,u.y,d.weapon.splash,d.weapon.dmg*0.4,'drone',u);
-      fxAdd({k:'boom',x:u.x,y:u.y,r:0.6,life:0.5}); u.dead=true; if(u.owner===0) G.stats.lost++; G.sel=G.sel.filter(s=>s!==u); return;
+      fxAdd({k:'boom',x:u.x,y:u.y,r:0.6,life:0.5});
+      if(d.swarm){ u.hp-=AIR.swarmHp; u.target=null; u.path=null; if(u.hp>0) return; }   // Schwarm: eine Drohne weniger
+      u.dead=true; if(u.owner===0) G.stats.lost++; G.sel=G.sel.filter(s=>s!==u); return;
     }
     if(u.target){
       const t=u.target, dd=distTo(u,t), aim=Math.atan2(t.y-u.y,t.x-u.x);
       u.tur=rotTo(u.tur,aim,(d.cls==='inf'||d.cls==='air'?12:4)*dt);
       if(d.weapon.kamikaze){ if(!u.path||u.repathT<=0){u.repathT=0.3;setPath(u,t.x,t.y);} u.repathT-=dt; }
-      else if(dd<=d.weapon.range){
+      else if(dd<=rangeOf(u)){
         firing=true; u.path=null;
         if(d.cls==='inf') u.angle=u.tur;
-        if(Math.abs(angDiff(u.tur,aim))<0.2&&u.cd<=0){ fire(u,t); if(d.upkeep&&G.players[u.owner].fuelShort) u.cd*=2; }
+        if(Math.abs(angDiff(u.tur,aim))<0.2&&u.cd<=0){ fire(u,t); if(d.upkeep&&G.players[u.owner].fuelShort) u.cd*=2;
+          if(d.sortie) returnToBase(u,t); }   // Flugzeug: Bombe ab, zurück zum Fliegerhorst
       } else {
         const lim=chaseLimit(u);
         if(lim===0||(u.mode==='idle'&&dist(u.x,u.y,u.guard.x,u.guard.y)>(lim??LEASH))){u.target=null;}   // Stellung halten: nicht nachlaufen
@@ -48,7 +52,7 @@ export function updateUnit(u,dt){
     }
   }
   if(d.weapon&&d.weapon.kamikaze){   // Störsender in der Nähe: Verbindung weg, Drohne taumelt und stürzt ab
-    u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=!hasTech(G.players[u.owner],'ai')&&G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }   // mit KI fliegen sie autonom
+    u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=!d.swarm&&!hasTech(G.players[u.owner],'ai')&&G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }   // mit KI fliegen sie autonom
     if(u.jammed){ u.target=null; if(Math.random()<dt*3){ u.path=[{x:u.x+(Math.random()-.5)*2,y:u.y+(Math.random()-.5)*2}]; u.pathI=0; }
       if(Math.random()<dt*JAM.crashPerSec){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.3,life:0.35}); u.dead=true; if(u.owner===0){ G.stats.lost++; msg('📡 Eine FPV-Drohne ist im Störfeld abgestürzt.','#ffb38a'); } G.sel=G.sel.filter(s=>s!==u); return; } }
   }
@@ -60,11 +64,12 @@ export function updateUnit(u,dt){
   if(d.diplomat) updateDiplomat(u);
   if(u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15&&d.cls!=='air'&&(u.healChk=(u.healChk||0)-dt)<=0){ u.healChk=1; u.home=homeTurf(u); }
   if(u.home&&u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.015*dt);   // Versorgung zu Hause
+  if(d.sortie) updateSortie(u,dt);
   if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt (Schweben braucht wenig)
     const home=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9);
     if(home) u.battery=Math.min(d.battery,(u.battery??d.battery)+dt*4); else u.battery=(u.battery??d.battery)-dt*(u.path&&u.path.length?1:DRONE.hoverDrain);
     if(d.weapon&&d.weapon.kamikaze&&u.mode!=='recharge'&&(u.sigT=(u.sigT||0)-dt)<=0){ u.sigT=0.5;   // Funkreichweite der FPV-Drohnen
-      const R=fpvRange(u.owner); let near=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===u.owner){ const dd=distTo(u,b); if(dd<near) near=dd; }
+      const R=fpvRange(u.owner)+(d.swarm?AIR.swarmRangeExtra:0); let near=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===u.owner){ const dd=distTo(u,b); if(dd<near) near=dd; }
       if(near<=R) u.lastSig={x:u.x,y:u.y};
       else if(u.lastSig){ u.target=null; u.mode='move'; u.goal={...u.lastSig}; u.post={...u.lastSig}; setPath(u,u.lastSig.x,u.lastSig.y);
         if(u.owner===0&&G.t-(G.sigMsg||-99)>20){ G.sigMsg=G.t; msg(`📡 FPV-Drohne am Rand der Funkreichweite (${R} Felder vom eigenen Gebiet) – sie kehrt um. Grenzbunker erweitern die Reichweite.`,'#ffb38a'); } } }
@@ -102,6 +107,21 @@ export function updateUnit(u,dt){
     }
   }
 }
+/** Flugzeug nach dem Abwurf: zurück zum nächsten Fliegerhorst, dort nachladen, dann dasselbe Ziel erneut anfliegen */
+function returnToBase(u,t){
+  u.strike=t; u.target=null; u.mode='rtb';
+  let best=null,bd=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&!b.contam&&b.owner===u.owner&&b.type==='airbase'){ const d=dist(u.x,u.y,b.x,b.y); if(d<bd){bd=d;best=b;} }
+  u.base=best; if(best) setPath(u,best.x,best.y); else { u.mode='idle'; u.guard={x:u.x,y:u.y}; }
+}
+export function updateSortie(u,dt){
+  if(u.mode==='rtb'){ const b=u.base; if(!b||b.dead){ returnToBase(u,u.strike); return; }
+    if(dist(u.x,u.y,b.x,b.y)<2.5){ u.path=null; u.mode='rearm'; u.rearmT=AIR.rearm; u.cd=AIR.rearm; } else if(!u.path) setPath(u,b.x,b.y); }
+  else if(u.mode==='rearm'){ u.rearmT-=dt; u.cd=Math.max(u.cd,u.rearmT); if(u.hp<u.maxHp) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.04*dt);
+    if(u.rearmT<=0){ const t=u.strike; u.strike=null; u.cd=0;
+      if(t&&!t.dead&&hostile(u.owner,t.owner)){ u.target=t; u.mode='attack'; } else { u.mode='idle'; u.guard={x:u.x,y:u.y}; } } }
+}
+/** Waffenreichweite einer Einheit (Gleitbomben verlängern die Abwurfweite der Flugzeuge) */
+export const rangeOf = u => { const w=u.def.weapon; if(!w) return 0; return w.range+(w.glide&&hasTech(G.players[u.owner],'glidebomb')?AIR.glideExtra:0); };
 /** Funkreichweite der FPV-Drohnen einer Partei (mit KI: autonom, weiter) */
 export const fpvRange = pid => DRONE.fpvRange+(hasTech(G.players[pid],'ai')?DRONE.fpvRangeAI:0);
 /** Drohnen: zum Laden heimfliegen, danach Posten bzw. Aufklärungsflug fortsetzen; Patrouille über die ganze Karte */
@@ -184,6 +204,19 @@ export function updateProjectiles(dt){
   for(const p of G.projectiles){
     if(p.delay>0){p.delay-=dt;continue;}
     if(p.t&&!p.t.dead){p.lx=p.t.x+p.ox;p.ly=p.t.y+p.oy;}
+    if(p.heavy){   // ballistische Rakete / Gleitbombe: Flächenschaden; Flugabwehrraketen können sie abfangen
+      if(p.type==='ballistic'&&Math.random()<0.8) fxAdd({k:'smoke',x:p.x,y:p.y,r:0.25,life:1.2});
+      for(const b of G.buildings){ if(b.dead||b.site||b.contam||b.type!=='sam'||!hostile(b.owner,p.src.owner)||p.icp.includes(b.id)) continue;
+        if(dist(b.x,b.y,p.x,p.y)>AIR.interceptR) continue; p.icp.push(b.id);
+        fxAdd({k:'tracer',x1:b.x,y1:b.y,x2:p.x,y2:p.y,life:0.25,col:'#9fd0ff'});
+        if(Math.random()<AIR.intercept){ p.done=true; fxAdd({k:'boom',x:p.x,y:p.y,r:0.6,life:0.6});
+          if(b.owner===0) msg(`🛡 Abgefangen: ${p.type==='ballistic'?'ballistische Rakete':'Gleitbombe'} über der Stadt zerstört.`,'#9fd88a'); break; } }
+      if(p.done) continue;
+      const dx=p.lx-p.x,dy=p.ly-p.y,L=Math.hypot(dx,dy),s=p.speed*dt;
+      if(L<=s){ p.done=true; fxAdd({k:'boom',x:p.lx,y:p.ly,r:p.splash*0.8,life:0.9}); fxAdd({k:'flash',x:p.lx,y:p.ly,r:30,life:0.2}); G.scorch.push({x:p.lx,y:p.ly,r:p.splash*0.6,t:G.t});
+        splash(p.lx,p.ly,p.splash,p.dmg,p.type,p.src); }
+      else { p.x+=dx/L*s; p.y+=dy/L*s; p.a=Math.atan2(dy,dx); p.k=1-Math.max(0,L-s)/Math.max(1,p.d0); }
+      continue; }
     if(p.type==='rocket'){ if(Math.random()<0.7) fxAdd({k:'smoke',x:p.x,y:p.y,r:0.14,life:0.6});
       const dx=p.lx-p.x,dy=p.ly-p.y,L=Math.hypot(dx,dy),s=p.speed*dt;
       if(L<=s){p.done=true; fxAdd({k:'boom',x:p.lx,y:p.ly,r:0.55,life:0.55}); G.scorch.push({x:p.lx,y:p.ly,r:0.35,t:G.t}); splash(p.lx,p.ly,p.splash,p.dmg,'rocket',p.src);}

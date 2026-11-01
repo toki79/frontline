@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { T, FIRE, FUN, TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { T, FIRE, FUN, TRIBUTE, AI_MIX2, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -24,7 +24,7 @@ export function aiThink(){
   const pid=1, p=G.players[pid], P=G.players[0], ai=G.ai, D=G.diff;
   const myB=G.buildings.filter(b=>!b.dead&&b.owner===pid); if(!myB.length) return;
   const myU=G.units.filter(u=>!u.dead&&u.owner===pid);
-  const army=myU.filter(u=>u.def.weapon&&!u.patrol&&u.mode!=='recharge'), trucks=myU.filter(u=>u.def.harvester);
+  const army=myU.filter(u=>u.def.weapon&&!u.patrol&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'), trucks=myU.filter(u=>u.def.harvester);
   const myStr=armyStr(pid)+defStr(pid)*0.3, theirStr=armyStr(0)+defStr(0)*0.6, ratio=myStr/Math.max(250,theirStr);
   const mineOk=G.buildings.some(b=>!b.dead&&b.owner===pid&&b.type==='mine'&&!b.empty);
   // --- Lage einschätzen ---
@@ -91,6 +91,8 @@ export function aiThink(){
   let want=3+campsNear*2+Math.floor(theirStr/450)+(G.war?3:0)+(lead?4:0)+(urgent?4:0)+(need&&ratio<1.3?3:0)+Math.min(6,Math.floor(p.res.money/1500));
   const armyPop=army.reduce((s,u)=>s+(u.def.cost.pop||0),0);
   if(armyPop>p.pop*0.3+10) want=Math.min(want,army.length);
+  if(army.length<want&&G.t>40&&p.res.money>2500&&Math.random()<0.35){   // Spätzeit-Waffen: Raketenträger, Schwärme, Jagdbomber
+    for(const t of AI_MIX2) if(available(pid,t)&&canAfford(pid,t)&&p.res.money>UNITS[t].cost.money+1200&&!p.q[UNITS[t].prod].length){ enqueue(pid,t); break; } }
   if(army.length<want&&G.t>40){
     for(let tries=0;tries<AI_MIX.length;tries++){
       const t=AI_MIX[ai.mix%AI_MIX.length];
@@ -184,9 +186,10 @@ export function aiDefense(pid){
   const cnt=t=>countBuildings(pid,t);
   const enemyDrones=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.cls==='air').length;
   const threat=G.war||ai.lead;
-  const want={flak:(enemyDrones>=2?2:0)+(enemyDrones>=5?1:0), sentry:2+(threat?2:0), turret:(G.t>300?1:0)+(threat?2:0)};
+  const heavyAir=G.units.filter(u=>!u.dead&&u.owner===0&&(u.def.sortie||u.def.swarm||u.type==='tel')).length;
+  const want={sam:heavyAir?Math.min(3,1+Math.floor(heavyAir/2)):0, flak:(enemyDrones>=2?2:0)+(enemyDrones>=5?1:0), sentry:2+(threat?2:0), turret:(G.t>300?1:0)+(threat?2:0)};
   const dx=MAP_W/2-hq.x, dy=MAP_H/2-hq.y, L=Math.hypot(dx,dy)||1, fx=dx/L, fy=dy/L;
-  for(const t of ['flak','sentry','turret']){
+  for(const t of ['sam','flak','sentry','turret']){
     if(cnt(t)>=want[t]||!available(pid,t)||!canAfford(pid,t)||p.res.money<BUILDINGS[t].cost.money+250) continue;
     let best=null,bs=1e9;
     for(let k=0;k<40;k++){ const r=4+Math.random()*4, ang=Math.atan2(fy,fx)+(Math.random()-0.5)*1.8;
@@ -270,6 +273,7 @@ function aiPickHighTech(p,has,rich){
   const spare=p.power-p.use;
   if(hasTech(p,'computing')&&!has('datacenter')&&p.pop>320&&rich('datacenter')) return spare>160?'datacenter':hasTech(p,'physics')&&rich('npp')?'npp':'power';
   if(hasTech(p,'physics')&&!has('npp')&&spare<250&&rich('npp')) return 'npp';
+  if(hasTech(p,'aviation')&&!has('airbase')&&rich('airbase')) return spare>45?'airbase':'power';
   if(hasTech(p,'deepdrill')&&has('derrick')<2&&p.res.oil<300&&rich('derrick')) return spare>50?'derrick':'power';
   if(hasTech(p,'bomb')&&!has('enrich')&&rich('enrich')) return spare>=420?'enrich':hasTech(p,'physics')&&rich('npp')?'npp':'power';
   if(has('enrich')&&!has('silo')&&rich('silo')) return 'silo';

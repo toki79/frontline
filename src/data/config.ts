@@ -95,7 +95,7 @@ export const ECON = {
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
-           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4, derrick:0.8, forester:0.1, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
+           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, sam:0.4, airbase:2.5, gbunker:0.4, derrick:0.8, forester:0.1, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   // Stadtverwaltung: Anteil der Steuern, wächst mit der Stadtgröße, bleibt aber unter adminMax
   // (500 EW ≈ 20 %, 1000 ≈ 30 %, 3000 ≈ 45 %, 10 000 ≈ 55 %) – Wachstum lohnt sich immer, nur weniger
@@ -107,7 +107,7 @@ export const ECON = {
   ranks: <[number,string][]>[[0,'Dorf'],[100,'Kleinstadt'],[250,'Stadt'],[500,'Großstadt'],[1000,'Metropole'],[2000,'Weltstadt']],
 };
 export const RES = {money:{icon:'$',name:'Geld'}, food:{icon:'🌾',name:'Nahrung'}, wood:{icon:'🪵',name:'Holz'}, stone:{icon:'🪨',name:'Stein'}, metal:{icon:'⛏',name:'Metall'}, oil:{icon:'🛢',name:'Öl'}, pop:{icon:'👥',name:'Einwohner'},
-  vehcap:{icon:'🛠',name:`Fahrzeuglimit (${VEH_PER_FACTORY} je Fahrzeugwerk)`}, dronecap:{icon:'🛠',name:`Drohnenlimit (${DRONES_PER_SHOP} je Werkstatt)`}};
+  vehcap:{icon:'🛠',name:`Fahrzeuglimit (${VEH_PER_FACTORY} je Fahrzeugwerk)`}, dronecap:{icon:'🛠',name:`Drohnenlimit (${DRONES_PER_SHOP} je Werkstatt)`}, jetcap:{icon:'🛠',name:'Flugzeuglimit (4 je Fliegerhorst)'}};
 // ---------- Gelände ----------
 export const TERRAIN = [
   {key:'grass',  name:'Steppe',    col:['#6f7e45','#73834a','#6a7942'], cost:{inf:1,  veh:1},   cover:0,    build:true},
@@ -124,15 +124,18 @@ export const isPlain = t => t===T.GRASS || t===T.MEADOW;
 // ---------- Schaden: Waffentyp gegen Panzerung ----------
 // air = tieffliegende Drohnen, airHigh = hochfliegende (nur Flugabwehr, schwach Maschinenkanone); 0 heißt: kann dieses Ziel gar nicht bekämpfen
 export const DAMAGE = {
-  bullet:     {none:1.0,  light:0.3, heavy:0.08, building:0.15, fort:0.06, air:0.45, airHigh:0},
+  bullet:     {none:1.0,  light:0.18, heavy:0.03, building:0.15, fort:0.06, air:0.45, airHigh:0},   // Gewehre kratzen Panzer kaum
   autocannon: {none:0.9,  light:0.8, heavy:0.25, building:0.4,  fort:0.25, air:1.0, airHigh:0.12},
   hellfire:   {none:1.6,  light:1.0, heavy:0.45, building:0.35, fort:0.2,  air:0, airHigh:0},     // Reaper: Präzisionsraketen von oben – tödlich für Schützen
-  shell:      {none:0.35, light:1.0, heavy:1.0,  building:0.9,  fort:0.55, air:0, airHigh:0},
+  shell:      {none:0.5,  light:1.0, heavy:1.0,  building:0.9,  fort:0.55, air:0, airHigh:0},
   missile:    {none:0.15, light:1.0, heavy:0.9,  building:0.6,  fort:0.35, air:0, airHigh:0},
   rocket:     {none:0.6,  light:0.7, heavy:0.35, building:1.0,  fort:0.6,  air:0, airHigh:0},
   drone:      {none:0.7,  light:5.0, heavy:10,   building:0.5,  fort:0.35, air:0, airHigh:0},   // Kamikaze von oben: ein Treffer zerstört Panzer und Raketenwerfer (Käfig schützt)
   flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:0.8},
   mine:       {none:0.3,  light:1.3, heavy:1.0,  building:0,    fort:0,    air:0,   airHigh:0},
+  ballistic:  {none:0.8,  light:1.0, heavy:0.8,  building:1.3,  fort:0.9,  air:0,   airHigh:0},     // ballistische Rakete: Flächenschaden, stark gegen Gebäude
+  glide:      {none:0.8,  light:1.0, heavy:0.9,  building:1.3,  fort:0.9,  air:0,   airHigh:0},     // Gleit-/Freifallbombe
+  sam:        {none:0,    light:0,   heavy:0,    building:0,    fort:0,    air:2.5, airHigh:1.2},   // Flugabwehrrakete
 };
 export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.airOnly) return air; return (DAMAGE[w.type][t.armor]||0)>0; };
 // ---------- Geländeausbau (Graben, Stacheldraht) ----------
@@ -167,8 +170,8 @@ export const UNITS = {
           weapon:{type:'autocannon', dmg:15, range:5, rof:0.5}, prod:'factory', req:[], desc:'Schnell, gut gegen Infanterie'},
   mbt:   {name:'Kampfpanzer', cls:'veh', cost:{money:450, metal:120, oil:70, pop:4}, time:20, hp:650, upkeep:0.1, combat:true, armor:'heavy', speed:1.55, sight:7, size:0.72,
           weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge'},
-  spaag: {name:'Flakpanzer', cls:'veh', tech:1, cost:{money:400, metal:70, oil:30, pop:3}, time:12, hp:300, upkeep:0.06, combat:true, armor:'light', speed:2.0, sight:8, size:0.62, radar:6,
-          weapon:{type:'flak', dmg:20, range:6.5, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
+  spaag: {name:'Flakpanzer', cls:'veh', tech:1, cost:{money:400, metal:70, oil:30, pop:3}, time:12, hp:300, upkeep:0.06, combat:true, armor:'light', speed:2.0, sight:8, size:0.62, radar:8.5,
+          weapon:{type:'flak', dmg:20, range:8, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
   jammer:{name:'Störsender', cls:'veh', tech:1, cost:{money:350, metal:40, oil:20, pop:2}, time:10, hp:220, upkeep:0.04, armor:'light', speed:1.9, sight:7, size:0.6, jam:true,
           prod:'factory', req:[], desc:'Elektronische Kampfführung: feindliche FPV-Drohnen in der Nähe verlieren die Verbindung und stürzen ab'},
   nuke:  {name:'Atomrakete', cls:'stored', cost:{money:15000, metal:1500, oil:800}, time:600, prod:'silo', req:['enrich'], stored:true, hp:1, armor:'none', speed:0, sight:0, size:0,
@@ -186,7 +189,13 @@ export const UNITS = {
   spy:   {name:'Spionagedrohne', cls:'air', tech:1, cost:{money:220, metal:20, pop:1}, time:6, hp:60, armor:'airHigh', speed:3.4, sight:13, size:0.35, battery:420,
           prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, unbewaffnet, sieht sehr weit – auf Aufklärungsflug (🛰) erkundet sie selbstständig die Karte'},
   reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:420, armor:'airHigh', speed:2.6, sight:12, size:0.6, battery:480,
-          weapon:{type:'hellfire', dmg:70, range:7.5, rof:3.5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, gepanzert, Präzisionsraketen gegen Schützen – auf Aufklärungsflug (🛰) jagt sie selbstständig feindliche Infanterie'},
+          weapon:{type:'hellfire', dmg:70, range:7, rof:3.5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, gepanzert, Präzisionsraketen gegen Schützen – auf Aufklärungsflug (🛰) jagt sie selbstständig feindliche Infanterie'},
+  tel:   {name:'Raketen\u00ADträger', cls:'veh', cost:{money:1600, metal:220, oil:120, pop:3}, time:20, hp:280, armor:'light', speed:1.4, sight:5, size:0.75, combat:true, upkeep:0.2, research:'rocketry',
+          weapon:{type:'ballistic', dmg:650, range:40, minRange:8, rof:50, splash:2.2}, prod:'factory', req:[], desc:'Ballistische Kurzstreckenrakete: 40 Felder weit, verheerend gegen Gebäude – nur auf aufgeklärte Ziele, lange Nachladezeit'},
+  swarm: {name:'Drohnen\u00ADschwarm', cls:'air', cost:{money:1000, metal:100, pop:2}, time:12, hp:176, armor:'air', speed:3.0, sight:7, size:0.6, battery:150, swarm:8, research:'swarm',
+          weapon:{type:'drone', dmg:80, range:0.45, rof:0.6, kamikaze:true, splash:0.6}, prod:'droneshop', req:[], desc:'Acht autonome Kamikazedrohnen: suchen sich selbst Ziele, Störsender wirken nicht – Flugabwehr und MGs dünnen sie aus'},
+  jet:   {name:'Jagd\u00ADbomber', cls:'air', cost:{money:1800, metal:200, oil:150, pop:2}, time:22, hp:320, armor:'air', speed:6.5, sight:8, size:0.8, upkeep:0.3, sortie:true, research:'aviation',
+          weapon:{type:'glide', dmg:650, range:2, rof:2, splash:1.9, glide:true}, prod:'airbase', req:[], desc:'Fliegt vom Fliegerhorst zum Ziel, wirft eine Bombe und kehrt zum Nachladen zurück – mit Gleitbomben aus großer Entfernung'},
   volunteer:{name:'Bürgerwehr', cls:'inf', cost:{pop:4}, time:3, hp:75, armor:'none', speed:1.2, sight:5, size:0.38, emergency:true,
           weapon:{type:'bullet', dmg:7, range:3.8, rof:1.0}, prod:'hq', req:[], desc:'Kostenlose Freiwillige – nur wenn die Stadt angegriffen wird oder Krieg herrscht; löst sich danach wieder auf'},
   militia:{name:'Milizionäre', cls:'inf', cost:{money:150}, time:0, hp:75, armor:'none', speed:1.3, sight:6, size:0.4,
@@ -219,6 +228,7 @@ export const BUILDINGS = {
   depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
   mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
+  airbase: {name:'Flieger\u00ADhorst',  w:4,h:3, hp:1600, power:-40, cost:{money:3000, stone:300, metal:300}, time:30, req:['factory'], research:'aviation', noise:0.5, sight:6, desc:'Startbahn und Hangars: baut Jagdbomber, die hier nach jedem Einsatz neu bewaffnet werden'},
   derrick: {name:'Bohrturm',      w:2,h:2, hp:600,  power:-40, cost:{money:1500, stone:100, metal:150}, time:20, req:[], research:'deepdrill', oilOut:1.2, noise:0.3, sight:4, desc:'Fördert 1,2 Öl/s aus der Tiefe – überall baubar, braucht Strom'},
   refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
   barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:200, wood:40, stone:20}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
@@ -233,6 +243,8 @@ export const BUILDINGS = {
             weapon:{type:'bullet', dmg:10, range:4.5, rof:0.35}},
   turret:  {name:'MK-Stellung',   w:1,h:1, hp:750,  power:-15, cost:{money:300, metal:30, stone:20}, time:8, req:['barracks'], def:true, noise:0.1, sight:7, desc:'Maschinenkanone gegen Fahrzeuge, Infanterie und Drohnen',
             weapon:{type:'autocannon', dmg:17, range:6, rof:0.55}},
+  sam:     {name:'Flugabwehr\u00ADraketen', w:1,h:1, hp:600, power:-20, cost:{money:900, metal:120, stone:40}, time:10, req:['barracks'], research:'airdef', def:true, noise:0.1, sight:10, radar:10, desc:'Holt Flugzeuge und Drohnen vom Himmel und fängt ballistische Raketen und Gleitbomben mit Chance ab',
+            weapon:{type:'sam', dmg:120, range:10, rof:2.5, airOnly:true}},
   flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:250, metal:25, stone:20}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, radar:9, desc:'Holt Drohnen vom Himmel; ihr Radar entdeckt getarnte Hochflieger im Umkreis von 9 Feldern',
             weapon:{type:'flak', dmg:24, range:8, rof:0.4, airOnly:true}},
   gbunker: {name:'Grenz\u00ADbunker',  w:2,h:2, hp:3200, power:0, cost:{money:1200, stone:300, metal:120}, time:20, req:['barracks'], def:true, border:true, fireproof:true, sight:8, desc:'Betonbunker an der Grenze – hält enorm viel aus, sichert das Vorfeld',
@@ -276,6 +288,8 @@ export const TRADE = {
   loot: 0.7,            // Anteil der Ladung, den ein Angreifer bei einer zerstörten Karawane erbeutet
 };
 // ---------- Drohnen ----------
+// Luftwaffe: Gleitbomben vergrößern die Abwurfweite; nach jedem Einsatz zum Fliegerhorst zurück
+export const AIR = {glideExtra:12, rearm:25, perBase:4, swarmSize:8, swarmHp:22, swarmRangeExtra:8, interceptR:9, intercept:0.55};
 export const DRONE = {
   hoverDrain: 0.3,      // Akkuverbrauch beim Schweben (Anteil vom Flug)
   returnAt: 0.25,       // unter diesem Akkustand fliegen Drohnen selbstständig zum Laden heim
@@ -304,6 +318,7 @@ export const DIFFICULTY = {
   mittel: {incomeMul:1.0,  grace:200, think:1.0, aggr:1.0},
   schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35},
 };
+export const AI_MIX2 = ['tel','swarm','jet'];   // Spätzeit-Waffen der KI, sobald erforscht
 export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','spaag','drone','ifv','at','jammer','mlrs','reaper','drone','mbt'];
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
 // Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt. Der fünfte ist normal.
@@ -333,13 +348,18 @@ export const RESEARCH = {
   ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos, +10 Felder Reichweite), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
   biofuel:{name:'Biokraftstoff', icon:'🌽', cost:{money:1500, metal:80}, time:180, need:['fert'], desc:'Raffinerien machen aus überschüssiger Nahrung Öl, wenn kein Rohöl da ist (2 🌾 → 1 🛢)'},
   deepdrill:{name:'Tiefbohrung', icon:'🛢', cost:{money:2500, metal:200}, time:240, need:['res3'], desc:'Bohrturm: fördert Öl aus tiefen Lagerstätten – auch wenn die Ölfelder erschöpft sind'},
+  airdef: {name:'Luftverteidigung', icon:'🛡', cost:{money:1800, metal:150}, time:180, need:['res2'], desc:'Flugabwehrraketen-Stellung: holt Flugzeuge und Drohnen vom Himmel, fängt Raketen und Gleitbomben mit Chance ab'},
+  rocketry:{name:'Raketentechnik', icon:'🚀', cost:{money:3000, metal:250, oil:100}, time:240, need:['res3'], desc:'Raketenträger mit ballistischen Kurzstreckenraketen (40 Felder weit)'},
+  aviation:{name:'Luftfahrt', icon:'✈', cost:{money:3500, metal:300, oil:150}, time:300, need:['res3'], needB:['factory'], desc:'Fliegerhorst und Jagdbomber (Freifallbomben – müssen das Ziel überfliegen)'},
+  glidebomb:{name:'Gleitbomben', icon:'🎯', cost:{money:2500, metal:200}, time:200, need:['aviation','computing'], desc:'Jagdbomber werfen aus 14 Feldern Entfernung – außerhalb der meisten Flugabwehr'},
+  swarm:  {name:'Drohnenschwärme', icon:'🐝', cost:{money:3000, metal:200}, time:240, need:['computing'], desc:'Drohnenschwarm: acht autonome Kamikazedrohnen in einer Einheit'},
   bomb:   {name:'Atomwaffenprogramm', icon:'☢', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
 };
 // Biokraftstoff: Nahrung → Öl in der Raffinerie (nur über der Reserve)
 export const BIOFUEL = {ratio:2, rate:1.5, reserve:300};
 export const RESEARCH_SPEED = {datacenter:0.5, maxDatacenters:2, ai:0.15};
 // KI Kastrova: Reihenfolge der Forschung und Mindest-Einwohnerzahl je Schritt
-export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['res3',240],['biofuel',280],['deepdrill',300],['computing',320],['physics',340],['glass',360],['ai',420],['bomb',480]];
+export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['airdef',230],['res3',240],['biofuel',280],['deepdrill',300],['computing',320],['rocketry',340],['aviation',360],['swarm',380],['glidebomb',400],['physics',340],['glass',360],['ai',420],['bomb',480]];
 // KI und Atomwaffen: Abschreckung dämpft die Angriffslust, Einsatz nur in der Not
 export const AI_NUKE = {stock:1, reserve:1500, deterAggr:0.15, blackmail:0.5, ratio:0.6, cool:300};
 // ---------- Atomwaffe ----------
