@@ -1,12 +1,13 @@
 import { fmt } from '../core/util';
-import { REGION, RES, TRADE } from '../data/config';
+import { REGION, RES, TRADE, TRIBUTE } from '../data/config';
+import { demandTribute, evalTribute, landOffer, waiveTribute } from '../sim/tribute';
 import { rr } from '../render/draw';
 import { TRADES, aiQuotes, marketOpen, marketTrend, trade, tradeAI, tradeTerms } from '../sim/market';
 import { G } from '../sim/state';
 import { findBuilding, setWar, spawnUnit, updateRel } from '../sim/world';
 import { cancelContract, evalContract, hasEmbassy, proposeContract } from '../sim/trade';
 import { $ } from '../ui/dom';
-import { costHtml } from '../ui/format';
+import { costHtml, f1 } from '../ui/format';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -57,6 +58,7 @@ export function renderDiplo(){
           else h+=btn(`ai_sell_${q.res}`,`Kaufen: ${q.amt} ${ic} für $${q.price}`,p.res.money>=q.price); }
         h+='</div><div class="barl"><span>Preise richten sich nach Kastrovas Vorrat und Engpass. 🔥 = dringend gesucht. Handel verbessert die Beziehung.</span></div>'; } }
     h+=contractHtml();
+    h+=tributeHtml();
     h+='<h4>Beziehung</h4><div class="row">';
     if(G.war){ h+=btn('peace1','Frieden anbieten',true)+btn('peace1t','Frieden + $400',p.res.money>=400); }
     else { h+=btn('gift1','Geschenk ($200)',p.res.money>=200)+btn('food1','Nahrung schenken (🌾100)',p.res.food>=100)+btn('war1','Krieg erklären',true,'#5a221c'); }
@@ -85,6 +87,24 @@ export function renderDiplo(){
     }
     h+='</div></div>'; }
   $('#diploBody').innerHTML=h;
+}
+// ---------- Tribut fordern ----------
+export const tg={kind:'money', lvl:1, rec:false};
+const tribAmt=()=>tg.kind==='land'?0:(tg.kind==='money'?TRIBUTE.money:TRIBUTE.res)[tg.lvl];
+const unit=k=>k==='money'?'$':RES[k].icon;
+function tributeHtml(){
+  let h='<h4>👑 Tribut fordern</h4>';
+  if(G.tribute) h+=`<div class="barl"><span>Kastrova zahlt jede Minute ${G.tribute.amt} ${unit(G.tribute.res)} (bisher ${fmt(G.tribute.paid)})</span>${btn('tw','Verzichten',true,'#4a2a22')}</div>`;
+  const sel=(k,v,cur,lab)=>btn(`tg_${k}_${v}`,lab,true,String(cur)===String(v)?'#4a6a2a':undefined);
+  h+='<div class="row">'+[['money','💰 Geld'],...['food','wood','stone','metal','oil'].map(r=>[r,RES[r].icon]),['land','🏳 Land']].map(([k,l])=>sel('kind',k,tg.kind,l)).join('')+'</div>';
+  if(tg.kind==='land'){ const L=landOffer(); h+=`<div class="barl"><span>${L.length?`Kastrova soll abtreten: ${L.map(b=>b.def.name.replace(/\u00AD/g,'')).join(', ')} (Gebäude nahe eurer Grenze, samt Bewohnern)`:'Kastrova hat kein Gebiet, das es abtreten könnte.'}</span></div>`; }
+  else { const A=(tg.kind==='money'?TRIBUTE.money:TRIBUTE.res);
+    h+='<div class="row">'+A.map((a,i)=>sel('lvl',i,tg.lvl,`${a} ${unit(tg.kind)}`)).join('')+sel('rec','0',tg.rec?'1':'0','einmalig')+sel('rec','1',tg.rec?'1':'0','jede Minute')+'</div>'; }
+  const e=evalTribute(tg.kind,tribAmt(),tg.kind!=='land'&&tg.rec), wait=Math.ceil((G.tribCool||0)-G.t);
+  h+=`<div class="barl"><span>${e.ok?'✓ Kastrova würde wohl nachgeben':'✗ Kastrova würde ablehnen: '+e.reasons.join(', ')} · Furcht ${f1(e.fear)} / Schmerz ${f1(Math.min(e.pain,9))}</span></div>`;
+  h+=`<div class="row">${btn('tg_go',wait>0?`Nächste Forderung in ${wait} s`:'👑 Tribut fordern',wait<=0&&!(G.tribute&&tg.rec&&tg.kind!=='land'))}</div>`;
+  h+='<div class="barl"><span>Furcht entsteht durch eure militärische Übermacht, eine Atomrakete, einen für Kastrova verlorenen Krieg oder ein Bündnis mit der Miliz. Wer nachgibt, ist gekränkt (Haltung sinkt) und sinnt eine Weile auf Rache. Eine abgelehnte Forderung verärgert – ohne Macht dahinter kann sie Krieg auslösen. Im Krieg ist ein angenommener Tribut zugleich der Friedensschluss.</span></div>';
+  return h;
 }
 // ---------- Handelsverträge ----------
 export const cg={give:'food',ga:100,get:'metal',ra:50};
@@ -116,6 +136,12 @@ export function diploAction(a){
     if(k==='propose'){ const res=proposeContract(0,1,{res:cg.give,amt:cg.ga},{res:cg.get,amt:cg.ra}) as any;
       r=res.ok?`Marschall Varek: „Abgemacht. Jede Minute ${cg.ga} ${RES[cg.give].icon} gegen ${cg.ra} ${RES[cg.get].icon}.“`:`Marschall Varek: „Nein.“ (${res.reasons.join(', ')})`; }
     else { if(k==='give'||k==='get') cg[k]=v; else cg[k]=Number(v); }
+    $('#reply').textContent=r; renderDiplo(); return; }
+  if(a==='tw'){ waiveTribute(); $('#reply').textContent='Marschall Varek: „Kastrova nimmt Euren Verzicht zur Kenntnis.“'; renderDiplo(); return; }
+  if(a.startsWith('tg_')){ const [,k,v]=a.split('_');
+    if(k==='go'){ const wasWar=G.war, res=demandTribute(tg.kind,tribAmt(),tg.kind!=='land'&&tg.rec);
+      r={ok:wasWar?'Marschall Varek: „… Kastrova beugt sich. Die Waffen ruhen.“':'Marschall Varek: „… Kastrova beugt sich. Diesmal.“',nein:'Marschall Varek: „Nein. Kastrova zahlt keinen Tribut an Aldoria.“',krieg:'Marschall Varek: „Ihr wagt es, uns zu drohen? Dann sprechen die Waffen!“',wartet:'Wartet ab, bevor Ihr erneut fordert.'}[res]; }
+    else if(k==='kind') tg.kind=v; else if(k==='lvl') tg.lvl=Number(v); else if(k==='rec') tg.rec=v==='1';
     $('#reply').textContent=r; renderDiplo(); return; }
   if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); $('#reply').textContent='Vertrag gekündigt.'; renderDiplo(); return; }
   if(a.startsWith('t_')){ const k=a.slice(2); r=trade(0,k)?'Händler der Miliz: „Gutes Geschäft.“':'Händler der Miliz: „Dafür reicht es nicht.“'; $('#reply').textContent=r; renderDiplo(); return; }

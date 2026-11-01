@@ -3,6 +3,7 @@ import { militiaThink } from '../ai/militia';
 import { banditThink } from '../ai/bandits';
 import { updateTrade } from '../sim/trade';
 import { updateNukes } from '../sim/nuke';
+import { updateTribute } from '../sim/tribute';
 import { updateUpgrades } from '../sim/build';
 import { updateEconomy } from '../sim/economy';
 import { MARKET_RECOVER } from '../sim/market';
@@ -19,7 +20,7 @@ export function update(dt){
   G.t+=dt;
   for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(p.id<2) updateEconomy(p.id,dt); if(G.over) return;}
   G.ai.thinkT-=dt; if(G.ai.thinkT<=0){G.ai.thinkT=G.diff.think; aiThink();}
-  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade();}
+  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute();}
   if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}
   for(const k in G.market) G.market[k]=Math.max(0,G.market[k]-MARKET_RECOVER*dt);

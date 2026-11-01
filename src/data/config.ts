@@ -290,6 +290,9 @@ export const REGION = {
 export const BASEVAL = {food:2.2, wood:1.6, stone:1.8, metal:4.5, oil:1.6};
 // Handelskontor: verkauft nur, was über der Reserve liegt; Exportpreis je Einheit
 export const EXPORT = {order:['oil','metal','stone','wood','food'], reserve:{oil:300, metal:250, stone:300, wood:300, food:400}, price:{oil:1.1, metal:2.8, stone:1.0, wood:0.8, food:1.4}};
+// Tribut, den Aldoria von Kastrova fordert: Furcht (Stärke, Atomwaffe, verlorener Krieg) gegen Schmerz (Wert, Land, Dauer)
+export const TRIBUTE = {money:[300,800,2000], res:[100,250,500], every:60, cool:120, landR:5, landMax:4,
+  accept:0.2, superiority:1.0, nuke:1.5, losingWar:0.6, ally:0.3, pain:4, land:1.0, landEach:0.15, recurring:0.5, grudge:20, angry:15, revenge:600};
 export const LOT = {food:100, wood:100, stone:80, metal:50, oil:100};
 // Forschungsbaum: Universität Stufe 1 = gebaut; alles Weitere wird in der Universität erforscht.
 // need = vorher erforscht, needB = Gebäude muss stehen, power = forscht nur ohne Stromengpass

@@ -7,6 +7,7 @@ import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar,
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
+import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
@@ -608,6 +609,30 @@ describe('Simulation', () => {
     for (const pop of [500, 1000, 3200, 10000]) { p.pop = pop; update(0.05);
       expect(p.rate.admin).toBeLessThan(p.rate.money * 0.61);
       expect(p.rate.money - p.rate.admin).toBeGreaterThan(pop * 0.015); }
+  });
+
+  it('Tribut: Kastrova gibt nur aus Furcht nach – Geld, Dauerzahlung, Land', () => {
+    newGame('mittel'); noBandits(); makeContact(0, 1); makeContact(1, 0); G.ai.peaceCool = 1e9;
+    const A = G.players[1], P = G.players[0], hq = findBuilding(0, 'hq');
+    A.res.money = 3000; aiThink();
+    expect(evalTribute('money', 800, false).ok).toBe(false);              // ohne Übermacht keine Furcht
+    for (let i = 0; i < 14; i++) spawnAt(0, 'mbt', hq.x + 3 + (i % 4), hq.y - 4 - Math.floor(i / 4));
+    for (const u of G.units) if (u.owner === 1 && u.def.weapon) u.dead = true;
+    aiThink();
+    expect(evalTribute('money', 300, false).ok).toBe(true);
+    const m0 = P.res.money;
+    expect(demandTribute('money', 300, false)).toBe('ok');
+    expect(P.res.money).toBe(m0 + 300);
+    expect(demandTribute('money', 300, false)).toBe('wartet');            // Abkühlzeit
+    G.tribCool = 0; A.res.food = 2000; A.pop = 600; update(0.05);         // Dauerzahlung bemisst sich am Einkommen
+    expect(demandTribute('food', 100, true)).toBe('ok');
+    const f0 = P.res.food; run(62);
+    expect(G.tribute && G.tribute.paid).toBeGreaterThan(0);
+    P.nukes = 1; G.tribCool = 0; aiThink();
+    const L = landOffer(); expect(L.length).toBeGreaterThan(0);
+    expect(demandTribute('land', 0, false)).toBe('ok');
+    expect(L.every(b => b.owner === 0)).toBe(true);
+    expect(f0).toBeGreaterThan(0);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

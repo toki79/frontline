@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -134,7 +134,7 @@ export function aiThink(){
   // --- Absicht ---
   if(!G.war){
     ai.mode='frieden';
-    let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(1)&&!deterrent(0)?AI_NUKE.blackmail:0))*D.aggr - Math.max(0,G.aiAtt)/60 - (G.t-(ai.tradedT||-999)<90?0.4:0);
+    let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(1)&&!deterrent(0)?AI_NUKE.blackmail:0)+(G.t-(ai.humT??-1e9)<TRIBUTE.revenge?0.4:0))*D.aggr - Math.max(0,G.aiAtt)/60 - (G.t-(ai.tradedT||-999)<90?0.4:0);
     const deterred=deterrent(0);   // Aldorias Atomrakete: keine Forderungen, kein Krieg
     if(deterred){ aggr*=AI_NUKE.deterAggr; if(!ai.deterMsg&&met){ ai.deterMsg=true; msg('☢ Geheimdienst: Kastrova fürchtet eure Atomrakete. Forderungen und Kriegsdrohungen bleiben aus.','#9fd88a'); } } else ai.deterMsg=false;
     if(met && G.t>D.grace && aggr>=1 && G.t>ai.cool && !G.offer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
