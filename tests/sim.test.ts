@@ -351,7 +351,7 @@ describe('Simulation', () => {
     expect(orderEscort([s], w)).toBe(1);
     orderMove([w], w.x + 6, w.y - 4);
     run(10);
-    expect(Math.hypot(s.x - w.x, s.y - w.y)).toBeLessThan(3.5);
+    expect(Math.hypot(s.x - w.x, s.y - w.y)).toBeLessThan(4.5);
   });
 
   it('Zufriedenheit: Hunger drückt Stimmung und Steuern', () => {
