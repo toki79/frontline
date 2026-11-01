@@ -79,7 +79,9 @@ export const ECON = {
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
            university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
-  adminPerHead2: 0.000015, // Stadtverwaltung: wächst mit dem Quadrat der Einwohner (1000 EW ≈ 15 $/s, 2000 EW ≈ 60 $/s)
+  // Stadtverwaltung: Anteil der Steuern, wächst mit der Stadtgröße, bleibt aber unter adminMax
+  // (500 EW ≈ 20 %, 1000 ≈ 30 %, 3000 ≈ 45 %, 10 000 ≈ 55 %) – Wachstum lohnt sich immer, nur weniger
+  adminMax: 0.6, adminHalf: 1000, adminIT: 0.8,   // adminIT: Faktor mit erforschter Informatik (digitale Verwaltung)
   brokeFactor: 0.7,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil (Höfe arbeiten weiter)
   growBase: 0.2,        // Grundwachstum (Einwohner/s)
   growRate: 0.002,      // zusätzliches Wachstum je Einwohner

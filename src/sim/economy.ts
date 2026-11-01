@@ -54,7 +54,7 @@ export function updateEconomy(pid,dt){
     for(const u of vols){ u.dead=true; p.pop+=u.def.cost.pop; soldiers-=u.def.cost.pop; } G.sel=G.sel.filter(s=>!s.dead);
     if(pid===0) msg(`🏠 Die Lage ist ruhig – ${vols.length} Trupp${vols.length===1?'':'s'} Bürgerwehr ${vols.length===1?'geht':'gehen'} wieder nach Hause.`,'#9fd88a'); } } else p.calmT=0;
   // Unterhalt: Gebäude und Sold – ohne Geld arbeiten Betriebe nur noch halb
-  const wages=paid*ECON.wagePerPop, admin=p.pop*p.pop*ECON.adminPerHead2, cost=upkeep+wages+admin;
+  const wages=paid*ECON.wagePerPop, cost=upkeep+wages;
   p.res.money-=cost*dt;
   const wasBroke=p.broke; p.broke=p.res.money<=0; if(p.res.money<0) p.res.money=0;
   if(pid===0&&p.broke&&!wasBroke&&G.t-(p.brokeMsg||-99)>40){ p.brokeMsg=G.t; msg(`⚠ Die Kasse ist leer! Unterhalt und Sold fehlen – Betriebe und Ausbildung laufen langsamer (Höfe arbeiten weiter).${emergency(pid)?' Verteidigung: Bürgerwehr kostet kein Geld.':''}`,'#ff8a7a'); }
@@ -84,12 +84,13 @@ export function updateEconomy(pid,dt){
   if(p.happy===undefined) p.happy=MOOD.start;
   p.happy+=(p.moodTarget-p.happy)*Math.min(1,MOOD.speed*dt);
   const taxF=Math.min(1.1,MOOD.taxBase+MOOD.taxPer*p.happy);
-  p.res.money+=p.pop*ECON.taxPerHead*taxF*dt*mul;
+  const tax=p.pop*ECON.taxPerHead*taxF*mul, adminShare=ECON.adminMax*p.pop/(p.pop+ECON.adminHalf)*(hasTech(p,'computing')?ECON.adminIT:1), admin=tax*adminShare;
+  p.res.money+=(tax-admin)*dt;
   // Handelskontore: verkaufen Überschüsse über der Reserve
   let cap=0, exp=0, expBy={}; for(const b of G.buildings) if(b.owner===pid&&b.def.export&&works(b)) cap+=b.def.export*(powOk?1:0.5);
   if(cap>0) for(const r of EXPORT.order){ const over=p.res[r]-EXPORT.reserve[r]; if(over<=0) continue; const a=Math.min(over,cap*dt); if(a<=0) continue;
     p.res[r]-=a; const m=a*EXPORT.price[r]*mul; p.res.money+=m; exp+=m; expBy[r]=(expBy[r]||0)+a/dt; cap-=a/dt; if(cap<=0) break; }
-  p.rate={money:p.pop*ECON.taxPerHead*taxF*mul, taxF, export:exp/dt, expBy, food:p.foodRate, foodProd, eat, metal:metalProd, oil:oilProd, wood:woodProd, stone:stoneProd, mines, minesEmpty, linked, noAccess, upkeep, wages, admin};
+  p.rate={money:tax, taxF, adminShare, export:exp/dt, expBy, food:p.foodRate, foodProd, eat, metal:metalProd, oil:oilProd, wood:woodProd, stone:stoneProd, mines, minesEmpty, linked, noAccess, upkeep, wages, admin};
   // Lager: was keinen Platz hat, verdirbt bzw. geht verloren
   p.full=p.full||{};
   for(const r of STORAGE.res){ const over=p.res[r]-p.store; p.full[r]=over>=-1;

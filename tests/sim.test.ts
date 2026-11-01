@@ -602,6 +602,14 @@ describe('Simulation', () => {
     expect(p.res.money).toBe(1000);
   });
 
+  it('Stadtverwaltung frisst nie die ganzen Steuern (auch bei 3000+ Einwohnern)', () => {
+    newGame('mittel');
+    const p = G.players[0];
+    for (const pop of [500, 1000, 3200, 10000]) { p.pop = pop; update(0.05);
+      expect(p.rate.admin).toBeLessThan(p.rate.money * 0.61);
+      expect(p.rate.money - p.rate.admin).toBeGreaterThan(pop * 0.015); }
+  });
+
   it('Simulation meldet über Ereignisse statt DOM', () => {
     const msgs: string[] = []; on('msg', (t: string) => msgs.push(t));
     newGame('mittel');

@@ -118,7 +118,7 @@ for(const r of STORAGE.res){ const f=HUD_TIPS[r]; if(!f) continue;
     return f()+`<br>${full?'<span style="color:#ffb060">':'<span class="dim">'}Lager: ${fmt(p.res[r])} / ${fmt(p.store)}${full?' – voll, Überschuss geht verloren! Lagerhaus bauen oder per Handelskontor verkaufen.':''}</span>`; }; }
 { const f=HUD_TIPS.money; HUD_TIPS.money=()=>{ const p=G.players[0], r: any=p.rate||{};
   const tot=(r.upkeep||0)+(r.wages||0)+(r.admin||0);
-  return f()+`<br><b>Ausgaben −${f1(tot)} $/s:</b> Unterhalt der Gebäude ${f1(r.upkeep||0)} · Sold ${f1(r.wages||0)} · Stadtverwaltung ${f1(r.admin||0)} (wächst mit der Stadtgröße).`+(p.broke?'<br><span style="color:#ff9a8a">Kasse leer: Betriebe und Ausbildung laufen nur halb so schnell!</span>':''); }; }
+  return f()+`<br><b>Ausgaben −${f1(tot)} $/s:</b> Unterhalt der Gebäude ${f1(r.upkeep||0)} · Sold ${f1(r.wages||0)} · Stadtverwaltung ${f1(r.admin||0)} (${Math.round((r.adminShare||0)*100)} % der Steuern – steigt mit der Stadtgröße, höchstens ${Math.round(ECON.adminMax*100)} %; Informatik senkt sie).<br><b>Saldo: ${(r.money||0)+(r.export||0)-tot>=0?'+':''}${f1((r.money||0)+(r.export||0)-tot)} $/s</b>`+(p.broke?'<br><span style="color:#ff9a8a">Kasse leer: Betriebe und Ausbildung laufen langsamer!</span>':''); }; }
 export const tipEl=$('#tip'); let tipTimer=null, tipAnchor=null;
 export function showTip(html,anchor,ms?){
   tipEl.innerHTML=html; tipEl.style.display='block'; tipAnchor=anchor;
