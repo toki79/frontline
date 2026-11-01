@@ -62,6 +62,11 @@ export function updateUnit(u,dt){
   if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt (Schweben braucht wenig)
     const home=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9);
     if(home) u.battery=Math.min(d.battery,(u.battery??d.battery)+dt*4); else u.battery=(u.battery??d.battery)-dt*(u.path&&u.path.length?1:DRONE.hoverDrain);
+    if(d.weapon&&d.weapon.kamikaze&&u.mode!=='recharge'&&(u.sigT=(u.sigT||0)-dt)<=0){ u.sigT=0.5;   // Funkreichweite der FPV-Drohnen
+      const R=fpvRange(u.owner); let near=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===u.owner){ const dd=distTo(u,b); if(dd<near) near=dd; }
+      if(near<=R) u.lastSig={x:u.x,y:u.y};
+      else if(u.lastSig){ u.target=null; u.mode='move'; u.goal={...u.lastSig}; u.post={...u.lastSig}; setPath(u,u.lastSig.x,u.lastSig.y);
+        if(u.owner===0&&G.t-(G.sigMsg||-99)>20){ G.sigMsg=G.t; msg(`📡 FPV-Drohne am Rand der Funkreichweite (${R} Felder vom eigenen Gebiet) – sie kehrt um. Grenzbunker erweitern die Reichweite.`,'#ffb38a'); } } }
     updateDroneDuty(u,home);
     if(u.battery<=0){ fxAdd({k:'boom',x:u.x,y:u.y,r:0.25,life:0.3}); u.dead=true; if(u.owner===0){G.stats.lost++; msg('Eine Drohne ist mit leerem Akku abgestürzt.','#ffb38a');} G.sel=G.sel.filter(s=>s!==u); return; }
   }
@@ -96,6 +101,8 @@ export function updateUnit(u,dt){
     }
   }
 }
+/** Funkreichweite der FPV-Drohnen einer Partei (mit KI: autonom, weiter) */
+export const fpvRange = pid => DRONE.fpvRange+(hasTech(G.players[pid],'ai')?DRONE.fpvRangeAI:0);
 /** Drohnen: zum Laden heimfliegen, danach Posten bzw. Aufklärungsflug fortsetzen; Patrouille über die ganze Karte */
 function updateDroneDuty(u,home){
   const d=u.def;

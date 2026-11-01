@@ -102,7 +102,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
   }
   c.restore();
 }
-export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
+export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
   const W=w*TILE,H=h*TILE, tt=G?G.t:0;
   c.save(); c.translate(px,py);
   c.fillStyle='rgba(0,0,0,.32)'; c.fillRect(4,4,W,H);
@@ -124,11 +124,18 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       roof(4,4,26,20); roof(W-28,H-24,24,20);
       c.fillStyle='#5e7a3e'; c.beginPath(); c.arc(W-14,14,6,0,7); c.fill(); c.beginPath(); c.arc(12,H-12,5,0,7); c.fill();
       c.fillStyle='#e8d890'; c.fillRect(9,26,4,3); c.fillRect(W-22,H-3,4,2);
+      if(lvl>=2){ box(W/2-9,H/2-11,18,22,'#b9b2a0','#6a6455'); roof(W/2-10,H/2-14,20,9);   // aufgestocktes Stadthaus
+        c.fillStyle='#4a5a6a'; c.fillRect(W/2-6,H/2-3,4,4); c.fillRect(W/2+2,H/2-3,4,4); c.fillRect(W/2-6,H/2+4,4,4); c.fillRect(W/2+2,H/2+4,4,4); }
+      if(lvl>=3){ box(3,H/2-6,12,H/2+2,'#b0a996','#6a6455'); box(W-15,3,12,H/2+2,'#b0a996','#6a6455');   // Mehrfamilienhaus: Anbauten
+        c.fillStyle='#4a5a6a'; for(const [wx,wy] of [[6,H/2-2],[6,H/2+5],[W-12,7],[W-12,14]]) c.fillRect(wx,wy,4,3); }
       break;
     case 'farm':
       for(let i=0;i<7;i++){ c.fillStyle=i%2?'#a69b4c':'#8f8a3c'; c.fillRect(4+i*((W-40)/7),4,(W-40)/7-1,H-8); }
       roof(W-32,6,26,22); box(W-32,H-22,26,16,'#9a8a70','#5e5440');
       c.fillStyle='#d8c06a'; c.beginPath(); c.arc(W-19,H-14,5,0,7); c.fill();
+      if(lvl>=2){ for(const sx of lvl>=3?[W-44,W-54]:[W-44]){ c.fillStyle='#c9c6bb'; c.beginPath(); c.arc(sx,12,6,0,7); c.fill(); c.strokeStyle='#6d6a60'; c.stroke();   // Silos
+        c.fillStyle='#9a978c'; c.beginPath(); c.arc(sx,12,2.5,0,7); c.fill(); } }
+      if(lvl>=3){ box(W-56,H-20,24,14,'#9fc8b8','#5f8a7a'); c.fillStyle='#4f8a3a'; for(let yy=H-17;yy<H-8;yy+=4) c.fillRect(W-53,yy,18,2); }   // Treibhaus
       break;
     case 'mine':
       box(3,3,W-6,H-6,'#7a776e','#4c4b45');
@@ -264,6 +271,13 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?){
       c.translate(W/2,H/2); c.rotate(tur); c.fillStyle='#232320'; c.fillRect(1,-3.5,13,2); c.fillRect(1,1.5,13,2);
       c.fillStyle=col; c.strokeStyle=dark; rr(c,-5,-5,9,10,2); c.fill(); c.stroke();
       break;
+    case 'gbunker': {   // Grenzbunker: dicker Betonblock mit Schießscharten und Tarnnetz
+      c.fillStyle='#5f5e57'; c.fillRect(2,2,W-4,H-4); box(5,5,W-10,H-10,'#8a887e','#4a4943');
+      c.fillStyle='#6a7048'; for(let i=0;i<6;i++){ c.beginPath(); c.arc(8+i*(W-16)/5,8+(i%2)*4,4,0,7); c.fill(); }   // Tarnnetz
+      c.fillStyle='#1d1d1a'; c.fillRect(W/2-10,H-9,20,3); c.fillRect(4,H/2-6,3,12); c.fillRect(W-7,H/2-6,3,12); c.fillRect(W/2-10,6,20,3);   // Schießscharten
+      c.fillStyle=col; c.fillRect(W-14,H-14,8,6); c.strokeStyle=dark; c.strokeRect(W-13.5,H-13.5,7,5);
+      c.translate(W/2,H/2); c.rotate(tur); c.fillStyle='#2a2a26'; c.fillRect(2,-2,15,4); c.fillStyle=col; c.strokeStyle=dark; c.beginPath(); c.arc(0,0,7,0,7); c.fill(); c.stroke();
+      break; }
     case 'turret':
     case 'bunker':
       if(type==='turret'){ c.fillStyle='#a3926b'; c.beginPath(); c.arc(W/2,H/2,13,0,7); c.fill(); c.fillStyle='#7a6d4f'; c.beginPath(); c.arc(W/2,H/2,9,0,7); c.fill(); }

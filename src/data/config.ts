@@ -8,6 +8,9 @@
    ===================================================================== */
 export const TILE = 32, MAP_W = 96, MAP_H = 96, BUILD_RADIUS = 5, LEASH = 6;
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
+// Stadtschutz: wichtige Gebäude, Zugänge, Grenzbunker
+export const FORT = {critical:['hq','power','npp','factory','university','refinery','datacenter','enrich','silo','droneshop','kontor'], guardR:6, accessRing:9, recalc:30,
+  borderR:30, enemyGap:8};   // Grenzbunker: bis 30 Felder von der Stadt, mind. 8 Felder Abstand zu fremden Gebäuden
 export const VEH_PER_FACTORY = 4;     // Kampffahrzeuge je Fahrzeugwerk
 export const DRONES_PER_SHOP = 6;     // Drohnen je Drohnenwerkstatt
 export const NOISE_R = 4;
@@ -70,7 +73,7 @@ export const ECON = {
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
-           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25},
+           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   adminPerHead2: 0.000015, // Stadtverwaltung: wächst mit dem Quadrat der Einwohner (1000 EW ≈ 15 $/s, 2000 EW ≈ 60 $/s)
   brokeFactor: 0.5,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil
@@ -102,7 +105,7 @@ export const DAMAGE = {
   shell:      {none:0.35, light:1.0, heavy:1.0,  building:0.9,  fort:0.55, air:0, airHigh:0},
   missile:    {none:0.15, light:1.0, heavy:0.9,  building:0.6,  fort:0.35, air:0, airHigh:0},
   rocket:     {none:0.6,  light:0.7, heavy:0.35, building:1.0,  fort:0.6,  air:0, airHigh:0},
-  drone:      {none:0.7,  light:2.0, heavy:2.4,  building:0.5,  fort:0.35, air:0, airHigh:0},   // Kamikaze von oben: billig, aber tödlich für Fahrzeuge
+  drone:      {none:0.7,  light:5.0, heavy:10,   building:0.5,  fort:0.35, air:0, airHigh:0},   // Kamikaze von oben: ein Treffer zerstört Panzer und Raketenwerfer (Käfig schützt)
   flak:       {none:0.3,  light:0.2, heavy:0.05, building:0.05, fort:0.03, air:2.0, airHigh:1.6},
   mine:       {none:0.3,  light:1.3, heavy:1.0,  building:0,    fort:0,    air:0,   airHigh:0},
 };
@@ -120,7 +123,7 @@ export const PIONEER = {
 };
 // Straße: wird geplant (gezogen) und von Bauarbeitern gebaut
 export const FEATURES = {
-  road:   {id:0, name:'Straße', cost:{stone:2}, desc:'Zufahrt: Gebäude arbeiten nur mit Anschluss ans Straßennetz. Einheiten sind auf Straßen fast doppelt so schnell.', line:true, road:true},
+  road:   {id:0, name:'Straße', cost:{stone:2}, desc:'Startpunkt antippen, dann Endpunkt – der Weg wird automatisch geplant. Einheiten sind auf Straßen fast doppelt so schnell, Waren kommen schneller an.', road:true},
   wire:   {id:1, name:'Stacheldraht',  cost:{money:15}, work:2.5, desc:'Bremst Infanterie stark, Fahrzeuge walzen ihn platt', line:true},
   trench: {id:2, name:'Schützengraben',cost:{money:30}, work:6, desc:'Infanterie darin: 60 % Deckung · bremst Fahrzeuge stark', line:true},
   atmine: {id:3, name:'Panzermine',    cost:{money:40, metal:5}, work:3, desc:'Für Feinde unsichtbar; zerstört bzw. beschädigt schwer jedes feindliche Fahrzeug, das darüber fährt', line:true},
@@ -168,7 +171,8 @@ export const UNITS = {
 // ---------- Gebäude ----------
 // cap = Wohnraum, food/metal = Produktion pro Sekunde, needsOre = muss an Erz grenzen
 export const BUILDINGS = {
-  hq:      {name:'Rathaus',       w:3,h:3, hp:1800, power:30,  cost:{}, time:0, buildable:false, cap:40, food:0.5, sight:8, desc:'Bildet Bauarbeiter aus, 40 Wohnraum'},
+  hq:      {name:'Rathaus',       w:3,h:3, hp:1800, power:30,  cost:{}, time:0, buildable:false, cap:40, food:0.5, sight:8, desc:'Bildet Bauarbeiter aus, 40 Wohnraum, Rathauswache mit MG',
+            weapon:{type:'bullet', dmg:9, range:5.5, rof:0.6}},
   house:   {name:'Wohnhaus',      w:2,h:2, hp:450,  power:-10, cost:{money:150, wood:40}, time:5, req:[], cap:50, sight:3, desc:'+50 Wohnraum'},
   farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
   lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
@@ -197,6 +201,8 @@ export const BUILDINGS = {
             weapon:{type:'autocannon', dmg:17, range:6, rof:0.55}},
   flak:    {name:'Flugabwehr',    w:1,h:1, hp:450,  power:-15, cost:{money:250, metal:25, stone:20}, time:7, req:['barracks'], def:true, noise:0.1, sight:9, radar:9, desc:'Holt Drohnen vom Himmel; ihr Radar entdeckt getarnte Hochflieger im Umkreis von 9 Feldern',
             weapon:{type:'flak', dmg:24, range:8, rof:0.4, airOnly:true}},
+  gbunker: {name:'Grenz\u00ADbunker',  w:2,h:2, hp:3200, power:0, cost:{money:1200, stone:300, metal:120}, time:20, req:['barracks'], def:true, border:true, fireproof:true, sight:8, desc:'Betonbunker an der Grenze – hält enorm viel aus, sichert das Vorfeld',
+            weapon:{type:'autocannon', dmg:16, range:6.5, rof:0.5}},
   bunker:  {name:'Milizbunker',   w:2,h:2, hp:1400, power:0,   cost:{}, time:0, buildable:false, sight:7,
             weapon:{type:'bullet', dmg:13, range:5.5, rof:0.5}},
   camp:    {name:'Räuberlager',   w:2,h:2, hp:900,  power:0,   cost:{}, time:0, buildable:false, sight:6, desc:'Unterschlupf einer Räuberbande – zerstören bringt Beute'},
@@ -239,6 +245,8 @@ export const TRADE = {
 export const DRONE = {
   hoverDrain: 0.3,      // Akkuverbrauch beim Schweben (Anteil vom Flug)
   returnAt: 0.25,       // unter diesem Akkustand fliegen Drohnen selbstständig zum Laden heim
+  fpvRange: 16,         // Funkreichweite der FPV-Drohnen ab eigenen Gebäuden (auch Grenzbunker) – sie wirken im Grenzgebiet
+  fpvRangeAI: 10,       // zusätzliche Reichweite mit erforschter KI (autonome Drohnen)
 };
 // ---------- Räuber ----------
 export const BANDITS = {
@@ -285,7 +293,7 @@ export const RESEARCH = {
   urban:  {name:'Stadtplanung', icon:'🏙', cost:{money:1500, stone:200}, time:150, need:['res2'], desc:'Wohnblock: 150 Einwohner auf 2×2 Feldern'},
   physics:{name:'Kernphysik', icon:'⚛', cost:{money:4000, metal:300}, time:300, need:['res3'], desc:'Kernkraftwerk: +600 Strom – zerstört verstrahlt es die Umgebung'},
   computing:{name:'Informatik', icon:'💻', cost:{money:3000, metal:200}, time:240, need:['res3'], desc:'Rechenzentrum: beschleunigt die Forschung, braucht viel Strom'},
-  ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
+  ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos, +10 Felder Reichweite), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
   bomb:   {name:'Atomwaffenprogramm', icon:'☢', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
 };
 export const RESEARCH_SPEED = {datacenter:0.5, maxDatacenters:2, ai:0.15};
@@ -304,6 +312,20 @@ export const NUKE = {
   hqKeep: 0.15,                        // Rathaus (Regierungsbunker) überlebt mit diesem Anteil – erobern müssen Truppen
 };
 export const TECH_UNLOCKS = {1:'Drohnenwerkstatt, Spionagedrohne', 2:'FPV-Kamikazedrohne, Raketenwerfer', 3:'Reaper-Drohne'};
+// ---------- Ausbaustufen: Gebäude direkt am Platz verbessern (spart Fläche) ----------
+// Stufe 1 = Grundbau; cap = Wohnraum, food = Faktor auf den Ertrag, research = nötige Forschung
+export const UPGRADES = {
+  house: [null, {name:'Stadthaus', cap:80, cost:{money:220, wood:30, stone:60}, time:30},
+                {name:'Mehrfamilienhaus', cap:120, cost:{money:380, stone:120, metal:20}, time:45, research:'urban'}],
+  farm:  [null, {name:'Gutshof', food:1.4, cost:{money:240, wood:40, stone:40}, time:30},
+                {name:'Agrarbetrieb', food:1.9, cost:{money:420, stone:60, metal:40}, time:45, research:'fert'}],
+};
+/** Ausbaustufe eines Gebäudes (1 = Grundbau) und die nächste Stufe */
+export const lvlOf = b => b.lvl||1;
+export const nextUpgrade = b => { const U=UPGRADES[b.type]; return U&&U[lvlOf(b)]||null; };
+/** Wohnraum und Ertragsfaktor unter Berücksichtigung der Ausbaustufe */
+export const capOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].cap ? U[l-1].cap : (b.def.cap||0); };
+export const foodMulOf = b => { const U=UPGRADES[b.type], l=lvlOf(b); return l>1&&U&&U[l-1].food ? U[l-1].food : 1; };
 export const DEF = t => UNITS[t] || BUILDINGS[t] || FEATURES[t] || RESEARCH[t];
 /** Forschungs-Fortschritt einer Partei */
 export const hasTech = (p,k) => !!(p&&p.done&&p.done[k]);

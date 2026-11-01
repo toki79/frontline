@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -8,7 +8,7 @@ import { missingReq } from '../sim/production';
 import { G } from '../sim/state';
 import { countBuildings } from '../sim/world';
 import { $ } from '../ui/dom';
-import { costLong, f1 } from '../ui/format';
+import { costHtml, costLong, f1 } from '../ui/format';
 
 /* =====================================================================
    Info-Texte (Mouseover bzw. Antippen)
@@ -31,8 +31,9 @@ export function tipFor(k){
   if(d.tech) L.push(`🎓 Benötigt Universität Stufe ${d.tech}.`);
   if(k==='kontor') L.push(`Verkauft laufend bis ${BUILDINGS.kontor.export} Einheiten/s, aber nur was über der Reserve liegt (🛢 ${EXPORT.reserve.oil}, ⛏ ${EXPORT.reserve.metal}, 🌾 ${EXPORT.reserve.food}). Preise: 🛢 ${f1(EXPORT.price.oil)} $, ⛏ ${f1(EXPORT.price.metal)} $, 🌾 ${f1(EXPORT.price.food)} $ je Einheit – weniger als beim Handel mit Kastrova, dafür ohne Marktsättigung.`);
   if(k==='university') L.push(`Stufe 1: ${TECH_UNLOCKS[1]} · Stufe 2: ${TECH_UNLOCKS[2]} · Stufe 3: ${TECH_UNLOCKS[3]}. Erforschtes Wissen bleibt auch erhalten, wenn die Universität zerstört wird.`);
-  if(k==='road') L.push(`Über die Karte ziehen, um Straßen zu planen (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden). Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. Planen ist kostenlos, jedes Feld verbraucht beim Bau ${DEF('road').cost.stone} 🪨 Stein. <b>Transport:</b> Höfe, Holzfäller, Steinbrüche und Minen liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an – eine Straße zählt nur ${Math.round(HAUL.roadCost*100)} % des Weges, lohnt sich also besonders bei weiten Strecken. Gebäude wählen → 🛣 Straße plant den Weg.`);
+  if(k==='road') L.push(`<b>Startpunkt antippen, dann Endpunkt</b> – der kürzeste Weg wird geplant (bis ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden, vorhandene Straßen werden mitbenutzt). Weitere Endpunkte verlängern die Straße. Bauarbeiter bauen sie Feld für Feld. Geplantes Feld antippen = zurücknehmen. Auf Straßen sind alle Einheiten fast doppelt so schnell. Planen ist kostenlos, jedes Feld verbraucht beim Bau ${DEF('road').cost.stone} 🪨 Stein. <b>Transport:</b> Höfe, Holzfäller, Steinbrüche und Minen liefern zur nächsten Sammelstelle (Rathaus oder Lagerhaus). Je länger der Weg, desto weniger kommt an – eine Straße zählt nur ${Math.round(HAUL.roadCost*100)} % des Weges, lohnt sich also besonders bei weiten Strecken. Gebäude wählen → 🛣 Straße plant den Weg.`);
   else if(isDefType(k)) L.push(`Wird auf der Karte geplant (bis ${DEF_RADIUS} Felder vor der Stadt)${d.line?', auch durch Ziehen über mehrere Felder':''} und von <b>Pionieren</b> vor Ort gebaut – erst in der Kaserne Pioniere ausbilden. Bezahlt wird beim Planen; Plan antippen nimmt ihn zurück.`);
+  if(k==='gbunker') L.push(`🏰 <b>Darf weit draußen stehen:</b> bis ${FORT.borderR} Felder von der Stadt auf erkundetem Land, mindestens ${FORT.enemyGap} Felder von fremden Gebäuden. Rund um den Bunker dürfen weitere Gräben und Stellungen geplant werden. Befestigt: Gewehre kratzen kaum, Panzer, Raketenwerfer und Drohnen brauchen lange. Pioniere müssen hinlaufen – begleiten!`);
   if(k==='atmine') L.push(`Für Feinde unsichtbar. Nur Fahrzeuge lösen sie aus (${PIONEER.mineDmg} Schaden – leichte Fahrzeuge sind meist hinüber). Feindliche Pioniere können Minen entdecken und räumen.`);
   if(k==='pioneer') L.push('Bauen alles aus dem Reiter Verteidigung vor Ort und räumen feindliche Minen, die sie in ihrer Nähe entdecken. Leicht bewaffnet.');
   if(FEATURES[k]){ if(k==='trench') L.push('Infanterie im Graben erhält 60 % Deckung. Fahrzeuge kommen nur sehr langsam hindurch. Unzerstörbar.');
@@ -54,6 +55,7 @@ export function tipFor(k){
     if(k==='farm') L.push(`🌾 Bewirtschaftet freie Fläche im Umkreis von ${DENSITY.farmFieldR} Feldern: ${DENSITY.farmFields} Äcker auf <b>grüner Wiese</b> = voller Ertrag, auf karger Steppe nur ${Math.round(DENSITY.steppeYield*100)} %. Zugebaute Felder fehlen.`);
     if(k==='depot') L.push('Sammelstelle: Betriebe in der Nähe liefern hierhin statt zum Rathaus (kürzere Transportwege).');
     if(k==='depot') L.push(`Lagerplatz: Rathaus ${STORAGE.base}, je Lagerhaus +${STORAGE.depot} für Nahrung, Holz, Stein, Metall und Öl. Was nicht ins Lager passt, geht verloren.`);
+    if(UPGRADES[k]) L.push('⬆ <b>Ausbau am Platz</b> (Gebäude wählen → ⬆ Ausbau): '+UPGRADES[k].slice(1).map((U,i)=>`Stufe ${i+2} ${U.name}: ${U.cap?U.cap+' Wohnraum':'Ertrag ×'+String(U.food).replace('.',',')+' auf denselben Äckern'}, ${costHtml(U.cost)}${U.research?` (nach „${RESEARCH[U.research].name}“)`:''}`).join(' · ')+'. Spart Fläche.');
     if(k==='npp') L.push(`☢ Wird es zerstört, kommt es zur Kernschmelze: Verwüstung im Umkreis von ${NUKE.meltdown.radius} Feldern und ${Math.round(NUKE.falloutTime/60)} min Verstrahlung. Nicht an die Front bauen!`);
     if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);
     if(k==='greenhouse') L.push('Braucht keine Äcker – spart viel Fläche gegenüber Bauernhöfen, kostet aber Strom und Unterhalt.');
@@ -75,7 +77,7 @@ export function tipFor(k){
     if(d.cls==='veh') L.push(`▦ Nahe dem Fahrzeugwerk mit Gitterkäfig nachrüstbar ($${CAGE.cost.money} + ⛏${CAGE.cost.metal}): Drohnen richten dann nur ${Math.round(CAGE.drone*100)} % Schaden an, Lenkwaffen ${Math.round(CAGE.missile*100)} %, aber ${Math.round((1-CAGE.speed)*100)} % langsamer.`);
     if(d.jam) L.push(`📡 Störfeld ${JAM.radius} Felder: feindliche FPV-Drohnen darin verlieren die Verbindung und stürzen ab. Unbewaffnet – Begleitschutz für Panzer.`);
     if(d.radar) L.push(`Radar ${d.radar} Felder: entdeckt getarnte Hochflieger in der Nähe.`);
-    if(k==='drone') L.push('Billig, aber tödlich für Fahrzeuge: 3–4 Treffer zerstören einen Kampfpanzer. Gegenmittel: Gitterkäfige, Störsender, Flakpanzer, Flugabwehr.');
+    if(k==='drone') L.push(`Billig, aber tödlich für Fahrzeuge: <b>ein Treffer zerstört Kampfpanzer oder Raketenwerfer</b> (mit Gitterkäfig braucht es 3–4). 📡 Funkreichweite ${DRONE.fpvRange} Felder ab eigenen Gebäuden – sie wirken im Grenzgebiet; Grenzbunker erweitern die Reichweite, erforschte KI um ${DRONE.fpvRangeAI}. Gegenmittel: Käfige, Störsender, Flakpanzer, Flugabwehr.`);
     if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
     if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder kurz nachdem sie feuert). Dann treffen nur Flugabwehr und schwach Maschinenkanonen.');
     else if(d.cls==='air') L.push('Fliegt tief: Gewehre, Maschinenkanonen und Flugabwehr können sie abschießen.');

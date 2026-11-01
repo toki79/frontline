@@ -1,4 +1,4 @@
-import { ECON, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { capOf, foodMulOf, ECON, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
@@ -37,7 +37,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; } else if(!b.empty){ b.empty=true; if(pid===0) msg('Ein Steinbruch ist erschöpft – baue einen neuen an anderen Felsen.','#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1):1)*(b.type==='hq'?1:bf*inFallout(b));
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1)*foodMulOf(b):1)*(b.type==='hq'?1:bf*inFallout(b));
     if(b.def.metal){ let got=0;
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
       mines++; if(b.empty) minesEmpty++;
@@ -92,7 +92,7 @@ export function updateEconomy(pid,dt){
   // Neue Bewohner ziehen zuerst in die ruhigsten Häuser; die Qualität des nächsten freien Hauses bestimmt das Tempo
   if(G.qDirty) refreshQuality();
   const homes=G.buildings.filter(b=>b.owner===pid&&b.def.cap&&works(b)).sort((a,b)=>b.quality-a.quality);
-  let rem=p.pop, qm=0; for(const h of homes){ h.resid=Math.min(h.def.cap,Math.max(0,rem)); rem-=h.resid; if(!qm&&h.resid<h.def.cap-0.01) qm=h.quality; }
+  let rem=p.pop, qm=0; for(const h of homes){ const cp=capOf(h); h.resid=Math.min(cp,Math.max(0,rem)); rem-=h.resid; if(!qm&&h.resid<cp-0.01) qm=h.quality; }
   p.growQ=qm||1;
   if(p.res.food<=0){ p.growBlock='hunger';
     p.res.food=0;

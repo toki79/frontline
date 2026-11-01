@@ -43,6 +43,7 @@ button:disabled{opacity:.4;cursor:default}
 #cmds button.ctx{display:none}
 #cmds button.ctx.show{display:flex}
 #cmds button.warn{border-color:#e0503a;background:#4a2018}
+#cmds button.poor{opacity:.55}
 #cmds button.on{border-color:var(--acc);background:#4a4420}
 #cmds button.nukeb{border-color:#c0392b;color:#ffd36a}
 #cmds button.nukeb.on{background:#5a1a12;border-color:#ff5a4a}

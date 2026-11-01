@@ -1,5 +1,5 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
@@ -82,11 +82,18 @@ export function tileBuildable(pid,x,y){ return tileFree(idx(x,y)) && nearOwn(pid
 // Verteidigung: direkt auf der Karte bauen (ohne Rathaus-Warteschlange)
 export function canPlaceDef(pid,type,x,y){
   if(FEATURES[type]&&FEATURES[type].road) return canPlaceRoad(pid,x,y);
-  if(!inMap(x,y)) return false; const i=idx(x,y), t=G.terr[i];
-  if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]||G.fplan[i]) return false;
-  if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&!isPlain(t)&&t!==T.MUD) return false; }
-  else { if(!TERRAIN[t].build||G.feat[i]) return false; for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&Math.floor(u.x)===x&&Math.floor(u.y)===y&&u.owner!==pid) return false; }
-  for(const b of G.buildings) if(!b.dead&&b.owner===pid&&!b.def.def&&rectDist(b,x,y,1,1)<=DEF_RADIUS) return true;
+  const d=BUILDINGS[type], w=d?d.w:1, h=d?d.h:1;
+  for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){
+    if(!inMap(xx,yy)) return false; const i=idx(xx,yy), t=G.terr[i];
+    if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]||G.fplan[i]) return false;
+    if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&!isPlain(t)&&t!==T.MUD) return false; }
+    else { if(!TERRAIN[t].build||G.feat[i]) return false; for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&Math.floor(u.x)===xx&&Math.floor(u.y)===yy&&u.owner!==pid) return false; } }
+  if(d&&d.border){   // Grenzbunker: weit draußen erlaubt, aber nur auf erkundetem Land und nicht direkt am Gegner
+    if(pid===0&&G.fog&&G.vis[idx(x,y)]===0) return false;
+    for(const b of G.buildings) if(!b.dead&&b.owner!==pid&&b.owner<=2&&rectDist(b,x,y,w,h)<FORT.enemyGap) return false;
+    for(const b of G.buildings) if(!b.dead&&b.owner===pid&&!b.def.def&&rectDist(b,x,y,w,h)<=FORT.borderR) return true;
+    return false; }
+  for(const b of G.buildings) if(!b.dead&&b.owner===pid&&(!b.def.def||b.def.border)&&rectDist(b,x,y,w,h)<=DEF_RADIUS) return true;   // auch rund um eigene Grenzbunker
   return false;
 }
 /** Verteidigung beauftragen: wird bezahlt und als Plan bzw. Baustelle gesetzt – Pioniere bauen es vor Ort */

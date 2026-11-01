@@ -14,7 +14,9 @@ import { applyOrder } from '../src/sim/missions';
 import { orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
 import { BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
-import { canPlaceRoad, demolish, orderRoadTo } from '../src/sim/build';
+import { canPlaceRoad, demolish, orderRoadTo, planRoadLine, startUpgrade, upgradeBlock } from '../src/sim/build';
+import { accessPoints, unprotected } from '../src/sim/fortify';
+import { canPlaceDef } from '../src/sim/production';
 import { idx } from '../src/core/util';
 import { on } from '../src/core/events';
 
@@ -381,8 +383,22 @@ describe('Simulation', () => {
     const hq = findBuilding(1, 'hq');
     const t1 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 8), t2 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 10); t2.cage = true;
     applyDamage(t1, 80, 'drone', {owner:0, dead:true, x:0, y:0}); applyDamage(t2, 80, 'drone', {owner:0, dead:true, x:0, y:0});
-    expect(t1.maxHp - t1.hp).toBeGreaterThan(140);
-    expect(t2.maxHp - t2.hp).toBeLessThan(80);
+    expect(t1.dead).toBe(true);                       // ein Treffer genügt
+    expect(t2.dead).toBeFalsy();                      // Käfig: Panzer überlebt
+    expect(t2.maxHp - t2.hp).toBeLessThan(t2.maxHp * 0.45);
+    const m = spawnAt(1, 'mlrs', hq.x + 10, hq.y + 8); applyDamage(m, 80, 'drone', {owner:0, dead:true, x:0, y:0});
+    expect(m.dead).toBe(true);
+  });
+
+  it('FPV-Drohnen: Funkreichweite begrenzt sie aufs Grenzgebiet', () => {
+    newGame('mittel'); noBandits();
+    const hq = findBuilding(0, 'hq'), ahq = findBuilding(1, 'hq');
+    const d = spawnAt(0, 'drone', hq.x, hq.y - 3);
+    orderMove([d], ahq.x, ahq.y);
+    run(60);
+    let near = 1e9; for (const b of G.buildings) if (!b.dead && b.owner === 0) near = Math.min(near, Math.hypot(b.x - d.x, b.y - d.y));
+    expect(d.dead).toBeFalsy();
+    expect(near).toBeLessThan(20);                    // kehrt am Rand der Reichweite um
   });
 
   it('Störsender lässt feindliche FPV-Drohnen abstürzen', () => {
@@ -518,6 +534,52 @@ describe('Simulation', () => {
     };
     expect(tryIt(false)).toBe(true);
     expect(tryIt(true)).toBe(false);
+  });
+
+  it('Straße per Start- und Endpunkt: der Weg wird geplant', () => {
+    newGame('mittel');
+    const hq = findBuilding(0, 'hq');
+    let a = null, b = null;
+    for (let r = 2; r < 8 && !a; r++) for (let dx = -r; dx <= r && !a; dx++) { const x = hq.tx + dx, y = hq.ty + hq.h + r; if (canPlaceRoad(0, x, y)) a = [x, y]; }
+    for (let r = 2; r < 8 && !b; r++) for (let dy = -r; dy <= r && !b; dy++) { const x = hq.tx + hq.w + r, y = hq.ty + dy; if (canPlaceRoad(0, x, y)) b = [x, y]; }
+    expect(a && b).toBeTruthy();
+    const n = planRoadLine(0, a[0], a[1], b[0], b[1]);
+    expect(n).toBeGreaterThanOrEqual(Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + 1);
+    expect(G.road[idx(a[0], a[1])]).toBe(1);
+    expect(G.road[idx(b[0], b[1])]).toBe(1);
+    expect(planRoadLine(0, a[0], a[1], b[0], b[1])).toBe(0);   // schon geplant
+  });
+
+  it('Ausbau am Platz: Haus und Hof werden besser, ohne mehr Fläche', () => {
+    newGame('mittel');
+    const p = G.players[0]; p.res.money = 5000; p.res.wood = 500; p.res.stone = 500; p.res.metal = 200;
+    const h = builtNearHq('house'), f = builtNearHq('farm');
+    const cap0 = p.cap;
+    expect(startUpgrade(0, h)).toBe(true);
+    expect(startUpgrade(0, h)).toBe(false);                     // läuft schon
+    expect(runUntil(() => !h.upg, 60)).toBe(true);
+    expect(h.lvl).toBe(2);
+    expect(p.cap).toBe(cap0 + 30);
+    expect(upgradeBlock(0, h).join()).toContain('Stadtplanung'); // Stufe 3 braucht Forschung
+    p.res.money = 5000; p.res.stone = 500; p.res.wood = 500;
+    run(2); const food0 = p.rate.foodProd;
+    expect(startUpgrade(0, f)).toBe(true);
+    expect(runUntil(() => !f.upg, 60)).toBe(true);
+    run(2);
+    expect(p.rate.foodProd).toBeGreaterThan(food0 * 1.1);
+  });
+
+  it('Grenzbunker: weit draußen erlaubt, Zugänge und ungeschützte Gebäude erkannt', () => {
+    newGame('mittel'); G.fog = false;
+    const hq = findBuilding(0, 'hq');
+    const far = (type: string) => { for (let r = 20; r < 28; r++) for (let k = 0; k < 40; k++) { const x = Math.floor(hq.x + r * Math.cos(k / 6.4)), y = Math.floor(hq.y - r * Math.abs(Math.sin(k / 6.4))); if (canPlaceDef(0, type, x, y)) return [x, y]; } return null; };
+    expect(far('turret')).toBeNull();                          // normale Stellungen nur nahe der Stadt
+    expect(far('gbunker')).toBeTruthy();
+    expect(accessPoints(0).length).toBeGreaterThan(0);
+    for (const u of G.units) if (u.owner === 0 && u.def.weapon) u.dead = true;
+    builtNearHq('power');
+    expect(unprotected(0).some(b => b.type === 'power')).toBe(true);
+    expect(BUILDINGS.hq.weapon).toBeTruthy();                   // Rathauswache
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

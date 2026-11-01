@@ -6,7 +6,7 @@ import { aiQuotes, marketOpen, trade } from '../sim/market';
 import { showOffer } from '../sim/offers';
 import { orderMove, upgradeCage } from '../sim/orders';
 import { available, canPlace, canPlaceDef, enqueue, placeDefense, placeSite } from '../sim/production';
-import { demolish, hauls, orderRoadTo, previewFields, siteLacks } from '../sim/build';
+import { demolish, hauls, orderRoadTo, previewFields, siteLacks, startUpgrade, upgradeBlock } from '../sim/build';
 import { G } from '../sim/state';
 import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
@@ -64,6 +64,12 @@ export function aiThink(){
   // --- Forschung ---
   const nextRes=aiNextResearch(p);
   if(nextRes&&!p.q.research.length&&available(pid,nextRes)&&canAfford(pid,nextRes)&&p.res.money>DEF(nextRes).cost.money+(RESEARCH[nextRes].level?150:600)) enqueue(pid,nextRes);
+  // --- Ausbau am Platz: spart Fläche (Häuser bei Platzmangel, Höfe bei knapper Nahrung) ---
+  ai.upgT=(ai.upgT||0)-D.think;
+  if(ai.upgT<=0&&p.res.money>700){ ai.upgT=12;
+    const kind=p.pop>=p.cap-30?'house':p.foodRate<2?'farm':p.res.money>2500?(Math.random()<0.5?'house':'farm'):null;
+    const b=kind&&myB.filter(b=>b.type===kind&&!b.site&&!b.upg&&!upgradeBlock(pid,b).length).sort((a,c)=>(a.lvl||1)-(c.lvl||1))[0];
+    if(b) startUpgrade(pid,b); }
   // --- Atomrakete ---
   if(findBuilding(pid,'silo')&&!p.q.silo.length&&(p.nukes||0)<AI_NUKE.stock&&canAfford(pid,'nuke')&&p.res.money>UNITS.nuke.cost.money+AI_NUKE.reserve) enqueue(pid,'nuke');
   aiNukeStrike(pid,ratio,urgent);
@@ -190,6 +196,11 @@ export function aiDefense(pid){
       const sc=near*5+Math.random(); if(sc<bs){bs=sc;best=[x,y];} }
     if(best){ placeDefense(pid,t,best[0],best[1]); return; }
   }
+  // Grenzbunker Richtung Talmitte (sichert das Vorfeld)
+  if(G.t>700&&cnt('gbunker')<(threat?2:1)&&available(pid,'gbunker')&&canAfford(pid,'gbunker')&&p.res.money>BUILDINGS.gbunker.cost.money+900){
+    for(let k=0;k<40;k++){ const r=14+Math.random()*8, ang=Math.atan2(fy,fx)+(Math.random()-0.5)*1.2;
+      const x=Math.floor(hq.x+Math.cos(ang)*r), y=Math.floor(hq.y+Math.sin(ang)*r);
+      if(canPlaceDef(pid,'gbunker',x,y)){ placeDefense(pid,'gbunker',x,y); return; } } }
   const lines=ai.lines||0;
   if(G.t>180&&p.res.money>700&&(lines<1||(threat&&lines<2))){
     const d0=7.5+lines*1.5, px=-fy, py=fx;

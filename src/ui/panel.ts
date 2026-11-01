@@ -32,7 +32,7 @@ export function buildPanel(){
   const box=$('#items'); box.innerHTML=''; ui.btns={};
   const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
             : ui.tab==='forsch' ? [...Object.keys(RESEARCH), 'nuke']
-            : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak']
+            : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak','gbunker']
             : Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored);
   for(const k of list){
     const d=DEF(k), el=document.createElement('button'); el.className='it';
@@ -55,7 +55,7 @@ export function buildPanel(){
 export function buildClick(k){
   const p=G.players[0];
   if(isDefType(k)){ const miss=missingReq(0,k); if(miss.length){msg('Benötigt: '+miss.join(', '),'#ffb38a');return;}
-    G.placing=G.placing===k?null:k; G.sel=[]; refreshCmds(); return; }
+    G.placing=G.placing===k?null:k; G.roadStart=null; G.sel=[]; refreshCmds(); return; }
   const miss=missingReq(0,k);
   if(miss.length){msg('Benötigt: '+miss.join(', '),'#ffb38a');return;}
   if(BUILDINGS[k]){   // Gebäude: direkt in den Platzier-Modus, bezahlt wird beim Setzen der Baustelle

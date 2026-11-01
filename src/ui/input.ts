@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
 import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
@@ -9,7 +9,8 @@ import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { sendDiplomats } from '../sim/trade';
 import { applyOrder, ORDER_NAME } from '../sim/missions';
 import { issuePending } from '../ui/forces';
-import { assignWorkers, cancelRoad, demolish, orderRoadTo, siteLacks, siteStock, siteWorkers } from '../sim/build';
+import { startUpgrade, upgradeBlock } from '../sim/build';
+import { assignWorkers, canPlaceRoad, cancelRoad, demolish, orderRoadTo, planRoadLine, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { hostile, knownBuilding, visibleUnit } from '../sim/world';
@@ -42,9 +43,9 @@ export function handleTap(w,right,shift){
   if(G.nukeAim){ if(right){ G.nukeAim=false; G.nukeArm=null; refreshCmds(); return; } nukeTap(w); return; }
   if(G.orderPending){ if(right){ G.orderPending=null; refreshCmds(); return; } issuePending(w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ffd36a',life:0.7}); return; }
   if(G.placing&&isDefType(G.placing)){
-    if(right){G.placing=null;refreshCmds();return;}
+    if(right){G.placing=null;G.roadStart=null;refreshCmds();return;}
     const x=Math.floor(w.x), y=Math.floor(w.y), road=FEATURES[G.placing]&&FEATURES[G.placing].road;
-    if(road&&cancelRoad(0,x,y)){ G.lastPaint=idx(x,y); return; }   // geplantes Straßenfeld antippen = zurücknehmen
+    if(road){ roadTap(x,y); return; }
     if(!road&&cancelDefPlan(0,x,y)){ G.lastPaint=idx(x,y); msg('Plan zurückgenommen, Kosten erstattet.'); return; }
     if(!placeDefense(0,G.placing,x,y)){ const lack=lacking(0,G.placing);
       if(G.t-(G.defMsgT||-9)>1.5){G.defMsgT=G.t; msg(lack.length?'Es fehlt: '+lack.map(r=>RES[r].name).join(', '):road?`Straßen nur auf freier Steppe, Schlamm oder Ortschaft, höchstens ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden.`:`Hier nicht möglich (freies Land, höchstens ${DEF_RADIUS} Felder vor der Stadt).`,'#ffb38a');} }
@@ -83,6 +84,18 @@ export function handleTap(w,right,shift){
   }
   if(mine.length){ command(ent,w,mine); return; }
   G.sel = ent?[ent]:[]; refreshCmds();
+}
+/** Straße: Startpunkt antippen, dann Endpunkt – der Weg wird geplant; der Endpunkt ist der nächste Start */
+function roadTap(x,y){
+  const s=G.roadStart;
+  if(!s){ if(cancelRoad(0,x,y)){ msg('Geplantes Straßenfeld zurückgenommen.'); return; }   // geplantes Feld antippen = zurücknehmen
+    if(!inMap(x,y)||!(G.road[idx(x,y)]||canPlaceRoad(0,x,y))){ msg(`Startpunkt muss auf freier Steppe, Wiese, Schlamm oder einer Straße liegen, höchstens ${CONSTRUCTION.roadRadius} Felder von eigenen Gebäuden.`,'#ffb38a'); return; }
+    G.roadStart={x,y}; msg('🛣 Startpunkt gesetzt – jetzt den Endpunkt antippen.'); refreshCmds(); return; }
+  if(s.x===x&&s.y===y) return;   // doppelt erkannter Tipp: nichts tun
+  const n=planRoadLine(0,s.x,s.y,x,y);
+  if(n<0){ msg('Kein Weg für eine Straße gefunden (Wasser, Gebäude, Rohstoffe oder zu weit von der Stadt).','#ffb38a'); return; }
+  msg(n?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein. Weiter: nächsten Endpunkt antippen, ✕ beendet.`:'Diese Strecke ist schon Straße.', n?'#9fd88a':undefined);
+  G.roadStart={x,y}; G.roadPrev=null; refreshCmds();
 }
 /** Atomrakete: erstes Antippen zielt, zweites Antippen an derselben Stelle startet */
 function nukeTap(w){
@@ -129,12 +142,15 @@ export function cmd(c){
   else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
-  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;}
+  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;G.roadStart=null;}
   else if(c==='nuke'){ const b=selBuilding(); if(b&&b.type==='silo'){ if(!(G.players[0].nukes>0)) msg('Noch keine Atomrakete fertig – im Reiter 🎓 Forschung bauen.','#ffb38a');
     else { G.nukeAim=!G.nukeAim; G.nukeArm=null; if(G.nukeAim) msg('☢ Ziel wählen: ein erkundetes Gebiet antippen. Alles im Umkreis von '+NUKE.radius+' Feldern wird vernichtet.','#ff8a7a'); } } }
   else if(c==='hold'||c==='clear'){ if(mine.length){ G.orderMode=G.orderMode===c?null:c; G.amoveMode=false; G.escortMode=false; } else msg('Zuerst Einheiten auswählen.'); }
   else if(c==='road'){ const b=selBuilding(); if(b){ const n=orderRoadTo(0,b);
     msg(n>0?`🛣 ${n} Straßenfeld${n===1?'':'er'} geplant – die Bauarbeiter brauchen ${n*DEF('road').cost.stone} 🪨 Stein dafür.`:n===0?'Schon mit Rathaus/Lagerhaus verbunden bzw. Straße bereits geplant.':'Kein Weg für eine Straße gefunden (Wasser, Gebäude oder zu weit von der Stadt).',n>0?'#9fd88a':'#ffb38a'); } }
+  else if(c==='upgrade'){ const b=selBuilding(); if(b){ const U=nextUpgrade(b), why=upgradeBlock(0,b);
+    if(why.length) msg(`Ausbau${U?' zu '+U.name:''} nicht möglich: ${why.join(', ')}.`,'#ffb38a');
+    else if(startUpgrade(0,b)) msg(`⬆ Ausbau zu ${U.name} begonnen (${U.time} s) – ${costHtml(U.cost)}. Das Gebäude arbeitet währenddessen weiter.`,'#9fd88a'); } }
   else if(c==='demolish'){ const b=selBuilding(); if(b){
     if(G.demolishArm!==b.id||G.t-(G.demolishT||-9)>3){ G.demolishArm=b.id; G.demolishT=G.t; msg(`Nochmal 🗑 tippen: ${b.def.name} ${b.site?'abbrechen (volle Erstattung)':'abreißen (30 % Erstattung)'}.`,'#ffb38a'); }
     else { G.demolishArm=null; if(demolish(0,b)) msg(`${b.def.name} ${b.site?'abgebrochen':'abgerissen'}.`); } } }
@@ -156,6 +172,7 @@ export function refreshCmds(){
   bp.classList.toggle('show',scouts.length>0); bp.classList.toggle('on',scouts.length>0&&scouts.every(u=>u.patrol));
   document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
+  { const ub=document.querySelector('[data-c=upgrade]'); ub.classList.toggle('show',!!(sb&&UPGRADES[sb.type]&&!sb.site)); ub.classList.toggle('poor',!!(sb&&UPGRADES[sb.type]&&upgradeBlock(0,sb).length)); }
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
   { const nb=document.querySelector('[data-c=nuke]'); nb.classList.toggle('show',!!(G&&(G.nukeAim||(sb&&sb.type==='silo'&&!sb.site)))); nb.classList.toggle('on',!!(G&&G.nukeAim)); }
   document.querySelector('[data-c=road]').classList.toggle('show',!!(sb&&!sb.site&&!sb.def.def&&(sb.eff??1)<0.97));
@@ -164,6 +181,7 @@ export function refreshCmds(){
 export function updateInfo(){
   const el=$('#info'); if(!G){el.textContent='';return;}
   if(G.placing&&isDefType(G.placing)){ const d=DEF(G.placing), road=FEATURES[G.placing]&&FEATURES[G.placing].road, pio=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.pioneer).length;
+    if(road){ el.textContent=G.roadStart?`🛣 Straße: Endpunkt antippen – der Weg wird automatisch geplant · ${DEF('road').cost.stone} 🪨 je Feld · ✕ beendet`:'🛣 Straße: Startpunkt antippen (an der Stadt oder einer Straße) · geplantes Feld antippen = zurücknehmen · ✕ beendet'; return; }
     el.textContent=`${d.name} ${road?'planen':'beauftragen'}: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ${road?'Bauarbeiter bauen':pio?`${pio} Pionier${pio===1?'':'e'} bauen`:'⚠ keine Pioniere – in der Kaserne ausbilden'} · Plan antippen = zurücknehmen · ✕ beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
   if(G.nukeAim){ el.textContent=G.nukeArm?'☢ Ziel markiert – dieselbe Stelle nochmal antippen = START · ✕ Abwählen bricht ab':`☢ Atomschlag: erkundetes Ziel antippen (Radius ${NUKE.radius} Felder) · ✕ Abwählen bricht ab`; return; }
@@ -200,7 +218,8 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.harvester) t+=` · Ladung ${Math.floor(e.cargo)}/${e.def.harvester.cap} Öl`;
     if(e.owner===0&&e.def.desc) t+=' · '+e.def.desc;
     if(e.def.weapon) t+=' · '+WEAPON_INFO[e.def.weapon.type];
-    if(e.kind==='building'&&e.def.cap&&e.quality!==undefined) t+=` · Bewohner ${Math.floor(e.resid||0)}/${e.def.cap} · Wohnqualität ${Math.round(e.quality*100)} %`+(e.noiseSrc&&e.noiseSrc.length?` (Lärm: ${e.noiseSrc.join(', ')})`:'');
+    if(e.kind==='building'&&e.def.cap&&e.quality!==undefined) t+=` · Bewohner ${Math.floor(e.resid||0)}/${capOf(e)} · Wohnqualität ${Math.round(e.quality*100)} %`+(e.noiseSrc&&e.noiseSrc.length?` (Lärm: ${e.noiseSrc.join(', ')})`:'');
+    if(e.kind==='building'&&UPGRADES[e.type]&&!e.site){ const U=nextUpgrade(e); t+=` · Stufe ${lvlOf(e)}/${UPGRADES[e.type].length}`+(e.upg?` · ⬆ Ausbau ${Math.floor(e.upg.t/e.upg.time*100)} %`:U&&e.owner===0?` · ⬆ nächste Stufe ${U.name}: ${U.cap?U.cap+' Wohnraum':'Ertrag ×'+String(U.food).replace('.',',')} für ${costHtml(U.cost)}${U.research&&!G.players[0].done[U.research]?' (braucht Forschung)':''}`:''); }
     if(e.kind==='building'&&e.type==='silo'&&e.owner===0) t+=` · ☢ ${G.players[0].nukes||0} Rakete${G.players[0].nukes===1?'':'n'} bereit`+(G.players[0].q.silo.length?` · Bau ${Math.floor(G.players[0].q.silo[0].t/G.players[0].q.silo[0].time*100)} %`:'');
     if(e.kind==='building'&&e.type==='mine') t+=e.empty?' · erschöpft':' · Erz übrig: '+fmt(e.oreTiles.reduce((s,i)=>s+G.ore[i],0));
     el.textContent=t; return;}
@@ -246,7 +265,7 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 cv.addEventListener('wheel',e=>{e.preventDefault();if(G)zoomAt(e.clientX,e.clientY,cam.zoom*Math.exp(-e.deltaY*0.0015));},{passive:false});
 addEventListener('keydown',e=>{ if(!G) return; input.keys.add(e.key.toLowerCase());
   const k=e.key.toLowerCase();
-  if(k==='escape'){G.placing=null;G.amoveMode=false;G.orderMode=null;G.orderPending=null;G.sel=[];refreshCmds();}
+  if(k==='escape'){G.placing=null;G.roadStart=null;G.amoveMode=false;G.orderMode=null;G.orderPending=null;G.sel=[];refreshCmds();}
   if(k==='s'&&!e.repeat) cmd('stop');
   if(k==='a'&&!e.repeat) cmd('amove');
 });

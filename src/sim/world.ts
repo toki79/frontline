@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { capOf, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -151,7 +151,7 @@ export function countBuildings(pid,type?,inclSites=false){let n=0;for(const b of
 /** Strom, Wohnraum und Lagerplatz (nur fertige Gebäude) */
 export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;p.store=STORAGE.base;
   for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;
-    const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=b.def.cap||0;if(b.type==='depot')p.store+=STORAGE.depot;}}
+    const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=capOf(b);if(b.type==='depot')p.store+=STORAGE.depot;}}
 export function freeTileAround(b,cls){
   const cand=[];
   for(let r=1;r<=4;r++){

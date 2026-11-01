@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DENSITY, HAUL, MAP_H, MAP_W, T, TECH_UNLOCKS, TERRAIN, isPlain } from '../data/config';
+import { BUILDINGS, CONSTRUCTION, DENSITY, HAUL, MAP_H, MAP_W, RES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, hasTech, isPlain, lvlOf, nextUpgrade } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, costOf, pay } from '../sim/costs';
 import { setPath } from '../sim/pathfinding';
@@ -167,6 +167,29 @@ export function routeRoad(pid,b){
   const out=[]; for(let k=end;k!==-1;k=from[k]) if(!G.road[k]) out.push(k);
   return out.reverse();
 }
+/** Straßenverlauf zwischen zwei Feldern (Start- und Endpunkt) – vorhandene Straßen werden mitbenutzt.
+ *  Gibt die neu zu planenden Felder zurück (null = kein Weg). */
+export function routeRoadBetween(pid,x0,y0,x1,y1){
+  if(!inMap(x0,y0)||!inMap(x1,y1)) return null;
+  const okTile=i=>G.road[i]||(roadTileOk(i)&&roadNearOwn(pid,i%MAP_W,(i/MAP_W)|0));
+  const a=idx(x0,y0), b=idx(x1,y1); if(!okTile(a)||!okTile(b)) return null;
+  const N=MAP_W*MAP_H, cost=new Float64Array(N).fill(Infinity), from=new Int32Array(N).fill(-1), done=new Uint8Array(N);
+  const stepCost=i=> G.road[i] ? 0.6 : okTile(i) ? 1 : Infinity;
+  const H=heapOps(); cost[a]=0; H.push(0,a);
+  while(H.heap.length){ const [cc,c]=H.pop(); if(done[c]) continue; done[c]=1; if(c===b) break;
+    const cx=c%MAP_W, cy=(c/MAP_W)|0;
+    for(const [dx,dy] of N4){ const x=cx+dx,y=cy+dy; if(!inMap(x,y)) continue; const i=idx(x,y); if(done[i]) continue;
+      const s=stepCost(i); if(s===Infinity) continue; const nc=cc+s; if(nc<cost[i]){ cost[i]=nc; from[i]=c; H.push(nc,i); } } }
+  if(!done[b]) return null;
+  const out=[]; for(let k=b;k!==-1;k=from[k]) if(!G.road[k]) out.push(k);
+  return out.reverse();
+}
+/** Straße von Start- bis Endpunkt planen. Ergebnis: Anzahl neuer Felder, -1 = kein Weg */
+export function planRoadLine(pid,x0,y0,x1,y1){
+  const r=routeRoadBetween(pid,x0,y0,x1,y1); if(r===null) return -1;
+  let n=0; for(const i of r) if(planRoad(pid,i%MAP_W,(i/MAP_W)|0)) n++;
+  return n;
+}
 /** Straße zur nächsten Sammelstelle planen. Ergebnis: Anzahl neuer Felder, 0 = schon verbunden/geplant, -1 = kein Weg */
 export function orderRoadTo(pid,b){
   const r=routeRoad(pid,b); if(r===null) return -1; if(!r.length) return 0;
@@ -316,3 +339,27 @@ export function clearForest(i){
 }
 export function hasRockNear(tx,ty,w,h){ return ringTiles(tx,ty,w,h).some(i=>G.rock[i]>0); }
 export const siteTypes = Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def);
+
+// ---------- Ausbau am Platz ----------
+/** Kann das Gebäude ausgebaut werden? Ergebnis: [] = ja, sonst Gründe */
+export function upgradeBlock(pid,b){
+  const U=nextUpgrade(b), p=G.players[pid], why=[];
+  if(!U) return ['höchste Stufe erreicht'];
+  if(b.site||b.upg) return ['wird gerade gebaut'];
+  if(U.research&&!hasTech(p,U.research)) why.push(`Forschung „${RESEARCH[U.research].name}“`);
+  for(const r of Object.keys(U.cost)) if(p.res[r]<U.cost[r]) why.push(`zu wenig ${RES[r].name}`);
+  return why;
+}
+/** Ausbau beginnen: Kosten werden sofort fällig, das Gebäude arbeitet währenddessen weiter */
+export function startUpgrade(pid,b){
+  if(b.owner!==pid||upgradeBlock(pid,b).length) return false;
+  const U=nextUpgrade(b), p=G.players[pid];
+  for(const r of Object.keys(U.cost)) p.res[r]-=U.cost[r];
+  b.upg={t:0,time:U.time}; return true;
+}
+export function updateUpgrades(dt){
+  for(const b of G.buildings){ if(b.dead||!b.upg) continue;
+    const p=G.players[b.owner]; b.upg.t+=dt*(p.broke?0.5:1);
+    if(b.upg.t>=b.upg.time){ const U=nextUpgrade(b); b.lvl=lvlOf(b)+1; b.upg=null; recalcPower(b.owner);
+      if(b.owner===0&&U) msg(`⬆ Ausgebaut: ${U.name} (${U.cap?`${U.cap} Wohnraum`:`Ertrag ×${String(U.food).replace('.',',')}`}).`,'#9fd88a'); } }
+}

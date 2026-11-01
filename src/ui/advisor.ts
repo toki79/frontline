@@ -9,6 +9,7 @@ import { $ } from '../ui/dom';
 import { f1 } from '../ui/format';
 import { cmd, refreshCmds } from '../ui/input';
 import { siteLacks } from '../sim/build';
+import { unprotected } from '../sim/fortify';
 import { openDiplo } from '../ui/menus';
 import { msg } from '../core/events';
 import { buildClick, setTab } from '../ui/panel';
@@ -48,6 +49,9 @@ export function advise(){
   if(G.road.some((r,i)=>r===1&&G.roadOwner[i]===1)&&p.res.stone<2) T.push({p:41,txt:'<b>Straßenbau steht:</b> Für jedes Straßenfeld brauchen die Arbeiter Stein.',act:has('quarry')||G.profile[0].scarce.includes('stone')?{label:'🤝 Stein kaufen',fn:openDiplo}:B('quarry')});
   if((p.happy??1)<0.55&&p.moodWhy&&p.moodWhy.length){ const w=p.moodWhy.slice().sort((a,b)=>b.amt-a.amt)[0];
     T.push({p:p.happy<0.4?88:58,txt:`<b>Die Einwohner sind unzufrieden (${Math.round(p.happy*100)} %).</b> Hauptgrund: ${w.txt}. Das kostet Steuern und Wachstum${p.happy<0.4?' – erste Familien wandern ab':''}.`}); }
+  if(G.t>480){ G.unprotT=(G.unprotT||0)-1; if(G.unprotT<=0){ G.unprotT=10; G.unprotList=unprotected(0); }
+    const L=G.unprotList||[]; if(L.length){ const names=[...new Set(L.map(b=>b.def.name.replace(/\u00AD/g,'')))].slice(0,3).join(', ');
+      T.push({p:G.war||ai.lead?60:26,txt:`<b>Ungeschützt:</b> ${names}. Sichert wichtige Gebäude und die <b>Zugänge zur Stadt</b> (beim Planen von Verteidigung rot markiert) mit Gräben, Stacheldraht, Stellungen – oder baut Grenzbunker weit draußen.`,act:{label:'🛡 Verteidigung',fn:()=>{setTab('vert');$('#panel').classList.remove('min');}}}); } }
   if(G.banditWarn&&G.t<G.banditWarn.t){ const w=G.banditWarn, near=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon&&Math.hypot(u.x-w.x,u.y-w.y)<8).length;
     if(near<2) T.push({p:88,txt:`<b>Räuber im Anmarsch</b> auf euren ${w.name}! ${army?'Schickt eure Schützen hin.':'Ihr habt keine Soldaten – Kaserne bauen und 2 Schützentrupps ausbilden.'}`,act:army?{label:'◎ Truppen wählen',fn:()=>cmd('all')}:has('barracks')?{label:'Schützen ausbilden',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('inf');}}:B('barracks')}); }
   { const c=G.buildings.find(c=>!c.dead&&c.type==='camp'&&G.buildings.some(b=>!b.dead&&b.owner===0&&!b.def.def&&Math.hypot(c.x-b.x,c.y-b.y)<16));
