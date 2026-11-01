@@ -32,7 +32,7 @@ function showEnd(win:boolean, reason:string){
   $('#endText').innerHTML=reason+`<br><br>Spielzeit: ${mm}:${ss} · Einwohner: ${Math.floor(G.players[0].pop)} (Kastrova ${Math.floor(G.players[1].pop)})<br>Einheiten gebaut: ${G.stats.built} · verloren: ${G.stats.lost} · Abschüsse: ${G.stats.kills} · Beute: ${fmt(G.stats.loot)}`;
   $('#end').classList.remove('hidden');
 }
-export function openDiplo(){ if(!G||G.over||G.offer) return; hideTip(); G.paused=true; $('#reply').textContent=''; renderDiplo(); $('#diplo').classList.remove('hidden'); }
+export function openDiplo(){ if(!G||G.over||G.offer) return; hideTip(); G.paused=true; $('#reply').textContent=''; G.tribLast=null; renderDiplo(); $('#diplo').classList.remove('hidden'); }
 
 export function init(){
 on('gameover',showEnd);

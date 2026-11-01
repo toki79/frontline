@@ -102,7 +102,8 @@ function tributeHtml(){
     h+='<div class="row">'+A.map((a,i)=>sel('lvl',i,tg.lvl,`${a} ${unit(tg.kind)}`)).join('')+sel('rec','0',tg.rec?'1':'0','einmalig')+sel('rec','1',tg.rec?'1':'0','jede Minute')+'</div>'; }
   const e=evalTribute(tg.kind,tribAmt(),tg.kind!=='land'&&tg.rec), wait=Math.ceil((G.tribCool||0)-G.t);
   h+=`<div class="barl"><span>${e.ok?'✓ Kastrova würde wohl nachgeben':'✗ Kastrova würde ablehnen: '+e.reasons.join(', ')} · Furcht ${f1(e.fear)} / Schmerz ${f1(Math.min(e.pain,9))}</span></div>`;
-  h+=`<div class="row">${btn('tg_go',wait>0?`Nächste Forderung in ${wait} s`:'👑 Tribut fordern',wait<=0&&!(G.tribute&&tg.rec&&tg.kind!=='land'))}</div>`;
+  if(G.tribLast) h+=`<div class="tribres ${G.tribLast.ok?'ok':'no'}">${G.tribLast.txt}</div>`;
+  h+=`<div class="row">${btn('tg_go',wait>0?`Nächste Forderung in ${wait} s Spielzeit`:G.tribute&&tg.rec&&tg.kind!=='land'?'Dauertribut läuft schon':'👑 Tribut fordern',wait<=0&&!(G.tribute&&tg.rec&&tg.kind!=='land'))}</div>`;
   h+='<div class="barl"><span>Furcht entsteht durch eure militärische Übermacht, eine Atomrakete, einen für Kastrova verlorenen Krieg oder ein Bündnis mit der Miliz. Wer nachgibt, ist gekränkt (Haltung sinkt) und sinnt eine Weile auf Rache. Eine abgelehnte Forderung verärgert – ohne Macht dahinter kann sie Krieg auslösen. Im Krieg ist ein angenommener Tribut zugleich der Friedensschluss.</span></div>';
   return h;
 }
@@ -127,24 +128,26 @@ export function peaceChance(tribute){
   const ai=G.ai; let s=(ai.need?-1:0)+(ai.lead?-1.2:0)+(ai.ratio<1?1:0)+(ai.ratio<0.6?0.8:0)+(ai.lootSince>150?0.6:0)+G.aiAtt/50+(tribute?1:0)+(G.t-ai.lastCombat>60?0.4:0);
   return s>=0.5;
 }
+/** Antwort unten im Fenster anzeigen (klebt sichtbar am unteren Rand) und kurz aufblinken lassen */
+function say(t){ const el=$('#reply'); el.textContent=t||''; el.classList.remove('flash'); void el.offsetWidth; if(t) el.classList.add('flash'); }
 export function diploAction(a){
   const p=G.players[0]; let r='';
   if(a.startsWith('ai_')){ const [,side,res]=a.split('_'); const rr=tradeAI(side==='buy'?'buy':'sell',res);
     r={ok:side==='buy'?'Marschall Varek: „Genau das brauchten wir. Ein gutes Geschäft für beide.“':'Marschall Varek: „Abgemacht. Die Lieferung ist unterwegs.“',krieg:'Kein Handel im Krieg.',kein:'Das Angebot gilt nicht mehr.',arm:'Dafür reichen eure Vorräte nicht.',pleite:'Marschall Varek: „Unsere Kasse ist leer.“'}[rr];
-    $('#reply').textContent=r; renderDiplo(); return; }
+    say(r); renderDiplo(); return; }
   if(a.startsWith('cg_')){ const [,k,v]=a.split('_');
     if(k==='propose'){ const res=proposeContract(0,1,{res:cg.give,amt:cg.ga},{res:cg.get,amt:cg.ra}) as any;
       r=res.ok?`Marschall Varek: „Abgemacht. Jede Minute ${cg.ga} ${RES[cg.give].icon} gegen ${cg.ra} ${RES[cg.get].icon}.“`:`Marschall Varek: „Nein.“ (${res.reasons.join(', ')})`; }
     else { if(k==='give'||k==='get') cg[k]=v; else cg[k]=Number(v); }
-    $('#reply').textContent=r; renderDiplo(); return; }
-  if(a==='tw'){ waiveTribute(); $('#reply').textContent='Marschall Varek: „Kastrova nimmt Euren Verzicht zur Kenntnis.“'; renderDiplo(); return; }
+    say(r); renderDiplo(); return; }
+  if(a==='tw'){ waiveTribute(); say('Marschall Varek: „Kastrova nimmt Euren Verzicht zur Kenntnis.“'); renderDiplo(); return; }
   if(a.startsWith('tg_')){ const [,k,v]=a.split('_');
     if(k==='go'){ const wasWar=G.war, res=demandTribute(tg.kind,tribAmt(),tg.kind!=='land'&&tg.rec);
       r={ok:wasWar?'Marschall Varek: „… Kastrova beugt sich. Die Waffen ruhen.“':'Marschall Varek: „… Kastrova beugt sich. Diesmal.“',nein:'Marschall Varek: „Nein. Kastrova zahlt keinen Tribut an Aldoria.“',krieg:'Marschall Varek: „Ihr wagt es, uns zu drohen? Dann sprechen die Waffen!“',wartet:'Wartet ab, bevor Ihr erneut fordert.'}[res]; }
     else if(k==='kind') tg.kind=v; else if(k==='lvl') tg.lvl=Number(v); else if(k==='rec') tg.rec=v==='1';
-    $('#reply').textContent=r; renderDiplo(); return; }
-  if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); $('#reply').textContent='Vertrag gekündigt.'; renderDiplo(); return; }
-  if(a.startsWith('t_')){ const k=a.slice(2); r=trade(0,k)?'Händler der Miliz: „Gutes Geschäft.“':'Händler der Miliz: „Dafür reicht es nicht.“'; $('#reply').textContent=r; renderDiplo(); return; }
+    say(r); renderDiplo(); return; }
+  if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); say('Vertrag gekündigt.'); renderDiplo(); return; }
+  if(a.startsWith('t_')){ const k=a.slice(2); r=trade(0,k)?'Händler der Miliz: „Gutes Geschäft.“':'Händler der Miliz: „Dafür reicht es nicht.“'; say(r); renderDiplo(); return; }
   switch(a){
     case 'gift1': p.res.money-=200; G.aiAtt=Math.min(100,G.aiAtt+12); r='Marschall Varek: „Kastrova nimmt Eure Aufmerksamkeit zur Kenntnis.“'; break;
     case 'food1': p.res.food-=100; G.players[1].res.food+=100; G.aiAtt=Math.min(100,G.aiAtt+(G.ai.need==='food'?20:8)); r=G.ai.need==='food'?'Marschall Varek: „Das kommt zur rechten Zeit. Wir vergessen das nicht.“':'Marschall Varek: „Danke. Unsere Speicher sind allerdings gut gefüllt.“'; break;
@@ -172,5 +175,5 @@ export function diploAction(a){
     case 'war2': G.militiaWar[0]=true; G.attitude[0]=-100; if(G.militiaAlly===0) G.militiaAlly=-1; updateRel(); r='Hauptmann Dorin: „Dann sehen wir uns auf dem Schlachtfeld.“'; msg('Krieg gegen die Grenzmiliz erklärt.','#ff8a7a'); break;
     case 'peace2': p.res.money-=500; G.militiaWar[0]=false; G.attitude[0]=-30; updateRel(); r='Hauptmann Dorin: „Wir nehmen an. Aber wir beobachten Euch.“'; break;
   }
-  $('#reply').textContent=r; renderDiplo();
+  say(r); renderDiplo();
 }

@@ -120,7 +120,13 @@ button:disabled{opacity:.4;cursor:default}
 .barl{font-size:11px;color:var(--dim);display:flex;justify-content:space-between}
 .party .row{margin:8px 0 0}
 .party .row button{font-size:12.5px;padding:7px 10px}
-#reply{min-height:20px;font-size:13.5px;color:var(--acc);margin:4px 0}
+#reply{font-size:14px;color:var(--acc);margin:6px 0;position:sticky;bottom:-16px;background:#1b2014;padding:8px 2px;z-index:2}
+#reply:empty{display:none}
+#reply.flash{animation:replyFlash 1.2s ease-out}
+@keyframes replyFlash{0%{background:#4a4420}100%{background:#1b2014}}
+.tribres{margin:6px 0;padding:8px 10px;border-radius:8px;font-size:13.5px;line-height:1.4}
+.tribres.ok{background:#24361c;border:1px solid #5a8a3a;color:#cfeab0}
+.tribres.no{background:#3a1f1a;border:1px solid #8a4a3a;color:#ffc2b0}
 #offer .card{max-width:440px;border-color:#8a6a2a}
 #offerText{font-size:15px;line-height:1.45}
 @media (max-width:600px){ .tabs{gap:2px} .tabs button{padding:3px 7px;font-size:12px} .tabs .hint{display:none} #cmds{gap:4px} #cmds button{width:47px} .tb .lbl{display:none} .res{gap:4px 9px;font-size:13px;flex-wrap:wrap} #mini{top:calc(var(--toph,calc(36px + var(--sat))) + 56px);width:110px;height:110px} .pb i{width:64px} .pb b{width:56px} .pb .nm{width:58px} }

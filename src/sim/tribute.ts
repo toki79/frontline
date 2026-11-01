@@ -4,6 +4,7 @@ import { deterrent } from '../sim/nuke';
 import { G } from '../sim/state';
 import { findBuilding, recalcPower, setWar } from '../sim/world';
 import { msg } from '../core/events';
+import { fxAdd } from '../sim/units';
 
 /* =====================================================================
    Tribut: Aldoria fordert von Kastrova Geld, Rohstoffe oder Land
@@ -49,7 +50,8 @@ export function demandTribute(kind,amt,recurring){
   G.tribCool=G.t+T.cool;
   const e=evalTribute(kind,amt,recurring);
   if(!e.ok){ G.aiAtt=Math.max(-100,G.aiAtt-T.angry);
-    if(!G.war&&e.fear<0.3&&(ai.ratio??1)>1.3&&Math.random()<0.5){ setWar(true,1); ai.nextRaid=0; return 'krieg'; }   // Drohung ohne Macht dahinter
+    if(!G.war&&e.fear<0.3&&(ai.ratio??1)>1.3&&Math.random()<0.5){ setWar(true,1); ai.nextRaid=0; G.tribLast={ok:false,txt:'Abgelehnt – und Kastrova hat euch den Krieg erklärt! (Haltung −'+T.angry+')'}; msg('👑 Tributforderung abgelehnt – Kastrova erklärt den Krieg!','#ff8a7a'); return 'krieg'; }   // Drohung ohne Macht dahinter
+    G.tribLast={ok:false,txt:'Abgelehnt: '+e.reasons.join(', ')+` (Haltung −${T.angry}).`}; msg('👑 Kastrova lehnt eure Tributforderung ab.','#ffb38a');
     return 'nein'; }
   G.aiAtt=Math.max(-100,G.aiAtt-T.grudge); ai.humT=G.t;
   if(kind==='land'){ const L=landOffer(); let pop=0;
@@ -57,10 +59,11 @@ export function demandTribute(kind,amt,recurring){
     A.pop=Math.max(10,A.pop-pop); P.pop+=pop*0.8;
     for(const u of G.units) if(!u.dead&&u.owner===1&&L.some(b=>dist(b.x,b.y,u.x,u.y)<4)){ u.target=null; }
     recalcPower(0); recalcPower(1); G.qDirty=true; G.roadDirty=true;
-    msg(`🏳 Kastrova tritt Land ab: ${L.map(b=>b.def.name.replace(/­/g,'')).join(', ')} gehören jetzt Aldoria.`,'#9fd88a'); }
+    const t=`🏳 Kastrova tritt Land ab: ${L.map(b=>b.def.name.replace(/\u00AD/g,'')).join(', ')} gehören jetzt Aldoria (+${Math.round(pop*0.8)} Einwohner).`; msg(t,'#9fd88a'); G.tribLast={ok:true,txt:t}; }
   else if(recurring){ G.tribute={res:kind, amt, next:G.t+T.every, paid:0};
-    msg(`👑 Kastrova zahlt ab jetzt jede Minute ${amt} ${kind==='money'?'$':RES[kind].icon} Tribut.`,'#9fd88a'); }
-  else { A.res[kind]-=amt; P.res[kind]+=amt; msg(`👑 Kastrova zahlt Tribut: ${amt} ${kind==='money'?'$':RES[kind].icon}.`,'#9fd88a'); }
+    const t=`👑 Angenommen: Kastrova zahlt ab jetzt jede Minute ${amt} ${kind==='money'?'$':RES[kind].icon} – die erste Zahlung kommt in einer Minute Spielzeit.`; msg(t,'#9fd88a'); G.tribLast={ok:true,txt:t}; }
+  else { A.res[kind]-=amt; P.res[kind]+=amt; const t=`👑 Angenommen: Kastrova hat ${amt} ${kind==='money'?'$':RES[kind].icon} gezahlt – schon in eurem Lager (jetzt ${Math.floor(P.res[kind])}).`; msg(t,'#9fd88a'); G.tribLast={ok:true,txt:t}; }
+  G.tribLast.txt+=` Kastrova ist gekränkt (Haltung −${T.grudge}).`;
   if(G.war) setWar(false);   // Tribut als Friedensbedingung
   return 'ok';
 }
@@ -73,5 +76,7 @@ export function updateTribute(){
     msg('👑 Kastrova stellt die Tributzahlungen ein – es fürchtet euch nicht mehr.','#ffb38a'); return; }
   const a=Math.min(t.amt,Math.floor(A.res[t.res]||0)); if(a<=0) return;
   A.res[t.res]-=a; P.res[t.res]+=a; t.paid+=a;
+  msg(`👑 Tribut von Kastrova: +${a} ${t.res==='money'?'$':RES[t.res].icon}`,'#d2bd62');
+  const hq=G.buildings.find(b=>!b.dead&&b.owner===0&&b.type==='hq'); if(hq) fxAdd({k:'loot',x:hq.x,y:hq.y,txt:`👑 +${a} ${t.res==='money'?'$':RES[t.res].icon}`,col:'#ffd36a',life:3});
 }
 export function waiveTribute(){ if(G.tribute){ G.tribute=null; G.aiAtt=Math.min(100,G.aiAtt+10); } }
