@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
@@ -77,6 +77,7 @@ export function tipFor(k){
     if(d.cls==='veh') L.push(`▦ Nahe dem Fahrzeugwerk mit Gitterkäfig nachrüstbar ($${CAGE.cost.money} + ⛏${CAGE.cost.metal}): Drohnen richten dann nur ${Math.round(CAGE.drone*100)} % Schaden an, Lenkwaffen ${Math.round(CAGE.missile*100)} %, aber ${Math.round((1-CAGE.speed)*100)} % langsamer.`);
     if(d.jam) L.push(`📡 Störfeld ${JAM.radius} Felder: feindliche FPV-Drohnen darin verlieren die Verbindung und stürzen ab. Unbewaffnet – Begleitschutz für Panzer.`);
     if(d.radar) L.push(`Radar ${d.radar} Felder: entdeckt getarnte Hochflieger in der Nähe.`);
+    if(d.emergency) L.push(`🚨 <b>Notstand:</b> nur verfügbar, wenn die Stadt in den letzten ${Math.round(EMERGENCY.window/60)} Minuten angegriffen wurde oder Krieg herrscht. Kostet kein Geld und keinen Sold – auch bei leerer Kasse sofort bereit. Höchstens ${EMERGENCY.maxVolunteers} Trupps; ist es ${Math.round(EMERGENCY.disband/60*10)/10} Minuten ruhig, gehen die Freiwilligen wieder nach Hause.`);
     if(k==='drone') L.push(`Billig, aber tödlich für Fahrzeuge: <b>ein Treffer zerstört Kampfpanzer oder Raketenwerfer</b> (mit Gitterkäfig braucht es 3–4). 📡 Funkreichweite ${DRONE.fpvRange} Felder ab eigenen Gebäuden – sie wirken im Grenzgebiet; Grenzbunker erweitern die Reichweite, erforschte KI um ${DRONE.fpvRangeAI}. Gegenmittel: Käfige, Störsender, Flakpanzer, Flugabwehr.`);
     if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
     if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder kurz nachdem sie feuert). Dann treffen nur Flugabwehr und schwach Maschinenkanonen.');

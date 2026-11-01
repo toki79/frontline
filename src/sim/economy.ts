@@ -1,4 +1,4 @@
-import { capOf, foodMulOf, ECON, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { capOf, foodMulOf, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
@@ -6,6 +6,7 @@ import { G } from '../sim/state';
 import { refreshQuality } from '../sim/world';
 import { clearForest, hauls, works } from '../sim/build';
 import { msg } from '../core/events';
+import { emergency } from '../sim/production';
 
 /* =====================================================================
    Volkswirtschaft: Produktion, Verbrauch, Wachstum
@@ -37,7 +38,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; } else if(!b.empty){ b.empty=true; if(pid===0) msg('Ein Steinbruch ist erschöpft – baue einen neuen an anderen Felsen.','#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1)*foodMulOf(b):1)*(b.type==='hq'?1:bf*inFallout(b));
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1)*foodMulOf(b):1)*(b.type==='hq'?1:inFallout(b));   // Bauern arbeiten auch ohne Lohn weiter
     if(b.def.metal){ let got=0;
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
       mines++; if(b.empty) minesEmpty++;
@@ -46,12 +47,17 @@ export function updateEconomy(pid,dt){
   }
   foodProd*=mul;
   let soldiers=0, fuel=0;
-  for(const u of G.units){ if(u.dead||u.owner!==pid) continue; soldiers+=u.def.cost.pop||0; if(u.def.upkeep) fuel+=u.def.upkeep; }
+  let paid=0, vols=[];
+  for(const u of G.units){ if(u.dead||u.owner!==pid) continue; soldiers+=u.def.cost.pop||0; if(!u.def.emergency) paid+=u.def.cost.pop||0; else vols.push(u); if(u.def.upkeep) fuel+=u.def.upkeep; }
+  // Bürgerwehr: nach dem Angriff gehen die Freiwilligen wieder nach Hause
+  if(vols.length&&!emergency(pid)){ p.calmT=(p.calmT||0)+dt; if(p.calmT>EMERGENCY.disband){ p.calmT=0;
+    for(const u of vols){ u.dead=true; p.pop+=u.def.cost.pop; soldiers-=u.def.cost.pop; } G.sel=G.sel.filter(s=>!s.dead);
+    if(pid===0) msg(`🏠 Die Lage ist ruhig – ${vols.length} Trupp${vols.length===1?'':'s'} Bürgerwehr ${vols.length===1?'geht':'gehen'} wieder nach Hause.`,'#9fd88a'); } } else p.calmT=0;
   // Unterhalt: Gebäude und Sold – ohne Geld arbeiten Betriebe nur noch halb
-  const wages=soldiers*ECON.wagePerPop, admin=p.pop*p.pop*ECON.adminPerHead2, cost=upkeep+wages+admin;
+  const wages=paid*ECON.wagePerPop, admin=p.pop*p.pop*ECON.adminPerHead2, cost=upkeep+wages+admin;
   p.res.money-=cost*dt;
   const wasBroke=p.broke; p.broke=p.res.money<=0; if(p.res.money<0) p.res.money=0;
-  if(pid===0&&p.broke&&!wasBroke&&G.t-(p.brokeMsg||-99)>40){ p.brokeMsg=G.t; msg('⚠ Die Kasse ist leer! Unterhalt und Sold fehlen – Betriebe und Ausbildung laufen nur halb so schnell.','#ff8a7a'); }
+  if(pid===0&&p.broke&&!wasBroke&&G.t-(p.brokeMsg||-99)>40){ p.brokeMsg=G.t; msg(`⚠ Die Kasse ist leer! Unterhalt und Sold fehlen – Betriebe und Ausbildung laufen langsamer (Höfe arbeiten weiter).${emergency(pid)?' Verteidigung: Bürgerwehr kostet kein Geld.':''}`,'#ff8a7a'); }
   const eat=(p.pop+soldiers)*ECON.foodPerHead;
   p.res.oil-=fuel*dt; p.fuelShort=p.res.oil<=0&&fuel>0; if(p.res.oil<0) p.res.oil=0;
   if(pid===0&&p.fuelShort&&G.t-(p.fuelMsg||-99)>40){p.fuelMsg=G.t;msg('⚠ Treibstoffmangel: Fahrzeuge fahren und schießen nur halb so schnell.','#ff8a7a');}

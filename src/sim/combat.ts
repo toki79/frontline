@@ -1,6 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { capOf, BANDITS, CAGE, DAMAGE, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { capOf, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -99,12 +99,11 @@ export function loot(e,src){
   else if(e.kind==='unit'){ if(e.def.harvester&&e.cargo>5) got.oil=Math.floor(e.cargo*0.7);
     if(e.def.caravan&&e.cargoAmt){ got[e.cargoRes]=Math.floor(e.cargoAmt*TRADE.loot); if(vo===0) msg(`⚠ Eine Handelskarawane wurde überfallen (${e.cargoAmt} ${RES[e.cargoRes].icon} verloren).`,'#ff8a7a'); } }
   else {
-    const share=e.type==='hq'?0.4:0.15, cap=e.type==='hq'?900:250;
-    for(const k of ['money','food','wood','stone','metal','oil']){ let a=Math.floor(Math.min((V.res[k]||0)*share,cap));
-      if(e.type==='farm'&&k==='food') a=Math.floor(Math.min(V.res.food*0.3,350));
-      if(e.type==='mine'&&k==='metal') a=Math.floor(Math.min(V.res.metal*0.3,250));
-      if(e.type==='refinery'&&k==='oil') a=Math.floor(Math.min(V.res.oil*0.35,300));
-      if(a>0){ V.res[k]-=a; got[k]=a; } }
+    // Geld liegt nur in der Stadtkasse (Rathaus) und im Kontor; Betriebe verlieren ihr eigenes Erzeugnis
+    const T=LOOT.treasury[e.type], Gd=LOOT.goods[e.type], take=(k,share,cap)=>{ const a=Math.floor(Math.min((V.res[k]||0)*share,cap)); if(a>0){ V.res[k]-=a; got[k]=(got[k]||0)+a; } };
+    if(T) take('money',T[0],T[1]);
+    if(e.type==='hq') for(const k of ['food','wood','stone','metal','oil']) take(k,0.3,400);
+    if(Gd){ if(Gd[0]==='*') for(const k of ['wood','stone','metal']) take(k,Gd[1],Gd[2]); else take(Gd[0],Gd[1],Gd[2]); }
   }
   const keys=Object.keys(got); if(!keys.length) return;
   for(const k of keys) K.res[k]+=got[k];

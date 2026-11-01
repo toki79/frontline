@@ -126,6 +126,7 @@ export function aiThink(){
   let threat=null,tb=1e9;
   if(G.war||G.militiaAlly===0) for(const e of G.units){ if(e.dead||!hostile(pid,e.owner)) continue;
     for(const b of myB){const d=distTo(e,b); if(d<13&&d<tb){tb=d;threat=e;}} }
+  if(threat&&army.length<5&&available(pid,'volunteer')&&!p.q.hq.some(i=>i.type==='volunteer')&&canAfford(pid,'volunteer')) enqueue(pid,'volunteer');   // Bürgerwehr in der Not
   if(threat){
     for(const u of army.filter(u=>!u.wave||dist(u.x,u.y,threat.x,threat.y)<15))
       if(!u.target&&(u.mode!=='amove'||!u.goal||dist(u.goal.x,u.goal.y,threat.x,threat.y)>6)) orderMove([u],threat.x,threat.y,'amove');

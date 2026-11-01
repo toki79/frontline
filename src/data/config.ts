@@ -7,6 +7,10 @@
    Eintrag (+ Zeichnung in render/draw.ts).
    ===================================================================== */
 export const TILE = 32, MAP_W = 96, MAP_H = 96, BUILD_RADIUS = 5, LEASH = 6;
+// Notstand: Bürgerwehr bei Angriff, Beute nur aus passenden Gebäuden
+export const EMERGENCY = {window:120, maxVolunteers:8, disband:150, wageFree:true};
+// Beute beim Zerstören: Geld nur aus Rathaus (Stadtkasse) und Kontor; Betriebe verlieren ihr eigenes Erzeugnis
+export const LOOT = {treasury:{hq:[0.3,700], kontor:[0.12,250]}, goods:{farm:['food',0.25,300], greenhouse:['food',0.2,200], mine:['metal',0.25,200], refinery:['oil',0.3,250], lumber:['wood',0.25,150], quarry:['stone',0.25,150], depot:['*',0.12,150]}};
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
 // Stadtschutz: wichtige Gebäude, Zugänge, Grenzbunker
 export const FORT = {critical:['hq','power','npp','factory','university','refinery','datacenter','enrich','silo','droneshop','kontor'], guardR:6, accessRing:9, recalc:30,
@@ -76,7 +80,7 @@ export const ECON = {
            university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   adminPerHead2: 0.000015, // Stadtverwaltung: wächst mit dem Quadrat der Einwohner (1000 EW ≈ 15 $/s, 2000 EW ≈ 60 $/s)
-  brokeFactor: 0.5,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil
+  brokeFactor: 0.7,     // ohne Geld arbeiten Betriebe nur mit diesem Anteil (Höfe arbeiten weiter)
   growBase: 0.2,        // Grundwachstum (Einwohner/s)
   growRate: 0.002,      // zusätzliches Wachstum je Einwohner
   minPop: 10,           // so viele Einwohner bleiben immer (keine Rekrutierung darunter)
@@ -162,6 +166,8 @@ export const UNITS = {
           prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, unbewaffnet, sieht sehr weit – auf Aufklärungsflug (🛰) erkundet sie selbstständig die Karte'},
   reaper:{name:'Reaper-Drohne', cls:'air', tech:3, cost:{money:900, metal:120, oil:60, pop:2}, time:16, hp:240, armor:'airHigh', speed:2.6, sight:12, size:0.6, battery:480,
           weapon:{type:'missile', dmg:75, range:6.5, rof:5}, prod:'droneshop', req:[], desc:'Hochfliegend und getarnt, lange Flugzeit, Lenkraketen – auf Aufklärungsflug (🛰) überfliegt sie selbstständig das ganze Tal'},
+  volunteer:{name:'Bürgerwehr', cls:'inf', cost:{pop:4}, time:3, hp:75, armor:'none', speed:1.2, sight:5, size:0.38, emergency:true,
+          weapon:{type:'bullet', dmg:7, range:3.8, rof:1.0}, prod:'hq', req:[], desc:'Kostenlose Freiwillige – nur wenn die Stadt angegriffen wird oder Krieg herrscht; löst sich danach wieder auf'},
   militia:{name:'Milizionäre', cls:'inf', cost:{money:150}, time:0, hp:75, armor:'none', speed:1.3, sight:6, size:0.4,
           weapon:{type:'bullet', dmg:8, range:4, rof:0.95}, prod:null, desc:'Kämpfer der Grenzmiliz'},
   bandit: {name:'Räuber', cls:'inf', cost:{money:0}, time:0, hp:70, armor:'none', speed:1.35, sight:6, size:0.4,

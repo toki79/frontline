@@ -583,6 +583,25 @@ describe('Simulation', () => {
     expect(BUILDINGS.hq.weapon).toBeTruthy();                   // Rathauswache
   });
 
+  it('Notstand: Bürgerwehr nur bei Angriff, kostenlos, löst sich auf; Beute nicht aus jedem Haus', () => {
+    newGame('mittel');
+    const p = G.players[0]; p.pop = 36;
+    expect(missingReq(0, 'volunteer').length).toBeGreaterThan(0);          // im Frieden nicht verfügbar
+    p.lastAttack = { x: 0, y: 0, t: G.t };
+    expect(missingReq(0, 'volunteer')).toEqual([]);
+    p.res.money = 0;
+    expect(enqueue(0, 'volunteer')).toBe(true);                             // auch bei leerer Kasse
+    expect(runUntil(() => G.units.some(u => u.owner === 0 && u.type === 'volunteer'), 10)).toBe(true);
+    p.lastAttack = { x: 0, y: 0, t: G.t - 1000 };
+    const msgs: string[] = []; on('msg', (m: string) => msgs.push(m));
+    expect(runUntil(() => !G.units.some(u => !u.dead && u.owner === 0 && u.type === 'volunteer'), 200)).toBe(true);
+    expect(msgs.some(m => m.includes('nach Hause'))).toBe(true);           // Freiwillige kehren heim
+    // Beute: ein zerstörtes Wohnhaus kostet kein Geld, das Rathaus schon
+    p.res.money = 1000;
+    const h = builtNearHq('house'); destroy(h, { owner: 1, dead: true, x: 0, y: 0 });
+    expect(p.res.money).toBe(1000);
+  });
+
   it('Simulation meldet über Ereignisse statt DOM', () => {
     const msgs: string[] = []; on('msg', (t: string) => msgs.push(t));
     newGame('mittel');

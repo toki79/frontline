@@ -1,5 +1,5 @@
 import { idx, inMap } from '../core/util';
-import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
@@ -20,11 +20,15 @@ export function missingReq(pid,type){
   for(const r of (d.req||[])) if(!findBuilding(pid,r)) miss.push(BUILDINGS[r].name);
   const p=G.players[pid];
   if(d.tech&&p.tech<d.tech) miss.push(`Universität Stufe ${d.tech}`);
+  if(d.emergency&&!emergency(pid)) miss.push('Angriff auf die Stadt oder Krieg');
+  if(d.emergency&&G.units.filter(u=>!u.dead&&u.owner===pid&&u.type===type).length>=EMERGENCY.maxVolunteers) miss.push(`höchstens ${EMERGENCY.maxVolunteers} Trupps`);
   if(d.research&&!hasTech(p,d.research)) miss.push(`Forschung „${RESEARCH[d.research].name}“`);
   if(RESEARCH[type]){ for(const n of (d.need||[])) if(!hasTech(p,n)) miss.push(RESEARCH[n].name);
     for(const b of (d.needB||[])) if(!findBuilding(pid,b)) miss.push(BUILDINGS[b].name); }
   return miss;
 }
+/** Notstand: Stadt kürzlich angegriffen oder Krieg */
+export const emergency = pid => G.war&&pid<2 || !!(G.players[pid].lastAttack&&G.t-G.players[pid].lastAttack.t<EMERGENCY.window);
 export const available=(pid,type)=>missingReq(pid,type).length===0;
 export function enqueue(pid,type){
   const p=G.players[pid], qn=queueName(type), q=p.q[qn]; if(!q) return false;
@@ -45,7 +49,7 @@ export function updateProduction(pid,dt){
     const q=p.q[qn]; if(!q||!q.length) continue;
     const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;
     const it=q[0];
-    let ff=f;
+    let ff=UNITS[it.type]&&UNITS[it.type].emergency?1:f;   // Bürgerwehr: Freiwillige brauchen kein Geld
     if(qn==='research'){ ff*=1+RESEARCH_SPEED.datacenter*Math.min(RESEARCH_SPEED.maxDatacenters,G.buildings.filter(b=>b.owner===pid&&b.type==='datacenter'&&!b.dead&&!b.site).length);   // Rechenzentren
       const R=RESEARCH[it.type]; if(R.power&&p.use>p.power) ff=0; it.stalled=ff===0?'⚡ Strommangel – steht still':''; }   // KI und Atomprogramm: nur mit genug Strom
     if(qn==='silo'){ if(!findWorking(pid,'enrich')) ff=0; it.stalled=ff===0?'Anreicherungsanlage arbeitet nicht':''; }

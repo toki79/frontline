@@ -7,7 +7,7 @@ export function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
    ===================================================================== */
 export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
   c.save(); c.translate(x,y);
-  if(type==='inf'||type==='at'||type==='militia'||type==='bandit'){
+  if(type==='inf'||type==='at'||type==='militia'||type==='bandit'||type==='volunteer'){
     const n=Math.max(1,Math.ceil(hpf*3-0.01)), offs=[[4,0],[-3,-5],[-3,5]];
     c.rotate(ang);
     for(let i=0;i<n;i++){const [ox,oy]=offs[i];
@@ -15,7 +15,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       const tube=type==='at'&&i===0;
       c.strokeStyle='#1d1d1a'; c.lineWidth=tube?2.8:1.3; c.beginPath(); c.moveTo(ox-(tube?4:0),oy+1.6); c.lineTo(ox+(tube?8:7),oy+1.6); c.stroke();
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
-      c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
+      c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':type==='volunteer'?'#8a6a4a':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
   } else if(type==='diplomat'){   // Diplomat: Anzug und Hut
     c.rotate(ang); c.fillStyle='rgba(0,0,0,.28)'; c.beginPath(); c.arc(1.5,1.5,3.4,0,7); c.fill();

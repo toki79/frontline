@@ -9,6 +9,7 @@ import { $ } from '../ui/dom';
 import { f1 } from '../ui/format';
 import { cmd, refreshCmds } from '../ui/input';
 import { siteLacks } from '../sim/build';
+import { emergency } from '../sim/production';
 import { unprotected } from '../sim/fortify';
 import { openDiplo } from '../ui/menus';
 import { msg } from '../core/events';
@@ -56,7 +57,11 @@ export function advise(){
     if(near<2) T.push({p:88,txt:`<b>Räuber im Anmarsch</b> auf euren ${w.name}! ${army?'Schickt eure Schützen hin.':'Ihr habt keine Soldaten – Kaserne bauen und 2 Schützentrupps ausbilden.'}`,act:army?{label:'◎ Truppen wählen',fn:()=>cmd('all')}:has('barracks')?{label:'Schützen ausbilden',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('inf');}}:B('barracks')}); }
   { const c=G.buildings.find(c=>!c.dead&&c.type==='camp'&&G.buildings.some(b=>!b.dead&&b.owner===0&&!b.def.def&&Math.hypot(c.x-b.x,c.y-b.y)<16));
     if(c) T.push({p:34,txt:'<b>Räuberlager in der Nähe.</b> Räuber überfallen unbegleitete Arbeiter, Laster und Außenposten. Schick Truppen (◎ Alle, dann Lager antippen) oder begleite Arbeiter mit 🛡.',act:{label:'◎ Truppen wählen',fn:()=>cmd('all')}}); }
-  if(p.broke) T.push({p:82,txt:'<b>Die Kasse ist leer!</b> Unterhalt, Sold und Verwaltung übersteigen die Einnahmen – Betriebe laufen nur halb so schnell. Weniger Truppen, Überflüssiges abreißen, mehr Einwohner oder Handel.',act:{label:'🤝 Handeln',fn:openDiplo}});
+  if(p.broke){ const r=p.rate||{}, big=[['Gebäude-Unterhalt',r.upkeep||0],['Sold',r.wages||0],['Verwaltung',r.admin||0]].sort((a,b)=>b[1]-a[1])[0];
+    T.push({p:82,txt:`<b>Die Kasse ist leer!</b> Einnahmen ${f1(r.money||0)} $/s, größter Posten: ${big[0]} ${f1(big[1])} $/s. Betriebe laufen langsamer (Höfe arbeiten weiter). Überflüssiges abreißen, Überschüsse verkaufen oder handeln.${emergency(0)?' Zur Verteidigung: <b>Bürgerwehr</b> kostet kein Geld.':''}`,act:{label:'🤝 Handeln',fn:openDiplo}}); }
+  if(emergency(0)&&!G.war){ const la=p.lastAttack, near=la?G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon&&u.def.cls!=='air'&&Math.hypot(u.x-la.x,u.y-la.y)<10).length:0;
+    if(near<3) T.push({p:91,txt:'<b>Die Stadt wird angegriffen!</b> Biete die <b>Bürgerwehr</b> auf: kostenlos, je Trupp 4 Einwohner, in Sekunden bereit. Nach dem Angriff gehen die Leute wieder nach Hause.',act:{label:'Bürgerwehr aufbieten',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('volunteer');}}}); }
+  else if(G.war){ const la=p.lastAttack; if(la&&G.t-la.t<30&&army<4) T.push({p:91,txt:'<b>Krieg – die Stadt wird angegriffen!</b> Bürgerwehr aufbieten: kostet kein Geld, nur Einwohner.',act:{label:'Bürgerwehr aufbieten',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('volunteer');}}}); }
   { const full=['food','wood','stone','metal','oil'].filter(r=>p.res[r]>=p.store-1);
     if(full.length) T.push({p:37,txt:`<b>Lager voll:</b> ${full.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} (${fmt(p.store)}). Was nicht hineinpasst, geht verloren. Ein Lagerhaus schafft Platz, ein Handelskontor macht Überschuss zu Geld.`,act:has('kontor')?B('depot'):B('kontor')}); }
   { const f=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&b.type==='farm'&&(b.fieldF??1)<0.6);

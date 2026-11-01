@@ -33,7 +33,7 @@ export function buildPanel(){
   const list= ui.tab==='bau' ? ['road', ...Object.keys(BUILDINGS).filter(k=>BUILDINGS[k].buildable!==false&&!BUILDINGS[k].def)]
             : ui.tab==='forsch' ? [...Object.keys(RESEARCH), 'nuke']
             : ui.tab==='vert' ? ['pioneer','wall','wire','trench','atmine','sentry','turret','flak','gbunker']
-            : Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored);
+            : ['worker','volunteer',...Object.keys(UNITS).filter(k=>UNITS[k].prod&&!UNITS[k].stored&&k!=='worker'&&k!=='volunteer')];
   for(const k of list){
     const d=DEF(k), el=document.createElement('button'); el.className='it';
     el.innerHTML=`<canvas width="84" height="84"></canvas><span class="n">${d.name}</span><span class="c">${costHtml(d.cost)}</span><div class="pr"></div><span class="q"></span><span class="st"></span>`;

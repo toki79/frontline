@@ -13,12 +13,12 @@ import { msg } from '../core/events';
    Kräfte-Übersicht: alle eigenen Einheiten nach Art, Status, Einsatz ordern
    ===================================================================== */
 const GROUPS: [string,string[]][] = [
-  ['Infanterie',['inf','at','militia']],
+  ['Infanterie',['inf','at','volunteer','militia']],
   ['Fahrzeuge',['ifv','mbt','mlrs','spaag','jammer']],
   ['Drohnen',['drone','spy','reaper']],
   ['Zivil & Spezial',['worker','pioneer','diplomat','truck','caravan']],
 ];
-const PICKABLE = new Set(['inf','at','militia','ifv','mbt','mlrs','spaag','jammer','drone','spy','reaper']);
+const PICKABLE = new Set(['inf','at','volunteer','militia','ifv','mbt','mlrs','spaag','jammer','drone','spy','reaper']);
 export const fs: {kind: OrderKind, pick: Record<string,number>} = {kind:'hold', pick:{}};
 const KINDS: [OrderKind,string,string][] = [
   ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung'],
