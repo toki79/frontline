@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { FIRE, FUN, TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { T, FIRE, FUN, TRIBUTE, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -221,6 +221,7 @@ export function aiPickBuilding(p,armyN,need,lead){
   if(!has('lumber')&&ok('lumber')) return 'lumber';
   if(!has('quarry')&&ok('quarry')&&G.t>15) return 'quarry';
   if(p.res.wood<70&&has('lumber')<3&&ok('lumber')) return 'lumber';
+  if(p.res.wood<200&&has('forester')<2&&ok('forester')&&p.res.money>300&&(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.type==='lumber'&&b.empty)||G.t-((ai.noSpot||{}).lumber??-999)<120)) return 'forester';   // gefällten Wald wieder aufforsten
   if(p.res.stone<70&&has('quarry')<2&&ok('quarry')) return 'quarry';
   const pick=aiPickMain(p,need,has,ok);
   if(pick){ const c: any=BUILDINGS[pick].cost;
@@ -325,6 +326,8 @@ export function aiPlace(pid,type){
     if(type==='house') s+=(1-housingQuality(pid,x,y,d.w,d.h).q)*30;                           // ruhig wohnen
     if(type==='farm') s-=previewFields(x,y,d.w,d.h)*25;                                        // Wiesen und freie Äcker
     if(type==='depot'&&far.length) s=Math.min(...far.map(b=>dist(x,y,b.x,b.y)));               // Lager zu entlegenen Betrieben
+    if(type==='forester'){ const l=G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.type==='lumber'); if(l.length) s=Math.min(...l.map(b=>dist(x,y,b.x,b.y))); }   // Forsthaus neben den Holzfäller
+    for(let yy=y;yy<y+d.h;yy++)for(let xx=x;xx<x+d.w;xx++) if(G.terr[idx(xx,yy)]===T.FOREST) s+=type==='lumber'?2:6;   // Wald möglichst stehen lassen
     if(d.noise) for(const h of own) if(h.def.cap&&rectDist(h,x,y,d.w,d.h)<=NOISE_R) s+=6;        // Industrie weg von Häusern
     cand.push({x,y,s:s+Math.random()*2});
   }

@@ -20,7 +20,7 @@ export const ui: any={tab:'bau',btns:{},cat:{}};
 // Kategorien je Reiter (Filter-Chips über den Bauknöpfen)
 export const CATS = {
   bau: [['alle','Alle'],['wohnen','🏠 Wohnen',['house','block']],['versorgung','🌾 Nahrung & ⚡ Strom',['farm','greenhouse','power','npp']],
-        ['rohstoffe','⛏ Rohstoffe',['lumber','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
+        ['rohstoffe','⛏ Rohstoffe',['lumber','forester','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
         ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär',['barracks','factory','droneshop']],
         ['hightech','🎓 Wissen & Hightech',['university','datacenter','enrich','silo']]],
   truppen: [['alle','Alle'],['zivil','👷 Zivil',['worker','volunteer','diplomat','truck']],['inf','🪖 Infanterie',['inf','at']],

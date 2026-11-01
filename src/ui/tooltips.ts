@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
@@ -50,6 +50,7 @@ export function tipFor(k){
     if(d.metal) L.push(`Metall: +${f1(d.metal)} ⛏ pro Sekunde, solange das angrenzende Erz reicht`);
     if(d.wood) L.push(`Holz: +${f1(d.wood)} 🪵 pro Sekunde. Fällt den Wald im Umkreis von 3 Feldern nach und nach (ein Waldfeld = ${CONSTRUCTION.forestWood} Holz).`);
     if(d.stone) L.push(`Stein: +${f1(d.stone)} 🪨 pro Sekunde, solange die angrenzenden Felsen reichen.`);
+    if(!d.def) L.push('🌲 Darf auch auf Wald gesetzt werden: die Bäume werden gerodet, die Hälfte des Holzes kommt ins Lager (gelb markierte Felder).');
     if(!d.def){ const m=['wood','stone','metal'].filter(r=>d.cost[r]); L.push(`🏗 Beim Setzen wird nur das Geld fällig${m.length?`; ${m.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} holen die Arbeiter beim Bauen aus dem Lager – fehlt es, wartet die Baustelle`:''}.`); }
     if(d.wood||d.stone||d.metal||k==='farm') L.push(`🛣 Liefert zum Rathaus oder nächsten Lagerhaus: weiter Weg = weniger Ertrag. Straßen und Lagerhäuser in der Nähe helfen.`);
     if(ECON.upkeep[k]) L.push(`Unterhalt: ${f1(ECON.upkeep[k])} $/s`);
@@ -60,6 +61,8 @@ export function tipFor(k){
     if(k==='refinery') L.push(`Mit Forschung „Biokraftstoff“: Fehlt Rohöl, macht die Raffinerie aus Nahrung Öl (${BIOFUEL.ratio} 🌾 → 1 🛢, bis ${BIOFUEL.rate} Öl/s), solange mehr als ${BIOFUEL.reserve} Nahrung im Lager sind.`);
     if(d.fun) L.push(`🎭 Unterhaltung für ${d.fun} Einwohner (ausgebaut mehr). Ab ${FUN.free} Einwohnern braucht jeder Bürger einen Platz – fehlt Unterhaltung, sinkt die Zufriedenheit und damit die Steuern.`);
     if(d.fireR) L.push(`🚒 Schützt alle Gebäude im Umkreis von ${d.fireR} Feldern: Brände brechen seltener aus, werden ${FIRE.stationQuench+1}× schneller gelöscht, richten halb so viel Schaden an und springen nicht über. Ab ${FIRE.minPop} Einwohnern brennt es ab und zu – besonders in eng bebauten Vierteln.`);
+    if(d.forester) L.push(`🌱 Pflanzt alle ${FOREST.plantEvery} s einen Setzling (bis ${FOREST.maxSaplings} gleichzeitig) auf freiem Land im Umkreis von ${FOREST.radius} Feldern – mit Abstand zu Gebäuden und Äckern. Nach ${Math.round(FOREST.grow/60)} Minuten wird daraus Wald, den ein Holzfäller fällen kann. Ausgebaut pflanzt es schneller.`);
+    if(d.needsForest) L.push('Tipp: Ein Forsthaus daneben forstet gefällten Wald wieder auf – so geht das Holz nie aus.');
     if(k==='derrick') L.push('Braucht kein Ölfeld und keine Tanklaster – liefert direkt ins Lager. Ohne Strom nur 30 % Leistung.');
     if(k==='npp') L.push(`☢ Wird es zerstört, kommt es zur Kernschmelze: Verwüstung im Umkreis von ${NUKE.meltdown.radius} Feldern und ${Math.round(NUKE.falloutTime/60)} min Verstrahlung. Nicht an die Front bauen!`);
     if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);

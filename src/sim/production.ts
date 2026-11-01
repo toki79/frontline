@@ -1,9 +1,9 @@
 import { idx, inMap } from '../core/util';
-import { lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
-import { canPlaceRoad, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
+import { canPlaceRoad, clearForest, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -67,7 +67,7 @@ export function updateProduction(pid,dt){
     }
   }
 }
-export function tileFree(i){return !(G.fallMap&&G.fallMap[i])&&TERRAIN[G.terr[i]].build&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.road[i]&&!G.occ[i];}
+export function tileFree(i){return !(G.fallMap&&G.fallMap[i])&&(TERRAIN[G.terr[i]].build||G.terr[i]===T.FOREST)&&!(G.sapling&&G.sapling[i]>0)&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.road[i]&&!G.occ[i];}
 export function nearOwn(pid,tx,ty,w,h){
   for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;
     const dx=Math.max(b.tx-(tx+w), tx-(b.tx+b.w), 0), dy=Math.max(b.ty-(ty+h), ty-(b.ty+b.h), 0);
@@ -119,6 +119,9 @@ export function cancelDefPlan(pid,x,y){
 /** Baustelle beauftragen: Kosten werden sofort bezahlt, Bauarbeiter erledigen den Rest. */
 export function placeSite(pid,type,tx,ty){
   if(!BUILDINGS[type]||BUILDINGS[type].def||!canPlace(pid,type,tx,ty)||missingReq(pid,type).length||!canAfford(pid,type)) return null;
-  G.players[pid].res.money-=BUILDINGS[type].cost.money||0;   // Holz, Stein, Metall holen die Arbeiter erst beim Bauen
+  const p=G.players[pid]; p.res.money-=BUILDINGS[type].cost.money||0;   // Holz, Stein, Metall holen die Arbeiter erst beim Bauen
+  const d=BUILDINGS[type]; let n=0, w=0;   // Bauplatz im Wald: Bäume werden gerodet, ein Teil des Holzes kommt ins Lager
+  for(let y=ty;y<ty+d.h;y++)for(let x=tx;x<tx+d.w;x++){ const i=idx(x,y); if(G.terr[i]===T.FOREST){ n++; w+=G.wood[i]*CONSTRUCTION.clearShare; clearForest(i); } }
+  if(n){ p.res.wood+=Math.floor(w); if(pid===0) msg(`🌲 ${n} Waldfeld${n===1?'':'er'} für den Bauplatz gerodet (+${Math.floor(w)} 🪵).`,'#9fd88a'); G.qDirty=true; }
   return placeBuilding(pid,type,tx,ty,false,true);
 }

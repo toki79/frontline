@@ -66,7 +66,7 @@ export function roadNearOwn(pid,x,y){
 export function roadTileOk(i){
   const t=G.terr[i];
   if(!isPlain(t)&&t!==T.MUD&&t!==T.TOWN) return false;
-  return !G.occ[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.feat[i]&&!(G.fallMap&&G.fallMap[i]);
+  return !G.occ[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.feat[i]&&!(G.fallMap&&G.fallMap[i])&&!(G.sapling&&G.sapling[i]>0);
 }
 export function canPlaceRoad(pid,x,y){
   if(!inMap(x,y)) return false; const i=idx(x,y);
@@ -120,7 +120,7 @@ export function updateRoadNet(){
 }
 // ---------- Äcker ----------
 /** Freie Steppe um Bauernhöfe wird zu Ackerland; zugebaute Felder senken den Ertrag. Ältere Höfe zuerst. */
-export function fieldTileFree(i){ return isPlain(G.terr[i])&&!G.occ[i]&&!G.road[i]&&!G.feat[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0; }
+export function fieldTileFree(i){ return !(G.sapling&&G.sapling[i]>0)&&isPlain(G.terr[i])&&!G.occ[i]&&!G.road[i]&&!G.feat[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0; }
 export function updateFields(){
   G.field=G.field||new Uint8Array(MAP_W*MAP_H); G.field.fill(0);
   const R=DENSITY.farmFieldR;

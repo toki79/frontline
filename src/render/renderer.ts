@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { dist, hash, idx, inMap } from '../core/util';
-import { capOf, BUILDINGS, FACTIONS, FEAT, JAM, MAP_H, MAP_W, NUKE, TILE, isDefType } from '../data/config';
+import { capOf, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, routeRoadBetween, siteLacks, siteWorkers } from '../sim/build';
@@ -49,6 +49,7 @@ export function render(){
     for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++) if(tileBuildable(0,x,y)){
       if(pd.cap){ const q=housingQuality(0,x,y,1,1).q; c.fillStyle=q>=0.9?'rgba(120,240,120,.26)':q>=0.6?'rgba(240,220,90,.28)':'rgba(240,130,70,.32)'; }
       else c.fillStyle='rgba(120,240,120,.24)';
+      if(G.terr[idx(x,y)]===T.FOREST) c.fillStyle='rgba(220,200,90,.3)';   // Wald: wird beim Bauen gerodet
       c.fillRect(x*TILE+1,y*TILE+1,TILE-2,TILE-2); }
     const need=pd.needsOre?G.ore:pd.needsRock?G.rock:pd.needsForest?G.wood:null;
     if(need){ c.strokeStyle='rgba(255,230,120,.9)'; c.lineWidth=2;
@@ -91,6 +92,9 @@ export function render(){
         c.fillStyle='#c8d4e0'; c.fillRect(cx-1,cy-s*0.4,2.5,2); c.fillStyle='#b98a52'; c.fillRect(cx+s*0.3,cy-1,2,2); }
     }
   }
+  if(G.saplings) for(const i of G.saplings){ const x=i%MAP_W, y=(i/MAP_W)|0; if(x<tx0||x>tx1||y<ty0||y>ty1||tileVis(x+0.5,y+0.5)===0) continue;   // Setzlinge
+    const g=1-Math.max(0,G.sapling[i])/FOREST.grow, s=3+g*8, px=x*TILE+16, py=y*TILE+18;
+    c.fillStyle='#5a4028'; c.fillRect(px-1,py,2,5); c.fillStyle='#3f6a2a'; c.beginPath(); c.arc(px,py-s*0.3,s,0,7); c.fill(); c.fillStyle='#5a8a3a'; c.beginPath(); c.arc(px-s*0.3,py-s*0.5,s*0.5,0,7); c.fill(); }
   for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; const f=G.players[b.owner];
     const k=Math.min(1,(G.t-b.born)/0.4);
     c.save(); if(k<1){c.translate(b.x*TILE,b.y*TILE);c.scale(0.6+0.4*k,0.6+0.4*k);c.translate(-b.x*TILE,-b.y*TILE);c.globalAlpha=0.5+0.5*k;}

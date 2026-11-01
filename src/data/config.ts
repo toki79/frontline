@@ -28,6 +28,7 @@ export const CONSTRUCTION = {
   roadRadius: 12,       // Straßen dürfen so weit von eigenen Gebäuden entfernt liegen
   startWorkers: 3,
   forestWood: 120,      // Holz pro Waldfeld; leer gefällter Wald wird zu Steppe
+  clearShare: 0.5,      // Bauen auf Wald: die Bäume werden gerodet, dieser Anteil des Holzes kommt ins Lager
   demolishRefund: 0.3,  // Erstattung beim Abriss fertiger Gebäude (Baustellen: voll)
   // Baustellen: Geld wird beim Setzen bezahlt, Holz/Stein/Metall erst beim Bauen aus dem Lager geholt.
 };
@@ -53,7 +54,7 @@ export const DENSITY = {
 // ---------- Stadtentwicklung: Bürger bauen selbst aus (Spieler gibt Prioritäten und Mittel frei) ----------
 export const DEV = {
   cats: {wohnen:{name:'Wohnen', icon:'🏠', types:['house','block','hq']}, nahrung:{name:'Nahrung', icon:'🌾', types:['farm','greenhouse']},
-         rohstoffe:{name:'Rohstoffe', icon:'⛏', types:['lumber','quarry','mine','refinery','derrick']}, strom:{name:'Strom', icon:'⚡', types:['power','npp']},
+         rohstoffe:{name:'Rohstoffe', icon:'⛏', types:['lumber','forester','quarry','mine','refinery','derrick']}, strom:{name:'Strom', icon:'⚡', types:['power','npp']},
          stadtleben:{name:'Stadtleben', icon:'🎭', types:['park','theater','pool','stadium','firest']}, lager:{name:'Lager & Handel', icon:'📦', types:['depot','kontor']},
          wissen:{name:'Forschung', icon:'🎓', types:['university','datacenter']}, militaer:{name:'Militär', icon:'🪖', types:['barracks','factory','droneshop']}},
   think: 6, parallel: 2, parallelPer: 1000,     // gleichzeitige Ausbauten: 2 + 1 je 1000 Einwohner
@@ -61,6 +62,8 @@ export const DEV = {
   defaults: {on:true, prio:{wohnen:1, nahrung:1, rohstoffe:1, strom:1, stadtleben:1, lager:1, wissen:1, militaer:0}, release:{money:0.25, wood:0.5, stone:0.5, metal:0.25}},
 };
 // ---------- Stadtleben: Unterhaltung und Feuerwehr ----------
+// Forsthaus: pflanzt Setzlinge, die nach grow Sekunden zu Wald werden
+export const FOREST = {plantEvery:12, grow:420, radius:4, maxSaplings:8};
 export const FUN = {free:300};   // so viele Einwohner kommen ohne Unterhaltung aus; darüber braucht jeder einen Platz
 export const FIRE = {outbreak:0.00025, minPop:250, stationR:11, stationQuench:3, stationOutbreak:0.25};   // Brandgefahr je Gebäude und Sekunde (eng bebaut höher); Feuerwehr löscht schnell und verhindert Übergreifen
 // ---------- Zufriedenheit: Versäumnisse haben Folgen ----------
@@ -92,7 +95,7 @@ export const ECON = {
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
   upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
-           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4, derrick:0.8, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
+           university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, flak:0.25, gbunker:0.4, derrick:0.8, forester:0.1, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   // Stadtverwaltung: Anteil der Steuern, wächst mit der Stadtgröße, bleibt aber unter adminMax
   // (500 EW ≈ 20 %, 1000 ≈ 30 %, 3000 ≈ 45 %, 10 000 ≈ 55 %) – Wachstum lohnt sich immer, nur weniger
@@ -199,6 +202,7 @@ export const BUILDINGS = {
             weapon:{type:'bullet', dmg:9, range:5.5, rof:0.6}},
   house:   {name:'Wohnhaus',      w:2,h:2, hp:450,  power:-10, cost:{money:150, wood:40}, time:5, req:[], cap:50, sight:3, desc:'+50 Wohnraum'},
   farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
+  forester:{name:'Forst\u00ADhaus',  w:2,h:2, hp:350,  power:0,   cost:{money:150, wood:20}, time:5, req:[], forester:true, sight:4, desc:'Pflanzt Bäume im Umkreis von 4 Feldern – nach 7 Minuten ist daraus Wald geworden'},
   lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
   quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein, nur direkt an Felsen'},
   block:   {name:'Wohnblock',     w:2,h:2, hp:700,  power:-20, cost:{money:500, wood:20, stone:120, metal:20}, time:14, req:[], research:'urban', cap:150, sight:3, desc:'150 Wohnraum auf kleiner Fläche'},

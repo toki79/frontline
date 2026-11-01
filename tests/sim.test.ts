@@ -695,6 +695,18 @@ describe('Simulation', () => {
     expect(fw).toBeTruthy();
   });
 
+  it('Wald: Bauplatz wird gerodet (+Holz), Forsthaus forstet wieder auf', () => {
+    gameWith('wood'); const hq = findBuilding(0, 'hq'), p = G.players[0];   // Region mit Wald
+    let spot = null; for (let r = 2; r < 20 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(hq.x) + dx, y = Math.floor(hq.y) + dy; if (G.terr[idx(x, y)] === T.FOREST && canPlace(0, 'house', x, y)) { spot = [x, y]; break; } }
+    expect(spot).toBeTruthy();
+    const w0 = p.res.wood; expect(placeSite(0, 'house', spot[0], spot[1])).toBeTruthy();
+    expect(G.terr[idx(spot[0], spot[1])]).not.toBe(T.FOREST); expect(p.res.wood).toBeGreaterThan(w0);
+    const f = builtNearHq('forester'); run(40);
+    expect(G.saplings.length).toBeGreaterThan(0);
+    const i = G.saplings[0]; G.sapling[i] = 1.5; run(3);
+    expect(G.terr[i]).toBe(T.FOREST); expect(G.wood[i]).toBeGreaterThan(0); expect(f).toBeTruthy();
+  });
+
   it('Simulation meldet über Ereignisse statt DOM', () => {
     const msgs: string[] = []; on('msg', (t: string) => msgs.push(t));
     newGame('mittel');

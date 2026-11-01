@@ -256,6 +256,11 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
       if(armed){ c.fillStyle='#e0ded4'; c.beginPath(); c.arc(W/2,H/2+4,4,0,7); c.fill(); c.fillStyle='#c0392b'; c.beginPath(); c.arc(W/2,H/2+4,1.8,0,7); c.fill(); }
       box(W-12,H-8,8,5,col,dark);
       break; }
+    case 'forester':   // Forsthaus: Blockhütte, Setzlingsbeete
+      c.fillStyle='#6a7a42'; c.fillRect(2,2,W-4,H-4); roof(5,5,26,20);
+      for(let i=0;i<3;i++) for(let j=0;j<2;j++){ c.fillStyle='#4a7a34'; c.beginPath(); c.arc(W-22+i*8,H-18+j*9,3,0,7); c.fill(); }
+      c.fillStyle='#8a6a3a'; c.fillRect(8,H-12,16,6); c.fillStyle=col; c.fillRect(W-12,4,8,5);
+      break;
     case 'park':   // Park: Wege, Bäume, Brunnen
       c.strokeStyle='#c9b98a'; c.lineWidth=4; c.beginPath(); c.moveTo(2,H/2); c.lineTo(W-2,H/2); c.moveTo(W/2,2); c.lineTo(W/2,H-2); c.stroke(); c.lineWidth=1;
       for(const [tx2,ty2] of [[12,12],[W-12,12],[12,H-12],[W-12,H-12],[20,H/2-12],[W-20,H/2+12]]){ c.fillStyle='#2f5a24'; c.beginPath(); c.arc(tx2,ty2,6,0,7); c.fill(); c.fillStyle='#4a7a34'; c.beginPath(); c.arc(tx2-1.5,ty2-1.5,3.5,0,7); c.fill(); }
