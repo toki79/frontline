@@ -8,6 +8,7 @@ import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
 import { rangeOf } from '../src/sim/units';
+import { makeGroup, groupState, dissolveGroup } from '../src/sim/groups';
 import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
@@ -747,6 +748,22 @@ describe('Simulation', () => {
     expect(runUntil(() => jet.mode === 'rtb' || jet.mode === 'rearm', 40)).toBe(true);
     expect(runUntil(() => jet.mode === 'rearm', 40)).toBe(true);
     expect(runUntil(() => jet.mode === 'attack' || tgt.dead, 40)).toBe(true);
+  });
+
+  it('Verband: gemeinsames Tempo, verbundene Waffen stärken die Truppe', () => {
+    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    const hq = findBuilding(0, 'hq');
+    const us = [spawnAt(0, 'inf', hq.x + 4, hq.y - 4), spawnAt(0, 'inf', hq.x + 4.6, hq.y - 4), spawnAt(0, 'mbt', hq.x + 5, hq.y - 5), spawnAt(0, 'spaag', hq.x + 5.5, hq.y - 4)];
+    const g = makeGroup(0, us); run(1.5);
+    expect(groupState(g).combined).toBe(true);
+    expect(us.every(u => u.cmb)).toBe(true);
+    const e1 = spawnAt(1, 'mbt', hq.x + 20, hq.y - 20), e2 = spawnAt(1, 'mbt', hq.x + 22, hq.y - 20);
+    const solo = { owner: 0, dead: true, x: 0, y: 0 }; for (let i = 0; i < 5; i++) { applyDamage(e1, 25, 'shell', us[2]); applyDamage(e2, 25, 'shell', solo); }
+    expect(e1.maxHp - e1.hp).toBeGreaterThan((e2.maxHp - e2.hp) * 1.03);   // verbundene Waffen: +15 % (bei Zufallsstreuung)
+    orderMove(us, hq.x + 4, hq.y - 16);
+    expect(us.every(u => u.pace === 1.25)).toBe(true);                 // Tempo der Schützen
+    run(5); const ys = us.map(u => u.y); expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(4);
+    dissolveGroup(g); expect(us.every(u => !u.grp)).toBe(true);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

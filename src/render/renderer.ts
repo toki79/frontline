@@ -198,8 +198,10 @@ export function render(){
     const R=u.def.size*TILE*0.8;
     if(s){c.strokeStyle=u.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=1.5;c.beginPath();c.arc(u.x*TILE,u.y*TILE,R+3,0,7);c.stroke();}
     if(s||u.hp<u.maxHp) hpBar(c,u.x*TILE-R,u.y*TILE-R-7,R*2,u.hp/u.maxHp);
+    if(u.grp&&u.owner===0){ const g=(G.groups||[]).find(x=>x.id===u.grp); if(g){ const bx=u.x*TILE+R+1, by=u.y*TILE-R-2;   // Verbandsabzeichen
+      c.fillStyle=u.cmb?'#c9a83a':'#5a5030'; c.beginPath(); c.arc(bx,by,5,0,7); c.fill(); c.fillStyle='#fff'; c.font='bold 8px sans-serif'; c.textAlign='center'; c.fillText(String(g.n),bx,by+3); c.textAlign='left'; } }
   }
-  drawRanges(c,G.sel.filter(e=>!e.dead).slice(0,12));   // Wirkkreise der Auswahl
+  { const ss=G.sel.filter(e=>!e.dead); if(ss.length<=3) drawRanges(c,ss); }   // Wirkkreise der Auswahl (bei großen Gruppen übersichtlich weglassen)
   for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; const s=selSet.has(b);
     if(s){c.strokeStyle=b.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=2;c.strokeRect(b.tx*TILE-1,b.ty*TILE-1,b.w*TILE+2,b.h*TILE+2);}
     if(s||b.hp<b.maxHp) hpBar(c,b.tx*TILE+3,b.ty*TILE-6,b.w*TILE-6,b.hp/b.maxHp);

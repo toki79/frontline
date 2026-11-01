@@ -44,6 +44,14 @@ button:disabled{opacity:.4;cursor:default}
 #cmds button.ctx.show{display:flex}
 #cmds button.warn{border-color:#e0503a;background:#4a2018}
 #cmds button.poor{opacity:.55}
+#grpBtns{display:contents}
+#grpBtns button{border-color:#c9a83a;background:#2e2a16}
+#grpBtns button.on{background:#4a4420;border-color:var(--acc)}
+#grpBtns button small{color:#e9d27a}
+#forces .grp{border:1px solid #6a5a2a;border-radius:9px;padding:8px 10px;margin:6px 0;background:#1d1a10}
+#forces .grp .gh{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+#forces .grp .gb{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+#forces .grp .gb button{font-size:12.5px;padding:6px 9px}
 #cmds button.on{border-color:var(--acc);background:#4a4420}
 #cmds button.nukeb{border-color:#c0392b;color:#ffd36a}
 #cmds button.nukeb.on{background:#5a1a12;border-color:#ff5a4a}

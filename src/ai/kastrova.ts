@@ -12,6 +12,7 @@ import { armyStr, countBuildings, defStr, findBuilding, hostile, housingQuality,
 import { msg } from '../core/events';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
+import { makeGroup } from '../sim/groups';
 import { fireCoverage } from '../sim/city';
 
 /* =====================================================================
@@ -308,6 +309,7 @@ export function launchRaid(army,need,lead,rally){
   const sorted=[...army].sort((a,b)=>dist(a.x,a.y,hq.x,hq.y)-dist(b.x,b.y,hq.x,hq.y));
   const home=army.length>5?2:0, grp=sorted.slice(home);
   for(const u of grp) u.wave=true;
+  makeGroup(1,grp);   // Kastrovas Angriffswelle kämpft als Verband
   orderMove(grp,tg.x,tg.y,'amove');
   ai.nextRaid=G.t+90; ai.raidTarget=tg; ai.lootSince=0;
   msg(`⚠ Überfall! ${grp.length} Einheiten Kastrovas rücken gegen euren ${tg.def.name} vor.`,'#ff8a7a');

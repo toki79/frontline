@@ -8,6 +8,7 @@ import { drawIcon } from './panel';
 import { refreshCmds } from './input';
 import { hideTip } from './tooltips';
 import { msg } from '../core/events';
+import { dissolveGroup, groupState, groupsOf, makeGroup, members } from '../sim/groups';
 
 /* =====================================================================
    Kräfte-Übersicht: alle eigenen Einheiten nach Art, Status, Einsatz ordern
@@ -29,7 +30,7 @@ const KINDS: [OrderKind,string,string][] = [
 ];
 const own = () => G.units.filter(u=>!u.dead&&u.owner===0);
 /** frei = ohne Auftrag, nicht begleitend, nicht auf Patrouille, kein Kampf */
-export const isFree = u => !u.order&&!u.escort&&!u.patrol&&!u.target&&(u.mode==='idle'||u.mode==='harvest'&&false)&&!u.job&&!u.pjob&&!u.mission;
+export const isFree = u => !u.grp&&!u.order&&!u.escort&&!u.patrol&&!u.target&&(u.mode==='idle'||u.mode==='harvest'&&false)&&!u.job&&!u.pjob&&!u.mission;
 function status(u){
   if(u.def.worker) return u.working?'baut':u.job?(u.job.kind==='haul'?'trägt':'unterwegs'):'wartet';
   if(u.def.pioneer&&(u.pjob||u.working)) return 'baut';
@@ -47,8 +48,18 @@ function status(u){
   if(u.mode==='move'||u.mode==='amove') return 'unterwegs';
   return 'frei';
 }
+function groupsHtml(){
+  const gs=groupsOf(0); let h='<h4>🎖 Verbände</h4>';
+  if(!gs.length) return h+'<div class="barl"><span>Noch keine Verbände. Einheiten unten mit −/+ zusammenstellen und „🎖 Als Verband“ tippen – oder auf der Karte mehrere wählen und 🎖 tippen. Infanterie, Fahrzeuge, Flugabwehr und Drohnen gemischt ergeben <b>verbundene Waffen</b>: mehr Kampfkraft, weniger Verluste.</span></div>';
+  for(const g of gs){ const s=groupState(g), cnt={}; for(const u of s.ms){ const n=u.def.name.replace(/\u00AD/g,''); cnt[n]=(cnt[n]||0)+1; }
+    const hp=s.ms.reduce((a,u)=>a+u.hp,0)/Math.max(1,s.ms.reduce((a,u)=>a+u.maxHp,0)), stt={}; for(const u of s.ms){ const x=status(u); stt[x]=(stt[x]||0)+1; }
+    h+=`<div class="grp"><div class="gh"><b>🎖 ${g.name}</b><span>${Math.round(hp*100)} %</span></div>
+      <div class="dim" style="font-size:12.5px">${Object.entries(cnt).map(([k,v])=>v+'× '+k).join(', ')}<br>${Object.entries(stt).map(([k,v])=>v+' '+k).join(' · ')} · ${s.combined?'⭐ verbundene Waffen':'ohne verbundene Waffen'}</div>
+      <div class="gb"><button data-gsel="${g.id}">📍 Wählen</button><button data-gord="${g.id}_hold">⛉ Halten</button><button data-gord="${g.id}_clear">🔍 Klären</button><button data-gord="${g.id}_assault">⚔ Angriff</button><button data-gdel="${g.id}" style="background:#4a2a22">Auflösen</button></div></div>`; }
+  return h;
+}
 export function renderForces(){
-  const all=own(); let h='<div class="row kinds">';
+  const all=own(); let h=groupsHtml()+'<h4>Einsatz aus freien Kräften</h4><div class="row kinds">';
   for(const [k,l] of KINDS) h+=`<button data-k="${k}" class="${fs.kind===k?'on':''}">${l}</button>`;
   h+=`</div><div class="barl"><span>${KINDS.find(k=>k[0]===fs.kind)[2]}. Drohnen: FPV lauern am Ziel, Aufklärer überwachen das Gebiet.</span></div>`;
   for(const [g,types] of GROUPS){
@@ -63,6 +74,7 @@ export function renderForces(){
   }
   const tot=Object.entries(fs.pick).reduce((s,[t,n])=>s+Math.min(n,all.filter(u=>u.type===t).length),0);
   h+=`<button class="big" id="fGo" ${tot?'':'disabled'}>🎯 ${tot} Einheit${tot===1?'':'en'}: ${ORDER_NAME[fs.kind]} – Ziel auf der Karte antippen</button>`;
+  h+=`<button class="big" id="fGrp" ${tot>=2?'':'disabled'} style="background:#3a3418;border-color:#8a7a3a">🎖 Als Verband zusammenstellen (${tot})</button>`;
   if(!all.length) h='<div class="barl"><span>Keine Einheiten.</span></div>';
   $('#forcesBody').innerHTML=h;
   $('#forcesBody').querySelectorAll('canvas[data-icon]').forEach((c: any)=>drawIcon(c,c.dataset.icon));
@@ -101,6 +113,14 @@ export function init(){
     else if(d.m){ fs.pick[d.m]=Math.max(0,(fs.pick[d.m]||0)-1); }
     else if(d.all){ const us=all.filter(u=>u.type===d.all), free=us.filter(isFree).length; fs.pick[d.all]=fs.pick[d.all]===free?us.length:free||us.length; }
     else if(d.loc){ locate(d.loc); return; }
+    else if(d.gsel||d.gord||d.gdel){ const g=(G.groups||[]).find(x=>x.id===Number(d.gsel||d.gdel||d.gord.split('_')[0])); if(!g) return;
+      if(d.gdel){ dissolveGroup(g); msg(`${g.name} aufgelöst.`); renderForces(); return; }
+      const ms=members(g); G.sel=ms; close();
+      if(d.gsel){ const s=groupState(g); centerOn(s.cx,s.cy); }
+      else { const k=d.gord.split('_')[1]; if(k==='assault'){ G.amoveMode=true; } else G.orderMode=k; msg(`🎖 ${g.name}: ${ORDER_NAME[k]} – Ziel auf der Karte antippen.`); }
+      refreshCmds(); return; }
+    else if(b.id==='fGrp'){ const hq=G.buildings.find(x=>!x.dead&&x.owner===0&&x.type==='hq'); const us=pickUnits(fs.pick,hq?hq.x:48,hq?hq.y:48).filter(u=>u.def.weapon||u.def.jam);
+      if(us.length>=2){ const g=makeGroup(0,us), s=groupState(g); fs.pick={}; msg(`🎖 ${g.name} gebildet: ${us.length} Einheiten${s.combined?' – verbundene Waffen':''}.`,'#9fd88a'); } renderForces(); return; }
     else if(b.id==='fGo'){ G.orderPending={kind:fs.kind, pick:{...fs.pick}}; close(); refreshCmds(); return; }
     renderForces(); });
 }

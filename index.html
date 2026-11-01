@@ -30,11 +30,13 @@
   <div id="items"></div>
 </div>
 <div id="cmds">
+  <span id="grpBtns"></span>
   <button data-c="box">▢<small>Rahmen</small></button>
   <button data-c="amove">⚔<small>Angriff</small></button>
   <button data-c="stop">■<small>Stopp</small></button>
   <button data-c="all">◎<small>Alle</small></button>
   <button data-c="desel">✕<small>Abwählen</small></button>
+  <button data-c="group" class="ctx">🎖<small>Verband</small></button>
   <button data-c="hold" class="ctx">⛉<small>Halten</small></button>
   <button data-c="clear" class="ctx">🔍<small>Klären</small></button>
   <button data-c="escort" class="ctx">🛡<small>Begleiten</small></button>
@@ -82,6 +84,7 @@
     <b>Stadtschutz:</b> Beim Planen von Verteidigung zeigen rote Kreise die <b>Zugänge zur Stadt</b>. <b>Grenzbunker</b> dürfen weit draußen stehen (bis 30 Felder) und halten enorm viel aus. Das Rathaus hat eine eigene MG-Wache.<br>
     <b>🏙 Stadtentwicklung:</b> Alle Gebäude lassen sich in zwei Stufen ausbauen (×1,4 und ×1,9 Leistung). Die Bürger bauen selbst aus – im Fenster 🏙 legst du Prioritäten je Bereich fest und wie viel deiner Vorräte sie verbauen dürfen.<br>
     <b>Stadtleben:</b> Ab 300 Einwohnern wollen die Leute Unterhaltung (Park, Theater, Schwimmbad, Stadion), sonst sinkt die Zufriedenheit. In größeren Städten bricht Feuer aus – eine Feuerwache schützt den Umkreis.<br>
+    <b>🎖 Verbände:</b> Mehrere Einheiten wählen und 🎖 tippen (oder im Fenster 🪖 Kräfte zusammenstellen). Der Verband marschiert im Tempo der Langsamsten und lässt sich über den Knopf 🎖 in der Befehlsleiste oder Doppeltipp auf ein Mitglied wählen. Gemischte Waffengattungen (Infanterie, Fahrzeuge, Flugabwehr, Drohnen) beisammen = <b>verbundene Waffen</b>: +15 % Kampfkraft, −12 % Schaden.<br>
     <b>Wirkkreise:</b> Einheit oder Gebäude antippen zeigt Reichweite (rot), Sicht, Radar, Störfeld, Lösch- und Pflanzbereich bzw. die Äcker eines Hofs.<br>
     <b>Neue Waffen (Forschung):</b> Luftverteidigung → Flugabwehrraketen (fangen Raketen und Gleitbomben ab) · Raketentechnik → Raketenträger (ballistische Raketen, 40 Felder, nur aufgeklärte Ziele) · Luftfahrt → Fliegerhorst und Jagdbomber, mit Gleitbomben aus 14 Feldern · Informatik → Drohnenschwärme (8 autonome Kamikazedrohnen).<br>
     <b>Wald:</b> Gebäude dürfen auch auf Wald stehen – die Bäume werden beim Setzen der Baustelle gerodet (die Hälfte des Holzes kommt ins Lager). Ein <b>Forsthaus</b> pflanzt Setzlinge, die nach 7 Minuten wieder Wald sind.<br>

@@ -11,6 +11,8 @@ export const TILE = 32, MAP_W = 96, MAP_H = 96, BUILD_RADIUS = 5, LEASH = 6;
 export const EMERGENCY = {window:120, maxVolunteers:8, disband:150, wageFree:true};
 // Beute beim Zerstören: Geld nur aus Rathaus (Stadtkasse) und Kontor; Betriebe verlieren ihr eigenes Erzeugnis
 export const LOOT = {treasury:{hq:[0.3,700], kontor:[0.12,250]}, goods:{farm:['food',0.25,300], greenhouse:['food',0.2,200], mine:['metal',0.25,200], refinery:['oil',0.3,250], lumber:['wood',0.25,150], quarry:['stone',0.25,150], depot:['*',0.12,150]}};
+// Verbände: verbundene Waffen (mind. zwei Gattungen beisammen) kämpfen besser
+export const COMBINED = {radius:7, minArms:2, dmg:0.15, def:0.12};
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
 // Stadtschutz: wichtige Gebäude, Zugänge, Grenzbunker
 export const FORT = {critical:['hq','power','npp','factory','university','refinery','datacenter','enrich','silo','droneshop','kontor'], guardR:6, accessRing:9, recalc:30,

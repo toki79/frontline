@@ -1,6 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { COMBINED, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -71,6 +71,8 @@ export function applyDamage(t,dmg,type,src){
   if(t.kind==='unit'&&t.def.cls==='inf'&&type!=='hellfire') m*=1-coverAt(t.x,t.y);   // Reaper treffen von oben: Deckung hilft nicht
   if(t.kind==='unit'&&t.owner<2&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
   if(t.cage&&CAGE[type]) m*=CAGE[type];
+  if(src&&src.cmb) m*=1+COMBINED.dmg;   // verbundene Waffen
+  if(t.cmb) m*=1-COMBINED.def;
   if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
   t.hp-=dmg*m*(0.85+Math.random()*0.3);

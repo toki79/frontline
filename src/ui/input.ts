@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { AIR, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { AIR, COMBINED, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
 import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
@@ -8,6 +8,8 @@ import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatr
 import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { sendDiplomats } from '../sim/trade';
 import { applyOrder, ORDER_NAME } from '../sim/missions';
+import { ARM_NAME, groupState, groupsOf, makeGroup, members } from '../sim/groups';
+import { centerOn } from '../render/camera';
 import { issuePending } from '../ui/forces';
 import { startUpgrade, upgradeBlock, upgradeEffect } from '../sim/build';
 import { assignWorkers, canPlaceRoad, cancelRoad, demolish, orderRoadTo, planRoadLine, siteLacks, siteStock, siteWorkers } from '../sim/build';
@@ -76,7 +78,8 @@ export function handleTap(w,right,shift){
     if(ent.kind==='building'&&ent.site&&mine.some(u=>u.def.worker)){ assignWorkers(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5}); return; }
     if(ent.kind==='building'&&ent.type==='refinery'&&mine.some(u=>u.def.harvester)){orderReturn(mine.filter(u=>u.def.harvester),ent);fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5});return;}
     const now=performance.now();
-    if(ent.kind==='unit'&&input.lastTap.id===ent.id&&now-input.lastTap.t<350){
+    if(ent.kind==='unit'&&input.lastTap.id===ent.id&&now-input.lastTap.t<350&&ent.grp){ G.sel=G.units.filter(u=>!u.dead&&u.grp===ent.grp); }   // Doppeltipp: ganzer Verband
+    else if(ent.kind==='unit'&&input.lastTap.id===ent.id&&now-input.lastTap.t<350){
       G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.type===ent.type&&u.x*TILE>cam.x&&u.x*TILE<cam.x+VW/cam.zoom&&u.y*TILE>cam.y&&u.y*TILE<cam.y+VH/cam.zoom);
     } else if(shift&&ent.kind==='unit'){ G.sel=G.sel.includes(ent)?G.sel.filter(s=>s!==ent):[...G.sel.filter(s=>s.kind==='unit'&&s.owner===0),ent]; }
     else G.sel=[ent];
@@ -142,6 +145,13 @@ export function cmd(c){
   else if(c==='escort'){ if(mine.some(u=>u.def.weapon)){ G.escortMode=!G.escortMode; G.amoveMode=false; G.boxMode=false; if(G.escortMode) msg('🛡 Jetzt den Arbeiter oder Laster antippen, der begleitet werden soll.'); } else msg('Zuerst bewaffnete Einheiten auswählen.'); }
   else if(c==='stop'){orderStop(mine);G.amoveMode=false;}
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
+  else if(c==='group'){ const fight=mine.filter(u=>u.def.weapon||u.def.jam);
+    if(fight.length<2) msg('Für einen Verband mindestens zwei kampffähige Einheiten auswählen (Rahmen ▢ oder Doppeltipp).','#ffb38a');
+    else { const g=makeGroup(0,fight), st=groupState(g); G.sel=fight;
+      msg(`🎖 ${g.name} gebildet: ${fight.length} Einheiten (${st.arms.map(a=>ARM_NAME[a]).join(', ')||'–'}). ${st.combined?'Verbundene Waffen: +'+Math.round(COMBINED.dmg*100)+' % Kampfkraft, −'+Math.round(COMBINED.def*100)+' % Schaden.':'Tipp: Infanterie, Fahrzeuge, Flugabwehr und Drohnen gemischt ergeben verbundene Waffen.'} Der Knopf 🎖 links in der Befehlsleiste wählt den Verband (zweimal tippen = hinschauen), Doppeltipp auf ein Mitglied ebenso.`,'#9fd88a'); } }
+  else if(c.startsWith('grp')){ const g=(G.groups||[]).find(x=>x.id===Number(c.slice(3))); if(g){ const ms=members(g);
+    const same=G.sel.length===ms.length&&ms.every(u=>G.sel.includes(u));
+    if(same&&ms.length){ const s=groupState(g); centerOn(s.cx,s.cy); } else G.sel=ms; G.amoveMode=false; G.orderMode=null; } }
   else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;G.roadStart=null;}
   else if(c==='nuke'){ const b=selBuilding(); if(b&&b.type==='silo'){ if(!(G.players[0].nukes>0)) msg('Noch keine Atomrakete fertig – im Reiter 🎓 Forschung bauen.','#ffb38a');
     else { G.nukeAim=!G.nukeAim; G.nukeArm=null; if(G.nukeAim) msg('☢ Ziel wählen: ein erkundetes Gebiet antippen. Alles im Umkreis von '+NUKE.radius+' Feldern wird vernichtet.','#ff8a7a'); } } }
@@ -164,6 +174,11 @@ export function refreshCmds(){
   document.querySelector('[data-c=box]').classList.toggle('on',!!(G&&G.boxMode));
   document.querySelector('[data-c=amove]').classList.toggle('on',!!(G&&G.amoveMode));
   const fight=!!G&&myUnitsSel().some(u=>u.def.weapon||u.def.cls==='air');
+  { const gb=document.querySelector('#grpBtns') as HTMLElement, gs=G?groupsOf(0):[];   // Schnellwahl der Verbände
+    const key=gs.map(g=>g.id+':'+members(g).length+(G.sel.length&&members(g).every(u=>G.sel.includes(u))&&G.sel.length===members(g).length?'*':'')).join(',');
+    if(gb.dataset.k!==key){ gb.dataset.k=key; gb.innerHTML=gs.map(g=>{ const n=members(g).length, on=key.includes(g.id+':'+n+'*'); return `<button data-c="grp${g.id}" class="${on?'on':''}">🎖${g.n}<small>${n} Einh.</small></button>`; }).join(''); } }
+  { const m=G?myUnitsSel().filter(u=>u.def.weapon||u.def.jam):[]; const one=m.length&&m[0].grp&&m.every(u=>u.grp===m[0].grp);
+    document.querySelector('[data-c=group]').classList.toggle('show',m.length>=2&&!one); }
   for(const k of ['hold','clear']){ const b=document.querySelector(`[data-c=${k}]`); b.classList.toggle('show',fight); b.classList.toggle('on',!!(G&&G.orderMode===k)); }
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
   document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
@@ -228,6 +243,10 @@ export function updateInfo(){
     if(e.kind==='building'&&e.type==='silo'&&e.owner===0) t+=` · ☢ ${G.players[0].nukes||0} Rakete${G.players[0].nukes===1?'':'n'} bereit`+(G.players[0].q.silo.length?` · Bau ${Math.floor(G.players[0].q.silo[0].t/G.players[0].q.silo[0].time*100)} %`:'');
     if(e.kind==='building'&&e.type==='mine') t+=e.empty?' · erschöpft':' · Erz übrig: '+fmt(e.oreTiles.reduce((s,i)=>s+G.ore[i],0));
     el.textContent=t; return;}
+  { const gid=s[0].grp, g=gid&&(G.groups||[]).find(x=>x.id===gid);   // ganzer Verband gewählt
+    if(g&&s.every(e=>e.grp===gid)){ const st=groupState(g), cnt={}; for(const e of st.ms) cnt[e.def.name.replace(/\u00AD/g,'')]=(cnt[e.def.name.replace(/\u00AD/g,'')]||0)+1;
+      const hp=st.ms.reduce((a,u)=>a+u.hp,0)/Math.max(1,st.ms.reduce((a,u)=>a+u.maxHp,0));
+      el.textContent=`🎖 ${g.name} · ${Object.entries(cnt).map(([k,v])=>v+'× '+k).join(', ')} · Zustand ${Math.round(hp*100)} % · ${st.combined?`⭐ verbundene Waffen (${st.arms.map(a=>ARM_NAME[a]).join(' + ')}): +${Math.round(COMBINED.dmg*100)} % Kampfkraft, −${Math.round(COMBINED.def*100)} % Schaden`:'keine verbundenen Waffen – Gattungen mischen und beisammenhalten'} · marschiert im Tempo der Langsamsten`; return; } }
   const cnt={}; for(const e of s) cnt[e.def.name]=(cnt[e.def.name]||0)+1;
   el.textContent=Object.entries(cnt).map(([k,v])=>v+'× '+k).join(', ');
 }
@@ -277,6 +296,7 @@ addEventListener('keydown',e=>{ if(!G) return; input.keys.add(e.key.toLowerCase(
 addEventListener('keyup',e=>input.keys.delete(e.key.toLowerCase()));
 addEventListener('blur',()=>input.keys.clear());
 $$('#cmds button').forEach(b=>b.addEventListener('click',()=>cmd(b.dataset.c)));
+$('#grpBtns').addEventListener('click',e=>{ const b=(e.target as HTMLElement).closest('button') as HTMLElement; if(b) cmd(b.dataset.c); });
 mini.addEventListener('pointerdown',e=>{mini.setPointerCapture(e.pointerId);miniPtr(e);});
 mini.addEventListener('pointermove',e=>{if(mini.hasPointerCapture(e.pointerId))miniPtr(e);});
 }
