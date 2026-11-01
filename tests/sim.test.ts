@@ -5,7 +5,7 @@ import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact } from '../src/sim/world';
 import { enqueue, missingReq } from '../src/sim/production';
-import { launchNuke, inFallout } from '../src/sim/nuke';
+import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
@@ -633,6 +633,22 @@ describe('Simulation', () => {
     expect(demandTribute('land', 0, false)).toBe('ok');
     expect(L.every(b => b.owner === 0)).toBe(true);
     expect(f0).toBeGreaterThan(0);
+  });
+
+  it('Verstrahlung: kein Bauen, Bodentruppen sterben, Wege führen außen herum', () => {
+    newGame('mittel'); noBandits();
+    const hq = findBuilding(0, 'hq'), x = Math.floor(hq.x) + 14, y = Math.floor(hq.y) - 14;
+    G.fallout = [{ x: x + 0.5, y: y + 0.5, r: 4, until: G.t + 300 }]; rebuildFallMap();
+    expect(canPlace(0, 'house', x, y)).toBe(false);
+    const inf = spawnAt(0, 'inf', x + 0.5, y + 0.5), d = spawnAt(0, 'drone', x + 0.5, y + 0.5);
+    run(1);
+    expect(inf.dead).toBe(true);                       // betreten = tot
+    expect(d.dead).toBeFalsy();                        // Drohnen fliegen darüber
+    const s = spawnAt(0, 'inf', x - 6.5, y + 0.5); orderMove([s], x + 6.5, y + 0.5);
+    run(20);
+    expect(s.dead).toBeFalsy();                        // läuft außen herum
+    G.fallout[0].until = G.t; run(1);
+    expect(G.fallout.length).toBe(0);
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

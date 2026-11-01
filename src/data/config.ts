@@ -314,8 +314,8 @@ export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['res3',240]
 export const AI_NUKE = {stock:1, reserve:1500, deterAggr:0.15, blackmail:0.5, ratio:0.6, cool:300};
 // ---------- Atomwaffe ----------
 export const NUKE = {
-  radius: 9, dmg: 4000, speed: 8,      // Sprengradius, Schaden im Zentrum, Flugtempo (Felder/s)
-  fallout: 7, falloutTime: 600, falloutDps: 6,
+  radius: 13, dmg: 4500, speed: 8,     // Sprengradius, Schaden im Zentrum, Flugtempo (Felder/s)
+  fallout: 12, falloutTime: 900,       // verstrahlt: kein Bauen, Bodentruppen sterben beim Betreten, Gebäude stehen still
   shock: 900, shockMood: 0.35,         // eigene Bevölkerung nach dem Einsatz
   victimMood: 0.3, victimTime: 600, radiationMood: 0.15,
   meltdown: {radius:4, dmg:1500, fallout:5},   // zerstörtes Kernkraftwerk

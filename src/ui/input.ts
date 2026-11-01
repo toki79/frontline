@@ -210,6 +210,7 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.worker) t+=(e.working?' · arbeitet':e.job?(e.job.kind==='haul'||e.job.kind==='road'&&e.job.phase==='fetch'?' · holt Material':' · auf dem Weg zur Arbeit'):' · wartet auf Aufträge')+(e.carry?` · trägt ${Math.floor(e.carry.amt)} ${RES[e.carry.res].icon}`:'');
     if(e.kind==='building'&&e.haul!==undefined&&(e.def.wood||e.def.stone||e.def.metal||e.type==='farm')) t+=` · Transportweg ${e.haul===Infinity?'–':f1(e.haul)} → Leistung ${Math.round((e.eff??1)*100)} %`+((e.eff??1)<0.97&&e.owner===0?' (🛣 Straße oder Lagerhaus in der Nähe hilft)':'');
     if(e.kind==='building'&&e.fire>0) t+=' · 🔥 brennt!';
+    if(e.kind==='building'&&e.contam) t+=' · ☢ verstrahlt – steht still, bis die Strahlung abklingt';
     if(e.kind==='building'&&e.type==='farm'&&e.fields!==undefined) t+=` · Äcker ${e.fields}/${DENSITY.farmFields} (Ertrag ${Math.round((e.fieldF??1)*100)} %)`;
     if(e.kind==='building'&&e.type==='lumber') t+=e.empty?' · kein Wald mehr':'';
     if(e.kind==='building'&&e.type==='quarry') t+=e.empty?' · erschöpft':' · Stein übrig: '+fmt(e.rockTiles.reduce((s,i)=>s+G.rock[i],0));

@@ -172,6 +172,7 @@ export function render(){
   for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; const s=selSet.has(b);
     if(s){c.strokeStyle=b.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=2;c.strokeRect(b.tx*TILE-1,b.ty*TILE-1,b.w*TILE+2,b.h*TILE+2);}
     if(s||b.hp<b.maxHp) hpBar(c,b.tx*TILE+3,b.ty*TILE-6,b.w*TILE-6,b.hp/b.maxHp);
+    if(b.contam){ c.fillStyle='rgba(120,160,30,.35)'; c.fillRect(b.tx*TILE,b.ty*TILE,b.w*TILE,b.h*TILE); c.font='bold 14px sans-serif'; c.textAlign='center'; c.fillStyle='#e8d830'; c.fillText('☢',b.x*TILE,b.y*TILE+5); c.textAlign='left'; }   // verstrahlt: steht still
     if(b.def.cap&&b.quality!==undefined){
       if(b.quality<0.95){ c.fillStyle=`rgba(80,78,70,${(1-b.quality)*0.55})`; c.fillRect(b.tx*TILE+1,b.ty*TILE+1,b.w*TILE-2,b.h*TILE-2); }
       if(b.owner===0){ const w=b.w*TILE-8; c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w,4); c.fillStyle='#7fb3ff'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-6,w*(b.resid||0)/capOf(b),4); }

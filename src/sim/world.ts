@@ -36,10 +36,11 @@ export function defStr(pid){let s=0;for(const b of G.buildings) if(!b.dead&&b.ow
    Entitäten
    ===================================================================== */
 export function terrAt(x,y){const tx=Math.floor(x),ty=Math.floor(y);return inMap(tx,ty)?G.terr[idx(tx,ty)]:T.WATER;}
-export function passable(tx,ty,cls){ if(!inMap(tx,ty)) return false; if(cls==='air') return true; const i=idx(tx,ty); return G.occ[i]===0 && TERRAIN[G.terr[i]].cost[cls]!==Infinity; }
+export function passable(tx,ty,cls){ if(!inMap(tx,ty)) return false; if(cls==='air') return true; const i=idx(tx,ty); return G.occ[i]===0 && !(G.fallMap&&G.fallMap[i]) && TERRAIN[G.terr[i]].cost[cls]!==Infinity; }
 // Bewegungskosten eines Feldes inkl. Stacheldraht/Graben
 export function tileCost(i,cls){
   if(cls==='air') return 1;
+  if(G.fallMap&&G.fallMap[i]) return Infinity;   // verstrahlt: Bodentruppen meiden das Gebiet
   let c=TERRAIN[G.terr[i]].cost[cls]; const f=G.feat[i];
   if(f===FEAT.WIRE) c*=cls==='inf'?3.5:1.1;
   else if(f===FEAT.TRENCH) c*=cls==='inf'?1.4:3.2;
@@ -150,7 +151,7 @@ export function findBuilding(pid,type){return G.buildings.find(b=>!b.dead&&!b.si
 export function countBuildings(pid,type?,inclSites=false){let n=0;for(const b of G.buildings) if(!b.dead&&(inclSites||!b.site)&&b.owner===pid&&(!type||b.type===type)) n++;return n;}
 /** Strom, Wohnraum und Lagerplatz (nur fertige Gebäude) */
 export function recalcPower(pid){const p=G.players[pid];p.power=0;p.use=0;p.cap=0;p.store=STORAGE.base;
-  for(const b of G.buildings){if(b.dead||b.site||b.owner!==pid)continue;
+  for(const b of G.buildings){if(b.dead||b.site||b.contam||b.owner!==pid)continue;
     const pw=b.def.power||0;if(pw>0)p.power+=pw;else p.use-=pw;p.cap+=capOf(b);if(b.type==='depot')p.store+=STORAGE.depot;}}
 export function freeTileAround(b,cls){
   const cand=[];

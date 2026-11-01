@@ -67,7 +67,7 @@ export function updateProduction(pid,dt){
     }
   }
 }
-export function tileFree(i){return TERRAIN[G.terr[i]].build&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.road[i]&&!G.occ[i];}
+export function tileFree(i){return !(G.fallMap&&G.fallMap[i])&&TERRAIN[G.terr[i]].build&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.road[i]&&!G.occ[i];}
 export function nearOwn(pid,tx,ty,w,h){
   for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;
     const dx=Math.max(b.tx-(tx+w), tx-(b.tx+b.w), 0), dy=Math.max(b.ty-(ty+h), ty-(b.ty+b.h), 0);
@@ -89,7 +89,7 @@ export function canPlaceDef(pid,type,x,y){
   const d=BUILDINGS[type], w=d?d.w:1, h=d?d.h:1;
   for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){
     if(!inMap(xx,yy)) return false; const i=idx(xx,yy), t=G.terr[i];
-    if(t===T.WATER||t===T.BRIDGE||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]||G.fplan[i]) return false;
+    if(t===T.WATER||t===T.BRIDGE||(G.fallMap&&G.fallMap[i])||G.occ[i]||G.oil[i]>0||G.ore[i]>0||G.rock[i]>0||G.road[i]||G.fplan[i]) return false;
     if(FEATURES[type]){ if(G.feat[i]) return false; if(type==='trench'&&!isPlain(t)&&t!==T.MUD) return false; }
     else { if(!TERRAIN[t].build||G.feat[i]) return false; for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&Math.floor(u.x)===xx&&Math.floor(u.y)===yy&&u.owner!==pid) return false; } }
   if(d&&d.border){   // Grenzbunker: weit draußen erlaubt, aber nur auf erkundetem Land und nicht direkt am Gegner

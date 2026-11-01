@@ -20,7 +20,7 @@ import { msg } from '../core/events';
 /** Fertiges, intaktes Gebäude (keine Baustelle) */
 export const active = b => !b.dead && !b.site;
 /** Arbeitet das Gebäude? (fertig und nicht zerstört) */
-export const works = b => !b.dead && !b.site;
+export const works = b => !b.dead && !b.site && !b.contam;   // verstrahlte Gebäude stehen still
 /** Betriebe, deren Waren zur Sammelstelle gebracht werden müssen */
 export const hauls = b => !!(b.def.wood||b.def.stone||b.def.metal||b.type==='farm');
 /** Baustoffe, die erst beim Bauen aus dem Lager geholt werden */
@@ -66,7 +66,7 @@ export function roadNearOwn(pid,x,y){
 export function roadTileOk(i){
   const t=G.terr[i];
   if(!isPlain(t)&&t!==T.MUD&&t!==T.TOWN) return false;
-  return !G.occ[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.feat[i];
+  return !G.occ[i]&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.feat[i]&&!(G.fallMap&&G.fallMap[i]);
 }
 export function canPlaceRoad(pid,x,y){
   if(!inMap(x,y)) return false; const i=idx(x,y);

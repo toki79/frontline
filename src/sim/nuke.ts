@@ -1,9 +1,9 @@
 import { dist, idx, inMap } from '../core/util';
-import { NUKE, T } from '../data/config';
+import { MAP_H, MAP_W, NUKE, T } from '../data/config';
 import { destroy, distTo } from '../sim/combat';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
-import { findBuilding, setWar, updateRel } from '../sim/world';
+import { findBuilding, recalcPower, setWar, updateRel } from '../sim/world';
 import { clearForest } from '../sim/build';
 import { msg } from '../core/events';
 
@@ -13,9 +13,18 @@ import { msg } from '../core/events';
    G.missiles: fliegende Raketen · G.fallout: verstrahlte Zonen {x,y,r,until}
    ===================================================================== */
 const pname = pid => G.players[pid].short;
+/** Verstrahlte Felder als Karte (G.fallMap) – neu berechnet, wenn Zonen entstehen oder abklingen */
+export function rebuildFallMap(){
+  const N=MAP_W*MAP_H; if(!G.fallMap||G.fallMap.length!==N) G.fallMap=new Uint8Array(N); else G.fallMap.fill(0);
+  G.fallout=(G.fallout||[]).filter(f=>G.t<f.until);
+  for(const f of G.fallout) for(let y=Math.floor(f.y-f.r);y<=f.y+f.r;y++)for(let x=Math.floor(f.x-f.r);x<=f.x+f.r;x++)
+    if(inMap(x,y)&&dist(x+0.5,y+0.5,f.x,f.y)<=f.r) G.fallMap[idx(x,y)]=1;
+  for(const b of G.buildings) if(!b.dead){ const was=!!b.contam; b.contam=!!G.fallMap[idx(Math.floor(b.x),Math.floor(b.y))]; if(was!==b.contam){ recalcPower(b.owner); G.qDirty=true; } }
+}
+export const falloutTile = i => !!(G.fallMap&&G.fallMap[i]);
+export const falloutAt = (x,y) => inMap(Math.floor(x),Math.floor(y))&&falloutTile(idx(Math.floor(x),Math.floor(y)));
 /** Anteil der Leistung an dieser Stelle (0 in verstrahltem Gebiet, sonst 1) */
-export function inFallout(b){ for(const f of (G.fallout||[])) if(G.t<f.until&&dist(b.x,b.y,f.x,f.y)<=f.r) return 0; return 1; }
-export const falloutAt = (x,y) => (G.fallout||[]).some(f=>G.t<f.until&&dist(x,y,f.x,f.y)<=f.r);
+export function inFallout(b){ return falloutAt(b.x,b.y)?0:1; }
 
 /** Atomrakete starten. Ergebnis: true, oder Begründung als Text */
 export function launchNuke(pid,x,y){
@@ -46,7 +55,7 @@ export function blast(x,y,r,dmg,fallR,src){
     const hit=dmg*1.4*(1-d/(r+1)); b.hp=b.type==='hq'?Math.min(b.hp,Math.max(b.maxHp*NUKE.hqKeep,b.hp-hit)):b.hp-hit; b.lastHit=G.t;   /* Rathaus = Regierungsbunker */ if(b.hp<=0) destroy(b,s.owner>=0?s:null); else if(b.type!=='hq') b.fire=Math.max(b.fire||0,10); }
   for(let ty=Math.floor(y-r);ty<=y+r;ty++)for(let tx=Math.floor(x-r);tx<=x+r;tx++){ if(!inMap(tx,ty)||dist(tx+0.5,ty+0.5,x,y)>r*0.8) continue; const i=idx(tx,ty);
     if(G.terr[i]===T.FOREST) clearForest(i); if(G.terr[i]===T.MEADOW){ G.terr[i]=T.GRASS; G.terrChanged.push(i); } G.feat[i]=0; }
-  if(fallR) G.fallout=(G.fallout||[]).concat([{x,y,r:fallR,until:G.t+NUKE.falloutTime}]);
+  if(fallR){ G.fallout=(G.fallout||[]).concat([{x,y,r:fallR,until:G.t+NUKE.falloutTime}]); rebuildFallMap(); }
   for(const v of victims){ G.players[v].bombedUntil=G.t+NUKE.victimTime; }
   G.qDirty=true; G.roadDirty=true;
 }
@@ -57,11 +66,13 @@ export function updateNukes(dt){
       blast(m.x,m.y,NUKE.radius,NUKE.dmg,NUKE.fallout,{owner:m.owner,dead:true,x:m.x,y:m.y,kind:'nuke',def:{}});
       msg(m.owner===0?'☢ Einschlag. Wo eben noch Leben war, ist nur noch Asche.':target.includes(0)?'☢☢ ATOMSCHLAG auf unser Land!':'☢ Eine Atomexplosion erschüttert das Tal.', '#ff5a4a'); }
   }
-  // Verstrahlung: Einheiten in der Zone nehmen Schaden, Zonen klingen ab
+  // Verstrahlung: Bodentruppen, die das Gebiet betreten, sterben; Zonen klingen ab
   if(G.fallout&&G.fallout.length){
-    G.falloutT=(G.falloutT||0)-dt; if(G.falloutT<=0){ G.falloutT=1;
-      for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&falloutAt(u.x,u.y)){ u.hp-=NUKE.falloutDps*(u.def.cls==='veh'?0.3:1); if(u.hp<=0) destroy(u,null); }
-      G.fallout=G.fallout.filter(f=>G.t<f.until); }
+    if(!G.fallMap) rebuildFallMap();
+    G.falloutT=(G.falloutT||0)-dt; if(G.falloutT<=0){ G.falloutT=0.5; const lost=[0,0];
+      for(const u of G.units) if(!u.dead&&u.def.cls!=='air'&&falloutAt(u.x,u.y)){ if(u.owner<2) lost[u.owner]++; fxAdd({k:'smoke',x:u.x,y:u.y,r:0.4,life:1.5}); destroy(u,null); }
+      if(lost[0]&&G.t-(G.radMsg||-99)>8){ G.radMsg=G.t; msg(`☠ ${lost[0]} Einheit${lost[0]===1?'':'en'} im verstrahlten Gebiet umgekommen.`,'#ff8a7a'); }
+      if(G.fallout.some(f=>G.t>=f.until)){ rebuildFallMap(); msg('☢ Eine verstrahlte Zone ist abgeklungen – dort kann wieder gebaut werden.','#9fd88a'); } }
   }
 }
 /** Abschreckung: besitzt pid einsatzbereite Atomraketen? */
