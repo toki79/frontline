@@ -15,7 +15,7 @@ export const members = g => G.units.filter(u=>!u.dead&&u.grp===g.id);
 export function makeGroup(pid,units){
   G.groups=G.groups||[]; G.grpNext=G.grpNext||1;
   const used=new Set(groupsOf(pid).map(g=>g.n)); let n=1; while(used.has(n)) n++;
-  const g={id:G.grpNext++, owner:pid, n, name:`${n}. Kampfgruppe`};
+  const g={id:G.grpNext++, owner:pid, n, name:`${n}. Kampfgruppe`, reinforce:false};
   G.groups.push(g);
   for(const u of units) if(!u.dead&&u.owner===pid) u.grp=g.id;
   pruneGroups(); return g;

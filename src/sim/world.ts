@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { DEPOSIT, capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -67,12 +67,16 @@ export function makeUnit(pid,type,x,y){
 export function spawnAt(pid,type,x,y){ const u=makeUnit(pid,type,x,y); if(UNITS[type].harvester) u.hs='seek'; return u; }
 export function ringTiles(tx,ty,w,h){const out=[];for(let y=ty-1;y<=ty+h;y++)for(let x=tx-1;x<=tx+w;x++){if((x===tx-1||x===tx+w||y===ty-1||y===ty+h)&&inMap(x,y))out.push(idx(x,y));}return out;}
 /** Gebäude setzen. site=true: als Baustelle, die erst von Bauarbeitern fertiggestellt wird. */
+/** Vorkommen im Umkreis (Erz oder Felsen), nächste Felder zuerst – die Mine baut das ganze Feld ab */
+export function depositTiles(b,arr){ const out=[], R=DEPOSIT.r;
+  for(let y=b.ty-R;y<b.ty+b.h+R;y++)for(let x=b.tx-R;x<b.tx+b.w+R;x++){ if(!inMap(x,y)) continue; const i=idx(x,y); if(arr[i]>0) out.push([rectDist(b,x,y,1,1),i]); }
+  return out.sort((a,c)=>a[0]-c[0]).map(a=>a[1]); }
 export function placeBuilding(pid,type,tx,ty,initial,site=false){
   const d=BUILDINGS[type];
   const b: Entity={id:G.nextId++, kind:'building', type, def:d, owner:pid, tx, ty, w:d.w, h:d.h, x:tx+d.w/2, y:ty+d.h/2,
     hp:d.hp, maxHp:d.hp, armor:d.def?'fort':'building', tur:pid===1?Math.PI*0.75:-Math.PI*0.25, cd:0, scanT:0, target:null, born:initial?-9:G.t, empty:false};
-  if(d.needsOre) b.oreTiles=ringTiles(tx,ty,d.w,d.h).filter(i=>G.ore[i]>0);
-  if(d.needsRock) b.rockTiles=ringTiles(tx,ty,d.w,d.h).filter(i=>G.rock[i]>0);
+  if(d.needsOre) b.oreTiles=depositTiles(b,G.ore);
+  if(d.needsRock) b.rockTiles=depositTiles(b,G.rock);
   if(site){ b.site=true; b.progress=0; b.hp=d.hp*0.1; b.lastHit=G.t; }
   G.buildings.push(b); G.qDirty=true; G.roadDirty=true;
   for(let y=ty;y<ty+d.h;y++)for(let x=tx;x<tx+d.w;x++) G.occ[idx(x,y)]=b.id;

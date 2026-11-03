@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, DEPOSIT, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
@@ -70,8 +70,8 @@ export function tipFor(k){
     if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);
     if(k==='greenhouse') L.push('Braucht keine Äcker – spart viel Fläche gegenüber Bauernhöfen, kostet aber Strom und Unterhalt.');
     if(k==='enrich') L.push('Ohne laufende Anreicherung baut das Silo keine Raketen. Schon die Bauphase verrät dich dem Geheimdienst des Gegners.');
-    if(d.needsOre) L.push('Muss direkt an graue Erzfelsen grenzen.');
-    if(d.needsRock) L.push('Muss direkt an helle Felsbrocken grenzen.');
+    if(d.needsOre) L.push(`Muss direkt an graue Erzfelsen grenzen – baut dann nach und nach das ganze Erz im Umkreis von ${DEPOSIT.r} Feldern ab.`);
+    if(d.needsRock) L.push(`Muss direkt an helle Felsbrocken grenzen – baut dann nach und nach alle Felsen im Umkreis von ${DEPOSIT.r} Feldern ab.`);
     if(d.needsForest) L.push('Braucht Wald in der Nähe (mind. 3 Waldfelder).');
     if(d.spawn) L.push('Liefert einen Tanklaster mit.');
     if(d.weapon) L.push('Waffe: '+WEAPON_INFO[d.weapon.type]+` · Reichweite ${d.weapon.range}`);

@@ -8,6 +8,7 @@ import { dugFactor } from '../sim/missions';
 import { coverAt, detected, hostile, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { bailOut } from '../sim/transport';
+import { noteLoss } from '../sim/reinforce';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -149,6 +150,7 @@ export function destroy(e,src){
     fxAdd({k:'boom',x:e.x,y:e.y,r:big?0.8:0.35,life:big?0.8:0.4});
     if(big) G.scorch.push({x:e.x,y:e.y,r:0.6,t:G.t});
     if(e.owner===0) G.stats.lost++;
+    noteLoss(e);   // ggf. automatisch nachbauen
     if(src&&src.owner===0&&e.owner!==0) G.stats.kills++;
   }
   G.sel=G.sel.filter(s=>!s.dead);

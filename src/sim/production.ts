@@ -5,6 +5,7 @@ import { G } from '../sim/state';
 import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
 import { canPlaceRoad, clearForest, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
+import { joinGroup } from '../sim/reinforce';
 
 /* =====================================================================
    Produktion: Einheiten (Rathaus, Kaserne, Werk, Werkstatt) und Forschung.
@@ -62,8 +63,7 @@ export function updateProduction(pid,dt){
       else if(UNITS[it.type].stored){ q.shift(); p.nukes=(p.nukes||0)+1;
         if(pid===0) msg('☢ Eine Atomrakete ist einsatzbereit. Schon ihr Besitz schreckt Kastrova ab.','#ffd36a');
         else if(G.known[0][1]) msg('☢☢ Geheimdienst: Kastrova besitzt jetzt eine Atomrakete!','#ff8a7a'); }
-      else if(spawnUnit(pid,it.type,producer)){q.shift();}
-      else it.t=it.time;
+      else { const nu=spawnUnit(pid,it.type,producer); if(nu){ q.shift(); if(it.grp) joinGroup(nu,it); } else it.t=it.time; }   // Ersatz stößt zum Verband
     }
   }
 }

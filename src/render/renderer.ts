@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { dist, hash, idx, inMap } from '../core/util';
-import { capOf, AIR, BANDITS, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
+import { capOf, AIR, BANDITS, DEPOSIT, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, routeRoadBetween, siteLacks, siteWorkers } from '../sim/build';
@@ -33,6 +33,8 @@ function drawRanges(c,sel){
     if(d.fireR){ const r=d.fireR*(1+0.25*((e.lvl||1)-1)); ring(e.x,e.y,r,'rgba(255,140,60,.85)',false,`Löschbereich ${Math.round(r)}`,'rgba(255,140,60,.05)'); }
     if(d.forester) ring(e.x,e.y,FOREST.radius+e.w/2,'rgba(120,220,100,.85)',false,`Pflanzbereich ${FOREST.radius}`,'rgba(120,220,100,.06)');
     if(e.type==='camp') ring(e.x,e.y,BANDITS.territory,'rgba(255,90,74,.8)',true,'Räubergebiet');
+    if(e.def.needsOre||e.def.needsRock){ const R=DEPOSIT.r; c.save(); c.strokeStyle='rgba(200,200,210,.8)'; c.lineWidth=2; c.setLineDash([6,5]); c.strokeRect((e.tx-R)*TILE,(e.ty-R)*TILE,(e.w+2*R)*TILE,(e.h+2*R)*TILE); c.setLineDash([]);
+      c.font='bold 11px sans-serif'; const t=`Abbaugebiet ${R}`; const tw=c.measureText(t).width; c.fillStyle='#000b'; c.fillRect((e.tx-R)*TILE+2,(e.ty-R)*TILE+2,tw+6,14); c.fillStyle='#dcdce6'; c.fillText(t,(e.tx-R)*TILE+5,(e.ty-R)*TILE+13); c.restore(); }
     if(e.type==='farm'){ const R=DENSITY.farmFieldR; c.save(); c.strokeStyle='rgba(232,200,74,.8)'; c.lineWidth=2; c.setLineDash([6,5]); c.strokeRect((e.tx-R)*TILE,(e.ty-R)*TILE,(e.w+2*R)*TILE,(e.h+2*R)*TILE); c.setLineDash([]); c.restore(); }
     if(d.weapon&&d.weapon.kamikaze&&e.owner===0&&one){ const R=fpvRange(0); let best=null,bd=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&b.owner===0){ const dd=Math.hypot(b.x-e.x,b.y-e.y); if(dd<bd){bd=dd;best=b;} }
       if(best) ring(best.x,best.y,R,'rgba(170,140,255,.7)',true,`Funkreichweite ${R}`); }

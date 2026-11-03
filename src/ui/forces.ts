@@ -8,6 +8,7 @@ import { drawIcon } from './panel';
 import { refreshCmds } from './input';
 import { hideTip } from './tooltips';
 import { msg } from '../core/events';
+import { reinfOf } from '../sim/reinforce';
 import { dissolveGroup, groupState, groupsOf, makeGroup, members } from '../sim/groups';
 
 /* =====================================================================
@@ -50,6 +51,12 @@ function status(u){
   if(u.mode==='move'||u.mode==='amove') return 'unterwegs';
   return 'frei';
 }
+function reinfHtml(){
+  const R=reinfOf(0), wait=R.q.length, queued=Object.values(G.players[0].q).flat().filter((i: any)=>i&&i.re).length;
+  return `<h4>🔁 Verluste ersetzen</h4><div class="grp" style="border-color:#3a5a2a;background:#141c10"><div class="gh"><span>Gefallene Einheiten ohne Verband automatisch nachbauen</span>
+    <span><button data-rein="1" class="${R.on?'on':''}" style="${R.on?'border-color:var(--acc);color:var(--acc)':''}">An</button> <button data-rein="0" style="${!R.on?'border-color:var(--acc);color:var(--acc)':''}">Aus</button></span></div>
+    <div class="dim" style="font-size:12px;margin-top:4px">Für Verbände einzeln einstellbar (🔁 beim Verband). Ersatz kostet normal und stößt danach zum Verband.${queued?` · ${queued} im Bau`:''}${wait?` · ${wait} wartet auf Geld oder Platz`:''}</div></div>`;
+}
 function groupsHtml(){
   const gs=groupsOf(0); let h='<h4>🎖 Verbände</h4>';
   if(!gs.length) return h+'<div class="barl"><span>Noch keine Verbände. Einheiten unten mit −/+ zusammenstellen und „🎖 Als Verband“ tippen – oder auf der Karte mehrere wählen und 🎖 tippen. Infanterie, Fahrzeuge, Flugabwehr und Drohnen gemischt ergeben <b>verbundene Waffen</b>: mehr Kampfkraft, weniger Verluste.</span></div>';
@@ -57,11 +64,11 @@ function groupsHtml(){
     const hp=s.ms.reduce((a,u)=>a+u.hp,0)/Math.max(1,s.ms.reduce((a,u)=>a+u.maxHp,0)), stt={}; for(const u of s.ms){ const x=status(u); stt[x]=(stt[x]||0)+1; }
     h+=`<div class="grp"><div class="gh"><b>🎖 ${g.name}</b><span>${Math.round(hp*100)} %</span></div>
       <div class="dim" style="font-size:12.5px">${Object.entries(cnt).map(([k,v])=>v+'× '+k).join(', ')}<br>${Object.entries(stt).map(([k,v])=>v+' '+k).join(' · ')} · ${s.combined?'⭐ verbundene Waffen':'ohne verbundene Waffen'}</div>
-      <div class="gb"><button data-gsel="${g.id}">📍 Wählen</button><button data-gord="${g.id}_hold">⛉ Halten</button><button data-gord="${g.id}_clear">🔍 Klären</button><button data-gord="${g.id}_assault">⚔ Angriff</button><button data-gdel="${g.id}" style="background:#4a2a22">Auflösen</button></div></div>`; }
+      <div class="gb"><button data-gsel="${g.id}">📍 Wählen</button><button data-gord="${g.id}_hold">⛉ Halten</button><button data-gord="${g.id}_clear">🔍 Klären</button><button data-gord="${g.id}_assault">⚔ Angriff</button><button data-grein="${g.id}" style="${g.reinforce?'border-color:var(--acc);color:var(--acc)':''}">🔁 Ersatz ${g.reinforce?'an':'aus'}</button><button data-gdel="${g.id}" style="background:#4a2a22">Auflösen</button></div></div>`; }
   return h;
 }
 export function renderForces(){
-  const all=own(); let h=groupsHtml()+'<h4>Einsatz aus freien Kräften</h4><div class="row kinds">';
+  const all=own(); let h=reinfHtml()+groupsHtml()+'<h4>Einsatz aus freien Kräften</h4><div class="row kinds">';
   for(const [k,l] of KINDS) h+=`<button data-k="${k}" class="${fs.kind===k?'on':''}">${l}</button>`;
   h+=`</div><div class="barl"><span>${KINDS.find(k=>k[0]===fs.kind)[2]}. Drohnen: FPV lauern am Ziel, Aufklärer überwachen das Gebiet.</span></div>`;
   for(const [g,types] of GROUPS){
@@ -115,6 +122,8 @@ export function init(){
     else if(d.m){ fs.pick[d.m]=Math.max(0,(fs.pick[d.m]||0)-1); }
     else if(d.all){ const us=all.filter(u=>u.type===d.all), free=us.filter(isFree).length; fs.pick[d.all]=fs.pick[d.all]===free?us.length:free||us.length; }
     else if(d.loc){ locate(d.loc); return; }
+    else if(d.rein){ reinfOf(0).on=d.rein==='1'; if(d.rein==='0') reinfOf(0).q=reinfOf(0).q.filter(i=>i.grp); }
+    else if(d.grein){ const g=(G.groups||[]).find(x=>x.id===Number(d.grein)); if(g){ g.reinforce=!g.reinforce; if(!g.reinforce) reinfOf(0).q=reinfOf(0).q.filter(i=>i.grp!==g.id); } }
     else if(d.gsel||d.gord||d.gdel){ const g=(G.groups||[]).find(x=>x.id===Number(d.gsel||d.gdel||d.gord.split('_')[0])); if(!g) return;
       if(d.gdel){ dissolveGroup(g); msg(`${g.name} aufgelöst.`); renderForces(); return; }
       const ms=members(g); G.sel=ms; close();

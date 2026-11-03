@@ -16,6 +16,10 @@ export const COMBINED = {radius:7, minArms:2, dmg:0.15, def:0.12};
 // Verteidigungsvorteil: Stellungen schießen genauer (vorbereitete Schussfelder) und halten direktem Feuer besser stand.
 // Artillerie, Raketen und Bomben wirken voll – wer Befestigungen knacken will, braucht sie (oder Luftlandungen, Amphibien).
 export const FORTIFY = {dmgOut:1.3, direct:0.65, artillery:['rocket','ballistic','glide'], dugOut:1.15};
+// Minen und Steinbrüche bauen das ganze Vorkommen im Umkreis ab (nicht nur die angrenzenden Felder)
+export const DEPOSIT = {r:8, rescan:20};
+// Verluste ersetzen: so lange wartet ein Ersatzauftrag höchstens auf Geld/Platz, bevor er verfällt
+export const REINFORCE = {wait:600, think:2, skip:['volunteer','caravan','diplomat','nuke','militia','bandit']};
 export const DEF_RADIUS = 9;          // Verteidigung darf weiter vor der Stadt liegen als Gebäude
 // Stadtschutz: wichtige Gebäude, Zugänge, Grenzbunker
 export const FORT = {critical:['hq','power','npp','factory','university','refinery','datacenter','enrich','silo','droneshop','kontor'], guardR:6, accessRing:9, recalc:30,
@@ -224,7 +228,7 @@ export const BUILDINGS = {
   farm:    {name:'Bauernhof',     w:3,h:2, hp:450,  power:0,   cost:{money:150, wood:50}, time:6, req:[], food:2.5, sight:3, desc:'+2,5 Nahrung/s'},
   forester:{name:'Forst\u00ADhaus',  w:2,h:2, hp:350,  power:0,   cost:{money:150, wood:20}, time:5, req:[], forester:true, sight:4, desc:'Pflanzt Bäume im Umkreis von 4 Feldern – nach 7 Minuten ist daraus Wald geworden'},
   lumber:  {name:'Holzfäller',    w:2,h:2, hp:400,  power:0,   cost:{money:120}, time:5, req:[], wood:1.0, needsForest:true, noise:0.1, sight:4, desc:'Holz, muss am Wald stehen (fällt ihn nach und nach)'},
-  quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein, nur direkt an Felsen'},
+  quarry:  {name:'Steinbruch',    w:2,h:2, hp:550,  power:-5,  cost:{money:150, wood:30}, time:6, req:[], stone:0.8, needsRock:true, noise:0.3, sight:4, desc:'Stein: direkt an Felsen bauen – baut das ganze Vorkommen ringsum ab'},
   block:   {name:'Wohnblock',     w:2,h:2, hp:700,  power:-20, cost:{money:500, wood:20, stone:120, metal:20}, time:14, req:[], research:'urban', cap:150, sight:3, desc:'150 Wohnraum auf kleiner Fläche'},
   greenhouse:{name:'Gewächshaus', w:2,h:2, hp:400,  power:-30, cost:{money:600, wood:40, stone:60, metal:60}, time:12, req:[], research:'glass', food:5, noise:0.05, sight:3, desc:'+5 Nahrung/s ohne Äcker'},
   datacenter:{name:'Rechen\u00ADzentrum', w:2,h:2, hp:600, power:-150, cost:{money:2500, stone:100, metal:200}, time:20, req:['university'], research:'computing', noise:0.1, sight:3, desc:'Forschung +50 % (bis zu zwei)'},
@@ -238,7 +242,7 @@ export const BUILDINGS = {
   firest:  {name:'Feuer\u00ADwache',  w:2,h:2, hp:700,  power:-10, cost:{money:600, wood:40, stone:80}, time:10, req:[], fireR:11, sight:4, desc:'Löscht Brände im Umkreis von 11 Feldern schnell und verhindert, dass sie übergreifen'},
   depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
-  mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall, nur direkt an Erz'},
+  mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall: direkt an Erz bauen – baut das ganze Vorkommen ringsum ab'},
   airbase: {name:'Flieger\u00ADhorst',  w:4,h:3, hp:1600, power:-40, cost:{money:3000, stone:300, metal:300}, time:30, req:['factory'], research:'aviation', noise:0.5, sight:6, desc:'Startbahn und Hangars: baut Jagdbomber, die hier nach jedem Einsatz neu bewaffnet werden'},
   derrick: {name:'Bohrturm',      w:2,h:2, hp:600,  power:-40, cost:{money:1500, stone:100, metal:150}, time:20, req:[], research:'deepdrill', oilOut:1.2, noise:0.3, sight:4, desc:'Fördert 1,2 Öl/s aus der Tiefe – überall baubar, braucht Strom'},
   refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},

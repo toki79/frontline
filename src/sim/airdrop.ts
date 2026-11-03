@@ -5,6 +5,7 @@ import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { hostile, nearestPassable } from '../sim/world';
 import { msg } from '../core/events';
+import { noteLoss } from '../sim/reinforce';
 
 /* =====================================================================
    Luftlandung: Fallschirmjäger steigen am Fliegerhorst in eine Transportmaschine,
@@ -33,7 +34,7 @@ export function updateFlights(dt){
       const aa=[...G.buildings.filter(b=>!b.dead&&!b.site&&(b.type==='flak'||b.type==='sam')), ...G.units.filter(u=>!u.dead&&!u.carried&&u.type==='spaag')];
       for(const s of aa){ if(!hostile(s.owner,f.owner)) continue; const w=s.def.weapon; if(!w||dist(s.x,s.y,f.x,f.y)>w.range) continue;
         fxAdd({k:'tracer',x1:s.x,y1:s.y,x2:f.x,y2:f.y,life:0.15,col:'#ffd27a'});
-        const alive=f.units.filter(u=>!u.dead); if(alive.length&&Math.random()<(AIR.dropAA[s.type]||0.1)){ const v=alive[Math.floor(Math.random()*alive.length)]; v.dead=true;
+        const alive=f.units.filter(u=>!u.dead); if(alive.length&&Math.random()<(AIR.dropAA[s.type]||0.1)){ const v=alive[Math.floor(Math.random()*alive.length)]; v.dead=true; noteLoss(v);
           fxAdd({k:'boom',x:f.x,y:f.y,r:0.4,life:0.5}); if(f.owner===0){ G.stats.lost++; msg('🪂 Flugabwehr trifft die Transportmaschine – ein Trupp verloren!','#ff8a7a'); } } } }
     if(k>=1){ f.done=true; const alive=f.units.filter(u=>!u.dead);
       alive.forEach((u,i)=>{ const a=i/Math.max(1,alive.length)*6.283, p=nearestPassable(f.tx+Math.cos(a)*1.5,f.ty+Math.sin(a)*1.5,'inf');

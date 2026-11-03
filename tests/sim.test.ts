@@ -11,6 +11,8 @@ import { rangeOf } from '../src/sim/units';
 import { makeGroup, groupState, dissolveGroup } from '../src/sim/groups';
 import { orderBoard, unload, aboard } from '../src/sim/transport';
 import { orderDrop } from '../src/sim/airdrop';
+import { reinfOf } from '../src/sim/reinforce';
+import { depositTiles } from '../src/sim/world';
 import { findPath } from '../src/sim/pathfinding';
 import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
@@ -805,6 +807,29 @@ describe('Simulation', () => {
     expect(runUntil(() => ps.every(u => !u.carried), 15)).toBe(true);
     expect(Math.hypot(ps[0].x - tx, ps[0].y - ty)).toBeLessThan(4);
     expect(orderDrop(0, ps, hq.x, hq.y)).not.toBe(2);              // nicht mehr am Fliegerhorst
+  });
+
+  it('Mine/Steinbruch bauen das ganze Vorkommen ab, nicht nur angrenzende Felder', () => {
+    newGame('mittel'); const p = G.players[0], hq = findBuilding(0, 'hq');
+    const x = Math.floor(hq.x) + 6, y = Math.floor(hq.y) - 6;
+    const q = placeBuilding(0, 'quarry', x, y, false);
+    for (let i = 0; i < G.rock.length; i++) G.rock[i] = 0;
+    G.rock[idx(x + 4, y)] = 50;                                   // Felsen 2 Felder vom Steinbruch entfernt
+    run(1); const s0 = p.res.stone; run(25);
+    expect(p.res.stone).toBeGreaterThan(s0 + 5); expect(q.empty).toBeFalsy();
+    expect(depositTiles(q, G.rock).length).toBeLessThanOrEqual(1);
+  });
+
+  it('Verluste ersetzen: Gefallene werden nachgebaut und stoßen zum Verband', () => {
+    newGame('mittel'); noBandits(); const p = G.players[0], hq = findBuilding(0, 'hq');
+    p.res.money = 5000; p.pop = 35; builtNearHq('barracks');
+    const us = [spawnAt(0, 'inf', hq.x + 5, hq.y + 5), spawnAt(0, 'inf', hq.x + 5.6, hq.y + 5)];
+    const g = makeGroup(0, us); g.reinforce = true;
+    destroy(us[0], { owner: 1, dead: true, x: 0, y: 0 });
+    expect(reinfOf(0).q.length).toBe(1);
+    expect(runUntil(() => G.units.some(u => !u.dead && u.owner === 0 && u.type === 'inf' && u.grp === g.id && u !== us[1]), 30)).toBe(true);
+    reinfOf(0).on = false; const free = spawnAt(0, 'inf', hq.x + 3, hq.y + 5); destroy(free, null);
+    expect(reinfOf(0).q.length).toBe(0);                          // ohne Verband nur, wenn global eingeschaltet
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {
