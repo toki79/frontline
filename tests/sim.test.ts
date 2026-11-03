@@ -1,5 +1,5 @@
 // Simulationstests ohne Browser: prüft, dass die Spiellogik unabhängig von Grafik/DOM läuft.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
@@ -761,8 +761,9 @@ describe('Simulation', () => {
     expect(groupState(g).combined).toBe(true);
     expect(us.every(u => u.cmb)).toBe(true);
     const e1 = spawnAt(1, 'mbt', hq.x + 20, hq.y - 20), e2 = spawnAt(1, 'mbt', hq.x + 22, hq.y - 20);
-    const solo = { owner: 0, dead: true, x: 0, y: 0 }; for (let i = 0; i < 5; i++) { applyDamage(e1, 25, 'shell', us[2]); applyDamage(e2, 25, 'shell', solo); }
-    expect(e1.maxHp - e1.hp).toBeGreaterThan((e2.maxHp - e2.hp) * 1.03);   // verbundene Waffen: +15 % (bei Zufallsstreuung)
+    const solo = { owner: 0, dead: true, x: 0, y: 0 }, rnd = vi.spyOn(Math, 'random').mockReturnValue(0.5);   // ohne Zufallsstreuung vergleichen
+    applyDamage(e1, 100, 'shell', us[2]); applyDamage(e2, 100, 'shell', solo); rnd.mockRestore();
+    expect((e1.maxHp - e1.hp) / (e2.maxHp - e2.hp)).toBeCloseTo(1.15, 2);   // verbundene Waffen: +15 %
     orderMove(us, hq.x + 4, hq.y - 16);
     expect(us.every(u => u.pace === 1.25)).toBe(true);                 // Tempo der Schützen
     run(5); const ys = us.map(u => u.y); expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(4);
