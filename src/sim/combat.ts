@@ -1,12 +1,13 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { COMBINED, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { dugFactor } from '../sim/missions';
 import { coverAt, detected, hostile, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
+import { bailOut } from '../sim/transport';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -30,7 +31,7 @@ export function findTarget(src,range){
 }
 // Flächenschaden (Raketen, Drohnen): trifft alle Feinde im Radius, zerstört Stacheldraht
 export function splash(x,y,r,dmg,type,src){
-  for(const e of G.units){ if(e.dead||!hostile(src.owner,e.owner)||!canHit({type},e)) continue; const d=dist(x,y,e.x,e.y); if(d<=r) applyDamage(e,dmg*(1-0.5*d/r),type,src); }
+  for(const e of G.units){ if(e.dead||e.carried||!hostile(src.owner,e.owner)||!canHit({type},e)) continue; const d=dist(x,y,e.x,e.y); if(d<=r) applyDamage(e,dmg*(1-0.5*d/r),type,src); }
   for(const e of G.buildings){ if(e.dead||!hostile(src.owner,e.owner)) continue; const d=distTo({x,y},e); if(d<=r) applyDamage(e,dmg*(1-0.5*d/r),type,src); }
   for(let ty=Math.floor(y-r);ty<=y+r;ty++)for(let tx=Math.floor(x-r);tx<=x+r;tx++) if(inMap(tx,ty)&&G.feat[idx(tx,ty)]===FEAT.WIRE&&dist(x,y,tx+0.5,ty+0.5)<=r) G.feat[idx(tx,ty)]=0;
 }
@@ -72,6 +73,9 @@ export function applyDamage(t,dmg,type,src){
   if(t.kind==='unit'&&t.owner<2&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
   if(t.cage&&CAGE[type]) m*=CAGE[type];
   if(src&&src.cmb) m*=1+COMBINED.dmg;   // verbundene Waffen
+  if(src&&src.kind==='building'&&src.def&&src.def.def) m*=FORTIFY.dmgOut;   // Stellungen: vorbereitete Schussfelder
+  if(src&&src.dug) m*=FORTIFY.dugOut;   // eingegrabene Truppen schießen ruhiger
+  if(t.kind==='building'&&t.def.def&&!FORTIFY.artillery.includes(type)) m*=FORTIFY.direct;   // Befestigung hält direktem Feuer stand
   if(t.cmb) m*=1-COMBINED.def;
   if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
@@ -122,6 +126,7 @@ export function loot(e,src){
 }
 export function destroy(e,src){
   if(e.dead) return; e.dead=true; if(e.kind==='building'){ G.qDirty=true; G.roadDirty=true; }
+  if(e.passengers) bailOut(e);   // Transporter: Mitfahrende springen ab
   loot(e,src);
   if(e.kind==='building'){
     for(let y=e.ty;y<e.ty+e.h;y++)for(let x=e.tx;x<e.tx+e.w;x++) if(G.occ[idx(x,y)]===e.id) G.occ[idx(x,y)]=0;

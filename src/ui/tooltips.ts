@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
@@ -64,6 +64,8 @@ export function tipFor(k){
     if(d.forester) L.push(`🌱 Pflanzt alle ${FOREST.plantEvery} s einen Setzling (bis ${FOREST.maxSaplings} gleichzeitig) auf freiem Land im Umkreis von ${FOREST.radius} Feldern – mit Abstand zu Gebäuden und Äckern. Nach ${Math.round(FOREST.grow/60)} Minuten wird daraus Wald, den ein Holzfäller fällen kann. Ausgebaut pflanzt es schneller.`);
     if(d.needsForest) L.push('Tipp: Ein Forsthaus daneben forstet gefällten Wald wieder auf – so geht das Holz nie aus.');
     if(k==='derrick') L.push('Braucht kein Ölfeld und keine Tanklaster – liefert direkt ins Lager. Ohne Strom nur 30 % Leistung.');
+    if(k==='atpost') L.push('Hält direktem Beschuss gut stand und schießt aus vorbereiteter Stellung genauer – Panzer müssen erst Artillerie oder Infanterie nachziehen.');
+    if(d.def&&d.weapon) L.push(`🛡 Verteidigungsvorteil: Stellungen treffen ${Math.round((FORTIFY.dmgOut-1)*100)} % besser und nehmen von direktem Feuer nur ${Math.round(FORTIFY.direct*100)} % Schaden – Artillerie, Raketen und Bomben wirken voll.`);
     if(k==='npp') L.push(`☢ Wird es zerstört, kommt es zur Kernschmelze: Verwüstung im Umkreis von ${NUKE.meltdown.radius} Feldern und ${Math.round(NUKE.falloutTime/60)} min Verstrahlung. Nicht an die Front bauen!`);
     if(k==='datacenter') L.push(`Beschleunigt die Forschung um ${Math.round(RESEARCH_SPEED.datacenter*100)} % (höchstens ${RESEARCH_SPEED.maxDatacenters} zählen). Voraussetzung für die Erforschung der KI.`);
     if(k==='greenhouse') L.push('Braucht keine Äcker – spart viel Fläche gegenüber Bauernhöfen, kostet aber Strom und Unterhalt.');
@@ -91,6 +93,9 @@ export function tipFor(k){
     if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder ganz kurz nachdem sie feuert). Selbst dann tun ihr nur Flugabwehr und kaum Maschinenkanonen etwas.');
     if(d.sortie) L.push(`✈ Startet vom Fliegerhorst, fliegt zum befohlenen Ziel, wirft eine Bombe und kehrt zum Nachladen (${AIR.rearm} s) zurück – danach fliegt er dasselbe Ziel erneut an, bis es zerstört ist. Ohne Forschung „Gleitbomben“ muss er das Ziel überfliegen (Flak!), mit Gleitbomben wirft er aus ${2+AIR.glideExtra} Feldern. Höchstens ${AIR.perBase} je Fliegerhorst. Ziele jenseits der eigenen Sicht müssen aufgeklärt sein.`);
     if(d.swarm) L.push(`🐝 ${d.swarm} Drohnen in einer Einheit: Jeder Treffer kostet eine Drohne, der Rest sucht sich das nächste Ziel. Autonom – Störsender wirken nicht, Funkreichweite +${AIR.swarmRangeExtra} Felder. Gegenmittel: Flugabwehr, Flakpanzer, MGs.`);
+    if(d.carry) L.push(`🚚 Nimmt ${d.carry} Trupps Infanterie mit: Schützen wählen, dann das Fahrzeug antippen. ⬇ Absitzen lässt sie aussteigen. Mitfahrende sind vor Beschuss geschützt – wird das Fahrzeug zerstört, springen sie verletzt ab.`);
+    if(d.move==='amph') L.push('🌊 Fährt durch Flüsse und kommt im Schlamm gut voran – so lassen sich Brücken, Sperren und befestigte Grenzen umgehen.');
+    if(k==='para') L.push(`🪂 Am Fliegerhorst (bis 6 Felder entfernt) wählen, 🪂 Absprung tippen, erkundetes Ziel antippen: Eine Transportmaschine fliegt bis zu ${AIR.dropRange} Felder weit und setzt bis zu ${AIR.dropMax} Trupps ab. Flugabwehr unterwegs kann Trupps abschießen (Flak ${Math.round(AIR.dropAA.flak*100)} %, Flugabwehrraketen ${Math.round(AIR.dropAA.sam*100)} % je Sekunde in Reichweite). Gelandet säubern sie das Gebiet.`);
     if(k==='tel') L.push(`🚀 Feuert nur auf aufgeklärte Ziele (Drohnen, Späher, Satellit). Lange Nachladezeit (${d.weapon.rof} s). Gegner mit Flugabwehrraketen können die Rakete abfangen (${Math.round(AIR.intercept*100)} % je Stellung im Umkreis von ${AIR.interceptR} Feldern).`);
     if(k==='reaper') L.push('🎯 Auf Aufklärungsflug (🛰) oder im Einsatz „Gebiet klären“ jagt sie selbstständig feindliche Schützen – ein Treffer reicht meist für einen Trupp.');
     else if(d.cls==='air') L.push('Fliegt tief: Gewehre, Maschinenkanonen und Flugabwehr können sie abschießen.');

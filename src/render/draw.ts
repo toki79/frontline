@@ -7,7 +7,7 @@ export function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
    ===================================================================== */
 export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
   c.save(); c.translate(x,y);
-  if(type==='inf'||type==='at'||type==='militia'||type==='bandit'||type==='volunteer'){
+  if(type==='inf'||type==='at'||type==='militia'||type==='bandit'||type==='volunteer'||type==='para'){
     const n=Math.max(1,Math.ceil(hpf*3-0.01)), offs=[[4,0],[-3,-5],[-3,5]];
     c.rotate(ang);
     for(let i=0;i<n;i++){const [ox,oy]=offs[i];
@@ -15,7 +15,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
       const tube=type==='at'&&i===0;
       c.strokeStyle='#1d1d1a'; c.lineWidth=tube?2.8:1.3; c.beginPath(); c.moveTo(ox-(tube?4:0),oy+1.6); c.lineTo(ox+(tube?8:7),oy+1.6); c.stroke();
       c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; c.beginPath(); c.arc(ox,oy,3.5,0,7); c.fill(); c.stroke();
-      c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':type==='volunteer'?'#8a6a4a':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
+      c.fillStyle=type==='militia'?'#5a4a2c':type==='bandit'?'#2a2622':type==='volunteer'?'#8a6a4a':type==='para'?'#6a3a5a':'#3c4a2c'; c.beginPath(); c.arc(ox,oy,1.9,0,7); c.fill();
     }
   } else if(type==='diplomat'){   // Diplomat: Anzug und Hut
     c.rotate(ang); c.fillStyle='rgba(0,0,0,.28)'; c.beginPath(); c.arc(1.5,1.5,3.4,0,7); c.fill();
@@ -76,6 +76,15 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     for(const [rx,ry] of [[-5,-5],[5,-5],[-5,5],[5,5]]){ c.fillStyle='rgba(200,200,200,.45)'; c.beginPath(); c.arc(rx,ry,3.2,0,7); c.fill(); c.strokeStyle='#333'; c.lineWidth=0.8; c.stroke(); }
     c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; rr(c,-3,-2.5,6,5,1.2); c.fill(); c.stroke();
     c.fillStyle='#ffd040'; c.fillRect(2,-1,2,2);
+  } else if(type==='apc'||type==='amphib'){   // Transporter: Radpanzer bzw. Schwimmrumpf mit Luken
+    c.rotate(ang); const amph=type==='amphib';
+    c.fillStyle='rgba(0,0,0,.3)'; rr(c,-10,-5,23,12,3); c.fill();
+    if(!amph){ c.fillStyle='#2b2b26'; for(const wx of [-8,-3,2,7]){ c.beginPath(); c.arc(wx,-5.5,2.2,0,7); c.fill(); c.beginPath(); c.arc(wx,5.5,2.2,0,7); c.fill(); } }
+    c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1; c.beginPath();
+    if(amph){ c.moveTo(13,0); c.lineTo(8,-6); c.lineTo(-11,-6); c.lineTo(-11,6); c.lineTo(8,6); c.closePath(); } else rr(c,-11,-5.5,22,11,3);
+    c.fill(); c.stroke(); c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(-7,-3,5,6); c.fillRect(-1,-3,5,6);
+    if(amph){ c.fillStyle='rgba(120,180,220,.6)'; c.fillRect(-12,-7,2,14); }
+    c.rotate(tur-ang); c.fillStyle='#4a4d42'; c.beginPath(); c.arc(3,0,3,0,7); c.fill(); c.fillStyle='#22231f'; c.fillRect(4,-0.8,8,1.6);
   } else if(type==='swarm'){   // Drohnenschwarm: kleine Drohnen, Anzahl nach Zustand
     const t=G?G.t:0, n=Math.max(1,Math.ceil(hpf*8));
     for(let i=0;i<n;i++){ const a=i*2.4+t*1.5, r=3+((i*7)%5), ox=Math.cos(a)*r, oy=Math.sin(a)*r*0.8-3+Math.sin(t*7+i)*0.8;

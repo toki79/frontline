@@ -112,7 +112,7 @@ export const visOf=pid=>pid===0?G.vis:G.vis1;
 /** ist ein Feld für eine Partei gerade aufgeklärt? */
 export function spotted(pid,x,y){ if(pid>1) return false; if(pid===0&&!G.fog) return true; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)&&visOf(pid)[idx(tx,ty)]===2; }
 /** Hochflieger für eine Partei entdeckt? (andere Einheiten immer) */
-export function detected(e,pid){ return e.kind!=='unit'||e.def.armor!=='airHigh'||seesFor(pid,e.owner)||!!(e.det&&e.det[pid]); }
+export function detected(e,pid){ if(e.carried) return false; return e.kind!=='unit'||e.def.armor!=='airHigh'||seesFor(pid,e.owner)||!!(e.det&&e.det[pid]); }
 export function updateVision(){
   G.vis1=G.vis1||new Uint8Array(MAP_W*MAP_H);
   for(const pid of [0,1]){
@@ -120,7 +120,7 @@ export function updateVision(){
     const v=visOf(pid); for(let i=0;i<v.length;i++) if(v[i]===2) v[i]=1;
     const reveal=(x,y,r)=>{ const r2=r*r; for(let ty=Math.max(0,Math.floor(y-r));ty<=Math.min(MAP_H-1,Math.ceil(y+r));ty++)for(let tx=Math.max(0,Math.floor(x-r));tx<=Math.min(MAP_W-1,Math.ceil(x+r));tx++){
       const dx=tx+0.5-x, dy=ty+0.5-y; if(dx*dx+dy*dy<=r2) v[ty*MAP_W+tx]=2; } };
-    for(const u of G.units) if(!u.dead&&seesFor(pid,u.owner)) reveal(u.x,u.y,u.def.sight+0.5);
+    for(const u of G.units) if(!u.dead&&!u.carried&&seesFor(pid,u.owner)) reveal(u.x,u.y,u.def.sight+0.5);
     for(const b of G.buildings) if(!b.dead&&seesFor(pid,b.owner)) reveal(b.x,b.y,(b.def.sight||4)+Math.max(b.w,b.h)/2);
   }
   // Tarnung: Radar der Flugabwehr (fertig) erfasst Hochflieger im Umkreis; wer feuert, verrät sich kurz

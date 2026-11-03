@@ -33,7 +33,7 @@ export function findPath(sx,sy,gx,gy,cls){
   return out.reverse();
 }
 export function setPath(u,gx,gy){
-  const cls=u.def.cls;
+  const cls=u.def.move||u.def.cls;   // Amphibien: eigene Bewegungsklasse
   if(cls==='air'){ u.path=[{x:clamp(gx,0.5,MAP_W-0.5),y:clamp(gy,0.5,MAP_H-0.5)}]; u.pathI=0; return; }   // Drohnen fliegen direkt
   let g={x:Math.floor(gx),y:Math.floor(gy)};
   if(!passable(g.x,g.y,cls)){g=nearestPassable(g.x,g.y,cls); if(!g){u.path=[];u.pathI=0;return;}}

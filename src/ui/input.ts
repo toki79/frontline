@@ -8,6 +8,8 @@ import { orderAttack, orderEscort, orderHarvest, orderLurk, orderMove, orderPatr
 import { cancelDefPlan, placeDefense, placeSite } from '../sim/production';
 import { sendDiplomats } from '../sim/trade';
 import { applyOrder, ORDER_NAME } from '../sim/missions';
+import { aboard, canRide, orderBoard, unload } from '../sim/transport';
+import { droppable, orderDrop } from '../sim/airdrop';
 import { ARM_NAME, groupState, groupsOf, makeGroup, members } from '../sim/groups';
 import { centerOn } from '../render/camera';
 import { issuePending } from '../ui/forces';
@@ -35,13 +37,15 @@ export const endPtr=e=>{
 export function myUnitsSel(){return G.sel.filter(e=>e.kind==='unit'&&e.owner===0&&!e.dead);}
 export function pickEntity(w){
   let best=null,bd=1e9;
-  for(const u of G.units){ if(u.dead||!visibleUnit(u)) continue; const d=dist(u.x,u.y,w.x,w.y); const r=Math.max(0.55,u.def.size*0.8); if(d<r&&d<bd){bd=d;best=u;} }
+  for(const u of G.units){ if(u.dead||u.carried||!visibleUnit(u)) continue; const d=dist(u.x,u.y,w.x,w.y); const r=Math.max(0.55,u.def.size*0.8); if(d<r&&d<bd){bd=d;best=u;} }
   if(best) return best;
   const tx=Math.floor(w.x),ty=Math.floor(w.y); if(!inMap(tx,ty)) return null; const id=G.occ[idx(tx,ty)];
   const b=id?G.buildings.find(b=>b.id===id&&!b.dead):null; return b&&knownBuilding(b)?b:null;
 }
 export function handleTap(w,right,shift){
   if(G.over) return;
+  if(G.dropAim){ G.dropAim=false; if(right){ refreshCmds(); return; } const r=orderDrop(0,myUnitsSel(),w.x,w.y);
+    if(typeof r==='number'){ fxAdd({k:'marker',x:w.x,y:w.y,col:'#9ff07a',life:0.8}); msg(`🪂 ${r} Trupp${r===1?'':'s'} Fallschirmjäger starten – Absprung über dem Ziel. Flugabwehr unterwegs ist gefährlich!`,'#9fd88a'); } else msg('Absprung nicht möglich: '+r,'#ffb38a'); refreshCmds(); return; }
   if(G.nukeAim){ if(right){ G.nukeAim=false; G.nukeArm=null; refreshCmds(); return; } nukeTap(w); return; }
   if(G.orderPending){ if(right){ G.orderPending=null; refreshCmds(); return; } issuePending(w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ffd36a',life:0.7}); return; }
   if(G.placing&&isDefType(G.placing)){
@@ -74,6 +78,9 @@ export function handleTap(w,right,shift){
   if(G.amoveMode&&mine.length){ applyOrder(mine,'assault',w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ff7a5a',life:0.5}); G.amoveMode=false; refreshCmds(); return; }
   if(G.orderMode&&mine.length){ applyOrder(mine,G.orderMode,w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:G.orderMode==='hold'?'#7fb0ea':'#ffd36a',life:0.6});
     msg(`${mine.length} Einheit${mine.length===1?'':'en'}: ${ORDER_NAME[G.orderMode]}.`); G.orderMode=null; refreshCmds(); return; }
+  if(ent&&ent.owner===0&&ent.kind==='unit'&&ent.def.carry&&mine.some(u=>canRide(u))&&!mine.includes(ent)){   // Einsteigen
+    const n=orderBoard(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#9ff07a',life:0.6});
+    msg(n?`🚚 ${n} Trupp${n===1?'':'s'} steig${n===1?'t':'en'} in den ${ent.def.name.replace(/\u00AD/g,'')} (Platz für ${ent.def.carry}).`:'Kein Platz mehr im Fahrzeug.',n?'#9ff07a':'#ffb38a'); return; }
   if(ent&&ent.owner===0){
     if(ent.kind==='building'&&ent.site&&mine.some(u=>u.def.worker)){ assignWorkers(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5}); return; }
     if(ent.kind==='building'&&ent.type==='refinery'&&mine.some(u=>u.def.harvester)){orderReturn(mine.filter(u=>u.def.harvester),ent);fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8c84a',life:0.5});return;}
@@ -125,7 +132,7 @@ export function command(ent,w,mine){
 }
 export function boxSelect(b,shift){
   const a=toWorld(Math.min(b.x0,b.x1),Math.min(b.y0,b.y1)), c=toWorld(Math.max(b.x0,b.x1),Math.max(b.y0,b.y1));
-  const got=G.units.filter(u=>!u.dead&&u.owner===0&&u.x>=a.x&&u.x<=c.x&&u.y>=a.y&&u.y<=c.y);
+  const got=G.units.filter(u=>!u.dead&&!u.carried&&u.owner===0&&u.x>=a.x&&u.x<=c.x&&u.y>=a.y&&u.y<=c.y);
   const combat=got.filter(u=>u.def.weapon);
   const pick=combat.length?combat:got;
   G.sel = shift ? [...new Set([...myUnitsSel(),...pick])] : pick;
@@ -152,7 +159,9 @@ export function cmd(c){
   else if(c.startsWith('grp')){ const g=(G.groups||[]).find(x=>x.id===Number(c.slice(3))); if(g){ const ms=members(g);
     const same=G.sel.length===ms.length&&ms.every(u=>G.sel.includes(u));
     if(same&&ms.length){ const s=groupState(g); centerOn(s.cx,s.cy); } else G.sel=ms; G.amoveMode=false; G.orderMode=null; } }
-  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;G.roadStart=null;}
+  else if(c==='drop'){ if(droppable(mine).length){ G.dropAim=!G.dropAim; if(G.dropAim) msg(`🪂 Absprungziel antippen (erkundet, höchstens ${AIR.dropRange} Felder vom Fliegerhorst).`); } else msg('Fallschirmjäger am Fliegerhorst auswählen (bis 6 Felder entfernt).','#ffb38a'); }
+  else if(c==='unload'){ let n=0; for(const u of mine) if(u.def.carry) n+=unload(u); if(n) msg(`⬇ ${n} Trupp${n===1?'':'s'} abgesessen.`); }
+  else if(c==='desel'){G.sel=[];G.amoveMode=false;G.boxMode=false;G.escortMode=false;G.placing=null;G.orderMode=null;G.orderPending=null;G.nukeAim=false;G.nukeArm=null;G.roadStart=null;G.dropAim=false;}
   else if(c==='nuke'){ const b=selBuilding(); if(b&&b.type==='silo'){ if(!(G.players[0].nukes>0)) msg('Noch keine Atomrakete fertig – im Reiter 🎓 Forschung bauen.','#ffb38a');
     else { G.nukeAim=!G.nukeAim; G.nukeArm=null; if(G.nukeAim) msg('☢ Ziel wählen: ein erkundetes Gebiet antippen. Alles im Umkreis von '+NUKE.radius+' Feldern wird vernichtet.','#ff8a7a'); } } }
   else if(c==='hold'||c==='clear'){ if(mine.length){ G.orderMode=G.orderMode===c?null:c; G.amoveMode=false; G.escortMode=false; } else msg('Zuerst Einheiten auswählen.'); }
@@ -189,6 +198,8 @@ export function refreshCmds(){
   bp.classList.toggle('show',scouts.length>0); bp.classList.toggle('on',scouts.length>0&&scouts.every(u=>u.patrol));
   document.querySelector('[data-c=escort]').classList.toggle('on',!!(G&&G.escortMode));
   document.querySelector('[data-c=demolish]').classList.toggle('show',!!sb);
+  { const db=document.querySelector('[data-c=drop]'); db.classList.toggle('show',!!G&&droppable(myUnitsSel()).length>0); db.classList.toggle('on',!!(G&&G.dropAim)); }
+  document.querySelector('[data-c=unload]').classList.toggle('show',!!G&&myUnitsSel().some(u=>u.def.carry&&aboard(u).length));
   { const ob=G&&selOwnBuilding(), ub=document.querySelector('[data-c=upgrade]'); ub.classList.toggle('show',!!(ob&&UPGRADES[ob.type]&&!ob.site&&nextUpgrade(ob))); ub.classList.toggle('poor',!!(ob&&UPGRADES[ob.type]&&upgradeBlock(0,ob).length)); }
   document.querySelector('[data-c=demolish]').classList.toggle('warn',!!(sb&&G.demolishArm===sb.id));
   { const nb=document.querySelector('[data-c=nuke]'); nb.classList.toggle('show',!!(G&&(G.nukeAim||(sb&&sb.type==='silo'&&!sb.site)))); nb.classList.toggle('on',!!(G&&G.nukeAim)); }
@@ -201,6 +212,7 @@ export function updateInfo(){
     if(road){ el.textContent=G.roadStart?`🛣 Straße: Endpunkt antippen – der Weg wird automatisch geplant · ${DEF('road').cost.stone} 🪨 je Feld · ✕ beendet`:'🛣 Straße: Startpunkt antippen (an der Stadt oder einer Straße) · geplantes Feld antippen = zurücknehmen · ✕ beendet'; return; }
     el.textContent=`${d.name} ${road?'planen':'beauftragen'}: ${d.line?'antippen oder über die Karte ziehen':'Feld antippen'} · ${costHtml(d.cost)} je Feld · ${road?'Bauarbeiter bauen':pio?`${pio} Pionier${pio===1?'':'e'} bauen`:'⚠ keine Pioniere – in der Kaserne ausbilden'} · Plan antippen = zurücknehmen · ✕ beendet`; return; }
   if(G.placing){const pd=BUILDINGS[G.placing]; el.textContent='Platzieren: '+pd.name+(pd.needsOre?' – direkt neben Erz (gelb) tippen':pd.needsRock?' – direkt neben Felsen (gelb) tippen':pd.needsForest?' – nahe am Wald (gelb) tippen':pd.cap?' – grün = ruhig, gelb/orange = Lärm oder enge Bebauung':G.placing==='farm'?' – am besten auf grüner Wiese, mit Freiraum für Äcker':' – auf grün markiertes Feld tippen')+' · Geld jetzt, Holz/Stein beim Bauen';return;}
+  if(G.dropAim){ el.textContent=`🪂 Luftlandung: Absprungziel antippen – erkundet, höchstens ${AIR.dropRange} Felder vom Fliegerhorst (Kreis) · ✕ bricht ab`; return; }
   if(G.nukeAim){ el.textContent=G.nukeArm?'☢ Ziel markiert – dieselbe Stelle nochmal antippen = START · ✕ Abwählen bricht ab':`☢ Atomschlag: erkundetes Ziel antippen (Radius ${NUKE.radius} Felder) · ✕ Abwählen bricht ab`; return; }
   if(G.orderPending){ const n=Object.values(G.orderPending.pick).reduce((s: number,v: any)=>s+v,0); el.textContent=`🎯 Einsatz „${ORDER_NAME[G.orderPending.kind]}“ mit ${n} Einheiten: Ziel auf der Karte antippen · ✕ Abwählen bricht ab`; return; }
   if(G.orderMode){ el.textContent=`${ORDER_NAME[G.orderMode]}: Ziel antippen – ${G.orderMode==='hold'?'Truppen ziehen hin und graben sich ein':'Truppen säubern den Umkreis und halten dann Stellung'}`; return; }
@@ -216,6 +228,8 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.cls==='air'&&!e.def.sortie&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
     if(e.kind==='unit'&&e.def.armor==='airHigh'&&e.owner===0) t+=' · getarnt – nur Radar der Flugabwehr entdeckt sie';
     if(e.kind==='unit'&&e.cage) t+=' · ▦ Gitterkäfig';
+    if(e.kind==='unit'&&e.def.carry) t+=` · 🚚 ${aboard(e).length}/${e.def.carry} Trupps an Bord${e.owner===0?' (Schützen wählen, dann Fahrzeug antippen = einsteigen; ⬇ = absitzen)':''}`;
+    if(e.kind==='unit'&&e.def.move==='amph') t+=' · 🌊 fährt durchs Wasser';
     if(e.kind==='unit'&&e.jammed) t+=' · 📡 gestört!';
     if(e.kind==='unit'&&e.def.diplomat) t+=e.mission!==undefined&&e.mission!==null?' · auf dem Weg zur Botschaft':' · Rathaus Kastrovas antippen, um eine Botschaft zu eröffnen';
     if(e.kind==='unit'&&e.def.caravan) t+=` · Ladung ${e.cargoAmt} ${RES[e.cargoRes].icon} → ${G.players[e.dest?e.dest.owner:0].short}`;

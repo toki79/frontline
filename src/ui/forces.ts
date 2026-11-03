@@ -14,13 +14,13 @@ import { dissolveGroup, groupState, groupsOf, makeGroup, members } from '../sim/
    Kräfte-Übersicht: alle eigenen Einheiten nach Art, Status, Einsatz ordern
    ===================================================================== */
 const GROUPS: [string,string[]][] = [
-  ['Infanterie',['inf','at','volunteer','militia']],
-  ['Fahrzeuge',['ifv','mbt','mlrs','tel','spaag','jammer']],
+  ['Infanterie',['inf','at','para','volunteer','militia']],
+  ['Fahrzeuge',['apc','amphib','ifv','mbt','mlrs','tel','spaag','jammer']],
   ['Drohnen',['drone','swarm','spy','reaper']],
   ['Luftwaffe',['jet']],
   ['Zivil & Spezial',['worker','pioneer','diplomat','truck','caravan']],
 ];
-const PICKABLE = new Set(['inf','at','volunteer','militia','ifv','mbt','mlrs','tel','spaag','jammer','drone','swarm','spy','reaper','jet']);
+const PICKABLE = new Set(['inf','at','para','apc','amphib','volunteer','militia','ifv','mbt','mlrs','tel','spaag','jammer','drone','swarm','spy','reaper','jet']);
 export const fs: {kind: OrderKind, pick: Record<string,number>} = {kind:'hold', pick:{}};
 const KINDS: [OrderKind,string,string][] = [
   ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung'],
@@ -37,6 +37,8 @@ function status(u){
   if(u.def.diplomat) return u.mission!=null?'reist':'wartet';
   if(u.def.caravan) return 'liefert';
   if(u.def.harvester) return u.hs?'fördert':'wartet';
+  if(u.carried) return u.carrier&&u.carrier.units?'im Flug':'an Bord';
+  if(u.mode==='board') return 'steigt ein';
   if(u.mode==='recharge') return 'lädt';
   if(u.patrol) return 'klärt auf';
   if(u.target) return 'kämpft';

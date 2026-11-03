@@ -13,6 +13,8 @@ import { msg } from '../core/events';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
 import { makeGroup } from '../sim/groups';
+import { droppable, orderDrop } from '../sim/airdrop';
+import { unprotected } from '../sim/fortify';
 import { fireCoverage } from '../sim/city';
 
 /* =====================================================================
@@ -158,6 +160,8 @@ export function aiThink(){
         const tg=raidTarget(u,need,lead,12);
         if(tg) orderMove([u],tg.x,tg.y,'amove'); else { u.wave=false; orderMove([u],rally.x,rally.y); }
       }
+    } else if(G.t>(ai.dropT||0)&&droppable(myU).length>=3){   // Luftlandung hinter den Linien: bevorzugt ungeschützte wichtige Gebäude
+      ai.dropT=G.t+120; const tg=unprotected(0)[0]||raidTarget(findBuilding(pid,'hq')||rally,need,lead,0); if(tg) orderDrop(pid,droppable(myU),tg.x,tg.y);
     } else if(G.t>ai.nextRaid&&army.length>=4&&(ratio>=1.0||(urgent&&ratio>=0.6))){
       launchRaid(army,need,lead,rally);
     } else if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x,rally.y);

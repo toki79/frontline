@@ -1,6 +1,6 @@
 import { renderTerrain, repaintTile } from './terrain';
 import { dist, hash, idx, inMap } from '../core/util';
-import { capOf, BANDITS, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
+import { capOf, AIR, BANDITS, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
 import { haulEff, hauls, previewFields, routeRoadBetween, siteLacks, siteWorkers } from '../sim/build';
@@ -133,7 +133,7 @@ export function render(){
     if(b.hp<b.maxHp*0.5&&Math.random()<0.08) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.6,y:b.y+(Math.random()-.5)*b.h*0.6,r:0.3,life:1.4});
   }
   const selSet0=new Set(G.sel);
-  for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
+  for(const u of G.units){ if(u.dead||u.carried||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
     if(u.dug){ c.strokeStyle='#a08a5a'; c.lineWidth=3; c.beginPath(); c.arc(u.x*TILE,u.y*TILE,u.def.size*TILE*0.75+3,Math.PI*0.15,Math.PI*1.85); c.stroke();
       c.strokeStyle='rgba(60,45,25,.6)'; c.lineWidth=1; c.stroke(); }   // Sandsäcke: eingegraben
     drawUnitShape(c,u.type,f.col,f.dark,u.x*TILE,u.y*TILE,u.angle,u.tur,u.working?-1:u.hp/u.maxHp);
@@ -188,13 +188,20 @@ export function render(){
       if(G.roadPrev){ c.fillStyle='rgba(232,200,74,.45)'; for(const i of G.roadPrev) c.fillRect((i%MAP_W)*TILE+6,((i/MAP_W)|0)*TILE+6,TILE-12,TILE-12); } }
     c.strokeStyle='#e8c84a'; c.lineWidth=3; c.beginPath(); c.arc((s.x+0.5)*TILE,(s.y+0.5)*TILE,TILE*0.42,0,7); c.stroke();
     c.fillStyle='#e8c84a'; c.beginPath(); c.arc((s.x+0.5)*TILE,(s.y+0.5)*TILE,4,0,7); c.fill(); }
+  for(const f of (G.flights||[])){ if(f.owner!==0&&tileVis(f.x,f.y)<2) continue;   // Transportmaschinen
+    c.save(); c.translate(f.x*TILE,f.y*TILE); c.rotate(f.a||0); c.fillStyle='rgba(0,0,0,.2)'; c.fillRect(-12,8,26,6);
+    c.fillStyle='#7a7e74'; c.strokeStyle='#3a3e34'; c.lineWidth=1; c.fillRect(-14,-3,28,6); c.strokeRect(-14,-3,28,6); c.fillRect(-3,-16,8,32); c.strokeRect(-3,-16,8,32); c.fillRect(-14,-6,5,12);
+    c.fillStyle=G.players[f.owner].col; c.fillRect(8,-2,4,4); c.restore(); }
+  if(G.dropAim){ for(const b of G.buildings) if(!b.dead&&b.owner===0&&b.type==='airbase'){ c.strokeStyle='rgba(159,240,122,.7)'; c.lineWidth=2; c.setLineDash([8,6]); c.beginPath(); c.arc(b.x*TILE,b.y*TILE,AIR.dropRange*TILE,0,7); c.stroke(); c.setLineDash([]); } }
   if(G.nukeAim&&G.hover){ c.strokeStyle='rgba(255,90,74,.85)'; c.lineWidth=2; c.setLineDash([8,6]); c.beginPath(); c.arc(G.hover.x*TILE,G.hover.y*TILE,NUKE.radius*TILE,0,7); c.stroke(); c.setLineDash([]);
     c.font='bold 22px sans-serif'; c.textAlign='center'; c.fillStyle='#ff5a4a'; c.fillText('☢',G.hover.x*TILE,G.hover.y*TILE+8); c.textAlign='left'; }
   const selSet=new Set(G.sel);
   { const areas=new Map(); for(const u of G.sel) if(!u.dead&&u.area) areas.set(u.msn,u.area);   // Einsatzgebiete der Auswahl
     for(const A of areas.values()){ c.strokeStyle='rgba(255,211,106,.6)'; c.lineWidth=1.5; c.setLineDash([6,5]); c.beginPath(); c.arc(A.x*TILE,A.y*TILE,A.r*TILE,0,7); c.stroke(); c.setLineDash([]); }
     for(const u of G.sel) if(!u.dead&&u.patrolArea){ const A=u.patrolArea; c.strokeStyle='rgba(127,176,234,.5)'; c.lineWidth=1.5; c.setLineDash([4,6]); c.beginPath(); c.arc(A.x*TILE,A.y*TILE,A.r*TILE,0,7); c.stroke(); c.setLineDash([]); } }
-  for(const u of G.units){ if(u.dead||!vis(u.x,u.y)||!visibleUnit(u)) continue; const s=selSet.has(u);
+  for(const u of G.units){ if(u.dead||u.carried||!vis(u.x,u.y)||!visibleUnit(u)) continue; const s=selSet.has(u);
+    if(u.passengers&&u.passengers.some(p=>!p.dead)&&(u.owner===0||s)){ const n=u.passengers.filter(p=>!p.dead).length, bx=u.x*TILE-u.def.size*TILE*0.8-6, by=u.y*TILE-u.def.size*TILE*0.8-2;   // Mitfahrende
+      c.fillStyle='#000b'; c.fillRect(bx-6,by-6,14,11); c.fillStyle='#9ff07a'; c.font='bold 9px sans-serif'; c.textAlign='center'; c.fillText('👥'+n,bx+1,by+3); c.textAlign='left'; }
     const R=u.def.size*TILE*0.8;
     if(s){c.strokeStyle=u.owner===0?'#9ff07a':'#ffd36a';c.lineWidth=1.5;c.beginPath();c.arc(u.x*TILE,u.y*TILE,R+3,0,7);c.stroke();}
     if(s||u.hp<u.maxHp) hpBar(c,u.x*TILE-R,u.y*TILE-R-7,R*2,u.hp/u.maxHp);

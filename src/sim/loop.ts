@@ -7,6 +7,7 @@ import { updateTribute } from '../sim/tribute';
 import { updateDev } from '../sim/devplan';
 import { updateCity } from '../sim/city';
 import { updateGroups } from '../sim/groups';
+import { updateFlights } from '../sim/airdrop';
 import { updateUpgrades } from '../sim/build';
 import { updateEconomy } from '../sim/economy';
 import { MARKET_RECOVER } from '../sim/market';
@@ -35,6 +36,7 @@ export function update(dt){
   updateDev(dt);
   updateCity(dt);
   updateGroups(dt);
+  updateFlights(dt);
   separate();
   for(const f of G.fx) f.age+=dt;
   G.fx=G.fx.filter(f=>f.age<f.life);

@@ -9,6 +9,9 @@ import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
 import { rangeOf } from '../src/sim/units';
 import { makeGroup, groupState, dissolveGroup } from '../src/sim/groups';
+import { orderBoard, unload, aboard } from '../src/sim/transport';
+import { orderDrop } from '../src/sim/airdrop';
+import { findPath } from '../src/sim/pathfinding';
 import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, destroy } from '../src/sim/combat';
@@ -764,6 +767,43 @@ describe('Simulation', () => {
     expect(us.every(u => u.pace === 1.25)).toBe(true);                 // Tempo der Schützen
     run(5); const ys = us.map(u => u.y); expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(4);
     dissolveGroup(g); expect(us.every(u => !u.grp)).toBe(true);
+  });
+
+  it('Mannschaftstransporter: einsteigen, geschützt fahren, absitzen; zerstört = abspringen', () => {
+    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    const hq = findBuilding(0, 'hq'), apc = spawnAt(0, 'apc', hq.x + 5, hq.y - 5);
+    const inf = [spawnAt(0, 'inf', hq.x + 3, hq.y - 4), spawnAt(0, 'inf', hq.x + 3.5, hq.y - 5), spawnAt(0, 'at', hq.x + 4, hq.y - 3)];
+    expect(orderBoard(inf, apc)).toBe(3);
+    expect(runUntil(() => aboard(apc).length === 3, 15)).toBe(true);
+    orderMove([apc], hq.x + 12, hq.y - 10); run(6);
+    expect(Math.hypot(inf[1].x - apc.x, inf[1].y - apc.y)).toBeLessThan(0.01);
+    expect(unload(apc)).toBe(3); expect(inf.every(u => !u.carried)).toBe(true);
+    orderBoard(inf, apc); runUntil(() => aboard(apc).length === 3, 15);
+    destroy(apc, null); expect(inf.every(u => !u.carried)).toBe(true);
+  });
+
+  it('Amphibienpanzer fährt durchs Wasser, normale Fahrzeuge nicht', () => {
+    newGame('mittel');
+    let w = -1, land = null;   // Wasserfeld mit Land daneben
+    for (let i = 0; i < G.terr.length && w < 0; i++) if (G.terr[i] === T.WATER) { const x = i % MAP_W, y = Math.floor(i / MAP_W);
+      for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) { const j = idx(x + dx, y + dy); if (x + dx > 0 && x + dx < MAP_W && y + dy > 0 && y + dy < MAP_H && (G.terr[j] === T.GRASS || G.terr[j] === T.MEADOW) && !G.occ[j]) { w = i; land = [x + dx, y + dy]; break; } } }
+    expect(w).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(tileCost(w, 'amph'))).toBe(true); expect(tileCost(w, 'veh')).toBe(Infinity);
+    const amph = spawnAt(0, 'amphib', land[0] + 0.5, land[1] + 0.5), wx = w % MAP_W + 0.5, wy = Math.floor(w / MAP_W) + 0.5;
+    orderMove([amph], wx, wy); run(10);
+    expect(Math.hypot(amph.x - wx, amph.y - wy)).toBeLessThan(1.5);   // ist ins Wasser gefahren
+  });
+
+  it('Fallschirmjäger: Absprung vom Fliegerhorst, Flug, Landung hinter den Linien', () => {
+    newGame('mittel'); noBandits(); G.fog = false;
+    const hq = findBuilding(0, 'hq'); const ab = builtNearHq('airbase');
+    const ps = [spawnAt(0, 'para', ab.x + 2, ab.y + 2), spawnAt(0, 'para', ab.x + 2.5, ab.y + 2)];
+    const tx = ab.x + 20, ty = ab.y - 20;
+    expect(orderDrop(0, ps, tx, ty)).toBe(2);
+    expect(ps.every(u => u.carried)).toBe(true);
+    expect(runUntil(() => ps.every(u => !u.carried), 15)).toBe(true);
+    expect(Math.hypot(ps[0].x - tx, ps[0].y - ty)).toBeLessThan(4);
+    expect(orderDrop(0, ps, hq.x, hq.y)).not.toBe(2);              // nicht mehr am Fliegerhorst
   });
 
   it('Simulation meldet über Ereignisse statt DOM', () => {

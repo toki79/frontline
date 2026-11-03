@@ -1,10 +1,11 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
+import { mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
 import { detected, hostile, nearestPassable, passable, tileCost } from '../sim/world';
 import { msg } from '../core/events';
+import { updateRider } from '../sim/transport';
 import { updateWorker } from '../sim/build';
 import { checkMine, updatePioneer } from '../sim/pioneers';
 import { updateCaravan, updateDiplomat } from '../sim/trade';
@@ -15,6 +16,7 @@ import { chaseLimit, updateMission } from '../sim/missions';
    ===================================================================== */
 export function updateUnit(u,dt){
   const d=u.def;
+  if(u.carried||u.mode==='board'){ if(updateRider(u,dt)) return; if(u.carried) return; }   // Truppentransport / Luftlandung
   u.cd-=dt;
   if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner)||!detected(u.target,u.owner))){u.target=null;if(u.mode==='attack'){u.mode='idle';u.guard={x:u.x,y:u.y};}}
   let firing=false;
@@ -24,7 +26,7 @@ export function updateUnit(u,dt){
       // FPV greifen nur in Lauerstellung selbstständig an; Aufklärer auf Patrouille lassen sich nicht ablenken
       // bewaffnete Hochflieger (Reaper) jagen auch auf Patrouille
       if(d.swarm&&u.lurk===undefined) u.lurk=true;   // Schwärme suchen sich selbst Ziele
-      if(u.mode!=='move'&&u.mode!=='attack'&&(u.mode!=='patrol'||d.armor==='airHigh')&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'&&!(d.weapon.kamikaze&&!u.lurk)){
+      if(u.mode!=='move'&&u.mode!=='attack'&&(u.mode!=='patrol'||d.armor==='airHigh')&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'&&u.mode!=='board'&&!(d.weapon.kamikaze&&!u.lurk)){
         if(!u.target||distTo(u,u.target)>rangeOf(u)){const t=findTarget(u,Math.max(d.sight,rangeOf(u))); if(t) u.target=t;}
       }
     }
@@ -92,11 +94,11 @@ export function updateUnit(u,dt){
     if(u.pathI>=u.path.length){ u.path=null; arrived(u); }
     else {
       const p=u.path[u.pathI];
-      if(!passable(Math.floor(p.x),Math.floor(p.y),d.cls)){u.path=null;u.repathT=0;return;}
+      if(!passable(Math.floor(p.x),Math.floor(p.y),mcls(u))){u.path=null;u.repathT=0;return;}
       if(d.weapon&&d.weapon.kamikaze&&u.target){p.x=u.target.x;p.y=u.target.y;}
       const dx=p.x-u.x, dy=p.y-u.y, L=Math.hypot(dx,dy);
       const ti=idx(clamp(Math.floor(u.x),0,MAP_W-1),clamp(Math.floor(u.y),0,MAP_H-1));
-      const c=tileCost(ti,d.cls); let spd=(u.pace&&(u.mode==='move'||u.mode==='amove')?Math.min(d.speed,u.pace):d.speed)/(c===Infinity?1:c)*(u.cage?CAGE.speed:1);   // Verband: im Tempo der Langsamsten
+      const c=tileCost(ti,mcls(u)); let spd=(u.pace&&(u.mode==='move'||u.mode==='amove')?Math.min(d.speed,u.pace):d.speed)/(c===Infinity?1:c)*(u.cage?CAGE.speed:1);   // Verband: im Tempo der Langsamsten
       if(d.upkeep&&G.players[u.owner].fuelShort) spd*=0.5;                        // Treibstoffmangel
       if(d.cls==='veh'&&G.feat[ti]===FEAT.WIRE) G.feat[ti]=0;                      // Fahrzeuge walzen Draht platt
       if(d.cls==='veh'&&G.feat[ti]===FEAT.MINE){ checkMine(u,ti); if(u.dead) return; }
@@ -233,8 +235,8 @@ export function updateProjectiles(dt){
 export function separate(){
   const us=G.units;
   for(let i=0;i<us.length;i++){const a=us[i]; if(a.dead) continue;
-    if(a.def.cls==='air') continue;
-    for(let j=i+1;j<us.length;j++){const b=us[j]; if(b.dead||b.def.cls==='air') continue;
+    if(a.def.cls==='air'||a.carried) continue;
+    for(let j=i+1;j<us.length;j++){const b=us[j]; if(b.dead||b.def.cls==='air'||b.carried) continue;
       const dx=b.x-a.x, dy=b.y-a.y; if(Math.abs(dx)>1||Math.abs(dy)>1) continue;
       const min=(a.def.size+b.def.size)*0.5, d=Math.hypot(dx,dy);
       if(d<min){
@@ -243,6 +245,6 @@ export function separate(){
         const push=(min-d)*0.25, nx=d>0.001?dx/d:Math.random()-0.5, ny=d>0.001?dy/d:Math.random()-0.5;
         const ka=am?0:bm?2:1, kb=bm?0:am?2:1;
         const ax=a.x-nx*push*ka, ay=a.y-ny*push*ka, bx=b.x+nx*push*kb, by=b.y+ny*push*kb;
-        if(ka&&passable(Math.floor(ax),Math.floor(ay),a.def.cls)){a.x=ax;a.y=ay;}
-        if(kb&&passable(Math.floor(bx),Math.floor(by),b.def.cls)){b.x=bx;b.y=by;} } } }
+        if(ka&&passable(Math.floor(ax),Math.floor(ay),mcls(a))){a.x=ax;a.y=ay;}
+        if(kb&&passable(Math.floor(bx),Math.floor(by),mcls(b))){b.x=bx;b.y=by;} } } }
 }
