@@ -7,6 +7,7 @@ import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar,
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
+import { applyDecision, llmActive, parseDecision, strategistPrompt } from '../src/ai/strategist';
 import { rangeOf } from '../src/sim/units';
 import { makeGroup, groupState, dissolveGroup } from '../src/sim/groups';
 import { orderBoard, unload, aboard } from '../src/sim/transport';
@@ -934,6 +935,27 @@ describe('Simulation', () => {
     const h = findBuilding(4, 'hq'); placeBuilding(4, 'university', h.tx - 4, h.ty - 4, true);
     A.q.research.push({type: 'fusion', t: RESEARCH.fusion.time - 0.5, time: RESEARCH.fusion.time});
     run(2); expect(G.over).toBe(true);                                 // Veloria gewinnt das Rennen
+  });
+  it('LLM-Stratege: Lagebild ohne Allwissen, Entscheidungen werden geprüft und umgesetzt, veraltet = eingebaute KI', () => {
+    newGame('mittel'); noBandits();
+    makeContact(1, 0); makeContact(0, 1);
+    const pr = strategistPrompt(1, 'Testcharakter');
+    expect(pr.system).toMatch(/Testcharakter/);
+    expect(pr.user).toMatch(/aldoria/); expect(pr.user).toMatch(/veloria: noch kein Kontakt/);   // Veloria unbekannt
+    expect(pr.schema.required).toContain('aldoria');
+    expect(parseDecision('Hier: ```json\n{"schwerpunkt":"ruestung"}\n```')).toEqual({schwerpunkt: 'ruestung'});
+    expect(parseDecision('kein json')).toBe(null);
+    // Krieg vor der Schonfrist wird verworfen, danach umgesetzt
+    G.t = 10; let r = applyDecision(1, {schwerpunkt: 'ruestung', forschung: 'gibtsnicht', aldoria: 'krieg_erklaeren', begruendung: 'Test'});
+    expect(r.ok).toBe(true); expect(atWar(1, 0)).toBe(false); expect(G.ais[1].llm.research).toBe(null);
+    G.t = G.diff.grace + 5; G.ais[1].cool = 0;
+    r = applyDecision(1, {schwerpunkt: 'ruestung', forschung: 'keine', aldoria: 'krieg_erklaeren', begruendung: 'Jetzt'});
+    expect(atWar(1, 0)).toBe(true); expect(llmActive(G.ais[1])).toBe(true);
+    // solange der Stratege aktiv ist, schließt die eingebaute KI keinen Frieden von sich aus
+    G.ais[1].peaceCool = 0; G.ais[1].lastCombat = -999; G.ais[1].warSince = {0: -999};
+    aiThink(1); expect(G.offer).toBe(null);
+    // veraltet: eingebaute KI entscheidet wieder
+    G.t += G.ais[1].llm.ttl + 1; expect(llmActive(G.ais[1])).toBe(false);
   });
   it('läuft 10 Spielminuten ohne Fehler (Endlos-Modus)', () => {
     newGame('mittel');

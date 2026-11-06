@@ -10,6 +10,7 @@ import { demolish, hauls, orderRoadTo, previewFields, siteLacks, startUpgrade, u
 import { G } from '../sim/state';
 import { aiKnowsThreat, intelEvent, intelLevel } from '../sim/intel';
 import { devOf } from '../sim/devplan';
+import { focusArmy, focusDefense, llmActive } from './strategist';
 import { exclBlock } from '../sim/production';
 import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, findBuilding, hostile, housingQuality, nameFor0, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
@@ -163,7 +164,7 @@ export function aiThink(pid=1){
   aiTradeAI(pid);
   // --- Armee: Sollstärke nach Bedrohung, Absicht und Charakter ---
   const campsNear=G.buildings.filter(c=>!c.dead&&c.type==='camp'&&myB.some(b=>dist(c.x,c.y,b.x,b.y)<24)).length;
-  let want=Math.round((3+campsNear*2+Math.floor(theirStr/450)+(war?3:0)+(lead?4:0)+(urgent?4:0)+(need&&ratio<1.3?3:0)+Math.min(6,Math.floor(p.res.money/1500)))*C.army);
+  let want=Math.round((3+campsNear*2+Math.floor(theirStr/450)+(war?3:0)+(lead?4:0)+(urgent?4:0)+(need&&ratio<1.3?3:0)+Math.min(6,Math.floor(p.res.money/1500)))*C.army*focusArmy(ai));
   const armyPop=army.reduce((s,u)=>s+(u.def.cost.pop||0),0);
   if(armyPop>p.pop*0.3+10) want=Math.min(want,army.length);
   if(army.length<want&&(aiKnowsThreat(pid,F,'heavyarmor')||aiKnowsThreat(pid,F,'heavy'))&&available(pid,'at')&&canAfford(pid,'at')&&!p.q.barracks.length&&Math.random()<0.4) enqueue(pid,'at');   // Geheimdienst: schwere Panzer -> Panzerabwehr
@@ -221,14 +222,15 @@ export function aiThink(pid=1){
     if(met&&aggr>=need0*0.75&&G.t>(ai.planT||0)&&!deterred&&!war){ ai.planT=G.t+(F===0?150:400); const tg=raidTarget(pid,F,findBuilding(pid,'hq')||rally,need,lead,0);
       intelEvent(pid,'plan','war',{on:F, target:tg?tg.def.name.replace(/\u00AD/g,''):null, army:armyText(army), counter:'Verteidigung an den Zugängen verstärken, Reserve bereithalten'}); }   // Kriegspläne sickern durch
     const aiFoe=F!==0, gate=aiFoe?AI_WAR.minT:D.grace;   // KI gegen KI: später und nur bei klarem Anlass (need0)
-    if(met && G.t>gate && aggr>=need0 && G.t>ai.cool && !busyOffer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
+    const LLM=llmActive(ai);   // ein LLM-Stratege entscheidet über Krieg, Forderungen und Frieden selbst
+    if(!LLM && met && G.t>gate && aggr>=need0 && G.t>ai.cool && !busyOffer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
       if(need&&!urgent&&P.res[need]>=150&&Math.random()<0.7){
         const amt=need==='food'?150:need==='metal'?100:120;
         ai.cool=G.t+150; aiDemand(pid,F,need,amt);
       } else { ai.cool=G.t+60; setWar(pid,F,true,pid); ai.nextRaid=0; }
     }
     // Schutzgeld: Stärke ausnutzen, wenn der Rivale reich und schwach ist
-    else if(!deterred&&met&&!war&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
+    else if(!LLM&&!deterred&&met&&!war&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
       ai.cool=G.t+220; aiDemand(pid,F,'money',Math.min(600,Math.floor(P.res.money*0.3/50)*50));
     }
     if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&!u.task&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x+(Math.random()-.5)*4,rally.y+(Math.random()-.5)*4);
@@ -249,7 +251,7 @@ export function aiThink(pid=1){
     // Frieden anbieten, wenn das Ziel erreicht oder der Krieg aussichtslos ist (Handelsmächte früher)
     (ai.warSince=ai.warSince||{}); if(ai.warSince[F]===undefined) ai.warSince[F]=G.t;
     const tired=G.t-ai.lastCombat>40-C.peace*20&&G.t-ai.warSince[F]>AI_WAR.minDur;
-    if(!raiders.length&&!urgent&&tired&&G.t>ai.peaceCool&&!(F===0&&G.offer)&&((!need&&ai.lootSince>150*(1-C.peace*0.6))||ratio<0.7+C.peace*0.4||(deterrent(F)&&!deterrent(pid)))){
+    if(!llmActive(ai)&&!raiders.length&&!urgent&&tired&&G.t>ai.peaceCool&&!(F===0&&G.offer)&&((!need&&ai.lootSince>150*(1-C.peace*0.6))||ratio<0.7+C.peace*0.4||(deterrent(F)&&!deterrent(pid)))){
       ai.peaceCool=G.t+120; aiOfferPeace(pid,F);
     }
   }
@@ -299,7 +301,7 @@ export function aiDefense(pid){
   const heavyAir=G.units.filter(u=>!u.dead&&u.owner===F&&(u.def.sortie||u.def.swarm||u.type==='tel')).length;
   // Geheimdienst: bekannte Raketen-/Luftbedrohung des Rivalen -> vorbeugend Flugabwehrraketen
   const warned=['rocketry','aviation','glidebomb','tel','jet','bomb'].some(k=>aiKnowsThreat(pid,F,k));
-  const want={sam:heavyAir?Math.min(3,1+Math.floor(heavyAir/2)):warned?1:0, flak:(enemyDrones>=2?2:0)+(enemyDrones>=5?1:0), sentry:Math.round((2+(threat?2:0))*C.defense), turret:Math.round(((G.t>300?1:0)+(threat?2:0))*C.defense)};
+  const want={sam:heavyAir?Math.min(3,1+Math.floor(heavyAir/2)):warned?1:0, flak:(enemyDrones>=2?2:0)+(enemyDrones>=5?1:0), sentry:Math.round((2+(threat?2:0))*C.defense*focusDefense(ai)), turret:Math.round(((G.t>300?1:0)+(threat?2:0))*C.defense*focusDefense(ai))};
   if(ai.saving){ want.sentry=Math.min(want.sentry,2); want.turret=0; }   // beim Sparen nur das Nötigste
   const dx=MAP_W/2-hq.x, dy=MAP_H/2-hq.y, L=Math.hypot(dx,dy)||1, fx=dx/L, fy=dy/L;
   for(const t of ['sam','flak','sentry','turret']){
@@ -382,6 +384,7 @@ export function armyText(units){ const c={}; for(const u of units) c[u.def.name.
 /** nächster Forschungsschritt der KI (nach AI_RESEARCH) */
 export function aiNextResearch(p){
   if(!findBuilding(p.id,'university')) return null;
+  const ai=G.ais[p.id]; if(llmActive(ai)&&ai.llm.research&&!hasTech(p,ai.llm.research)&&!exclBlock(p,ai.llm.research)&&available(p.id,ai.llm.research)) return ai.llm.research;   // Vorgabe des LLM-Strategen
   const L=(AI_RESEARCH[p.id]||AI_RESEARCH[1]) as [string,number][];
   for(const [k,pop] of L){ if(hasTech(p,k)||exclBlock(p,k)) continue;   // Entweder-oder: ausgeschlossene Zweige überspringen
     if((RESEARCH[k].needB||[]).includes('intel')&&!findBuilding(p.id,'intel')) continue;
@@ -426,7 +429,7 @@ const reach=(pid,L)=>{ for(const b of G.buildings){ if(b.dead||b.owner!==pid) co
 export function aiCanReachOre(pid){ for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;
   for(let y=b.ty-8;y<=b.ty+b.h+8;y++)for(let x=b.tx-8;x<=b.tx+b.w+8;x++) if(inMap(x,y)&&G.ore[idx(x,y)]>0) return true; } return false; }
 export function raidTarget(pid,F,from,need,lead,maxD){
-  const kinds=need==='food'?['farm']:need==='metal'?['mine']:need==='oil'?['refinery']:lead?['house','farm','hq']:['farm','refinery','mine','house'];
+  const ai=G.ais[pid], kinds=llmActive(ai)&&ai.llm.raid?[ai.llm.raid]:need==='food'?['farm']:need==='metal'?['mine']:need==='oil'?['refinery']:lead?['house','farm','hq']:['farm','refinery','mine','house'];
   let best=null,bd=1e9;
   for(const b of G.buildings){ if(b.dead||b.owner!==F) continue;
     const d=dist(from.x,from.y,b.x,b.y)+(kinds.includes(b.type)?0:20); if(maxD&&d>maxD+20) continue; if(d<bd){bd=d;best=b;} }

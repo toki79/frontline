@@ -20,6 +20,7 @@ import { init as initMessages } from './ui/messages';
 import { init as initForces } from './ui/forces';
 import { init as initDev } from './ui/devui';
 import { init as initTree } from './ui/tree';
+import { init as initLLM, llmTick } from './ui/llm';
 import { autosave } from './ui/saves';
 
 let last = performance.now();
@@ -42,12 +43,12 @@ function frame(now: number) {
     G.uiT -= dt; if (G.uiT <= 0) { G.uiT = 0.2; updatePanel(); refreshCmds(); document.body.classList.toggle('held', !!G.hold && !G.over); }
     G.advT = (G.advT || 0) - dt; if (G.advT <= 0 && !G.paused) { G.advT = 1; updateAdvisor(); }
     G.miniT -= dt; if (G.miniT <= 0) { G.miniT = 0.15; renderMini(); }
-    autosave();
+    autosave(); llmTick();
   }
   requestAnimationFrame(frame);
 }
 
-initForces(); initDev(); initTree(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
+initForces(); initDev(); initTree(); initLLM(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
 resize();
 requestAnimationFrame(frame);
 

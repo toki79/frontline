@@ -8,6 +8,7 @@ import { tradeTerms } from '../sim/market';
 import { missingReq } from '../sim/production';
 import { G } from '../sim/state';
 import { atWar, countBuildings } from '../sim/world';
+import { badge, llmCfg } from '../ui/llm';
 import { $ } from '../ui/dom';
 import { costHtml, costLong, f1 } from '../ui/format';
 
@@ -122,6 +123,7 @@ export const HUD_TIPS: Record<string, ()=>string> = {
   pop:()=>{const p=G.players[0];const why={unzufrieden:'Unzufriedenheit – Einwohner wandern ab!',hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];
     return `<b>👥 Einwohner: ${Math.floor(p.pop)} von ${p.cap} Wohnraum</b><br>${G.mode==='race'?`Siegziel: ${ECON.target} Einwohner (Balken).`:`Stadtstufe: <b>${ECON.ranks[rankOf(p.pop)][1]}</b> · Balken = Weg zur nächsten Stufe (${nextMilestone(p.pop)}).`} Wachstum zurzeit ${p.growth>=0?'+':''}${f1((p.growth||0)*60)} pro Minute.<br>Neue Bewohner ziehen zuerst in die ruhigsten Häuser.${why?`<br><span style="color:#ffb38a">${why}</span>`:''}<br><span class="dim">Soldaten kosten Einwohner. Zerstörte Wohnhäuser vertreiben Bewohner.</span>`;},
   popAi1:()=>popAiTip(1), popAi4:()=>popAiTip(4),
+  llm1:()=>llmTip(1), llm4:()=>llmTip(4),
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
   stance1:()=>stanceTip(1), stance4:()=>stanceTip(4),
 };
@@ -157,6 +159,8 @@ $$('[data-tip]').forEach(el=>{
 document.addEventListener('pointerdown',e=>{ if(tipAnchor&&!tipAnchor.contains(e.target)) hideTip(); },true);
 }
 
+function llmTip(pid){ const B=badge(pid), ai=G.ais[pid];
+  return `<b>Stratege ${G.players[pid].short}: ${B.t} ${B.tip}</b><br>Einstellen im Menü unter 🧠 KI-Strategen. Fällt das Modell aus, entscheidet automatisch die eingebaute KI.`+(llmCfg.showReasons&&ai&&ai.llm&&ai.llm.reason?`<br>Letzte Begründung: „${ai.llm.reason}“`:''); }
 function popAiTip(pid){ const A=G.players[pid];
   if(!G.known[0][pid]) return '<b>Unbekannte Macht</b><br>Noch kein Kontakt. Erkunde das Tal, um herauszufinden, wer hier noch lebt.';
   if(G.beaten&&G.beaten[pid]) return `<b>🏳 ${A.short} ist besiegt.</b>`;

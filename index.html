@@ -21,8 +21,8 @@
 <div id="pauseTag">⏸ Pause – P oder Leertaste setzt fort</div>
 <div id="popbar">
   <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span><span id="happy" data-tip="happy">😊</span></div>
-  <div class="pb" data-tip="popAi1"><span class="nm">👥 ???</span><b id="popAi1">0</b><i><em id="popAi1Bar" style="background:#cc4a3c"></em></i><span class="stance" id="stance1" data-tip="stance1"></span></div>
-  <div class="pb" data-tip="popAi4"><span class="nm">👥 ???</span><b id="popAi4">0</b><i><em id="popAi4Bar" style="background:#3fae7a"></em></i><span class="stance" id="stance4" data-tip="stance4"></span></div>
+  <div class="pb" data-tip="popAi1"><span class="nm">👥 ???</span><b id="popAi1">0</b><i><em id="popAi1Bar" style="background:#cc4a3c"></em></i><span class="stance" id="stance1" data-tip="stance1"></span><span class="llmB" id="llmB1" data-tip="llm1"></span></div>
+  <div class="pb" data-tip="popAi4"><span class="nm">👥 ???</span><b id="popAi4">0</b><i><em id="popAi4Bar" style="background:#3fae7a"></em></i><span class="stance" id="stance4" data-tip="stance4"></span><span class="llmB" id="llmB4" data-tip="llm4"></span></div>
 </div>
 <div id="log"></div>
 <canvas id="mini" width="124" height="124"></canvas>
@@ -60,8 +60,8 @@
 
 <div id="start" class="overlay"><div class="card">
   <h1>FRONTLINIE</h1>
-  <div class="sub">Das Grenztal von Belgor · Version 0.11</div>
-  <p class="intro">Die <b style="color:#6fa2ea">Republik Aldoria</b> und die <b style="color:#e0756b">Föderation Kastrova</b> bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wenn Nahrung oder Metall knapp werden oder eine Seite zu stark wird, greifen die Waffen. Mitten im Fluss hält die neutrale <b style="color:#d6b45a">Grenzmiliz</b> die Insel und betreibt einen Markt.</p>
+  <div class="sub">Das Grenztal von Belgor · Version 0.12</div>
+  <p class="intro">Die <b style="color:#6fa2ea">Republik Aldoria</b>, die <b style="color:#e0756b">Föderation Kastrova</b> (Militärmacht) und der <b style="color:#3fae7a">Handelsbund Veloria</b> (Handelsmacht) bauen ihre Städte im selben Tal auf. Noch herrscht Frieden – doch wer schwach wirkt oder zu schnell wächst, bekommt Forderungen oder Krieg. Handel, Bündnisse, Geheimdienst und Abschreckung halten das Gleichgewicht.</p>
   <p class="intro"><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
   <div class="sub" style="margin-top:12px">Schwierigkeit</div>
   <div class="row" id="diffRow"><button data-d="leicht">Leicht</button><button data-d="mittel" class="on">Mittel</button><button data-d="schwer">Schwer</button></div>
@@ -70,6 +70,7 @@
   <label class="chk"><input type="checkbox" id="optFog" checked> 🌫 Nebel des Krieges (nur erkundete Gebiete sichtbar)</label>
   <button class="big" id="bStart">Neues Spiel starten</button>
   <button class="big" id="bResume" style="display:none;background:#2a3a4a;border-color:#4a6a8a">Weiterspielen</button>
+  <button class="big" id="bLLM" style="background:#2e2a44;border-color:#6a5a9a">🧠 KI-Strategen (LLM) einstellen</button>
   <div class="sub" style="margin-top:12px">Spielstände</div>
   <div id="saves"></div>
   <div class="help">
@@ -142,6 +143,12 @@
   <div class="row"><button id="offerYes" class="big" style="flex:1"></button><button id="offerNo" class="big" style="flex:1;background:#4a2a22;border-color:#8a4a3a"></button></div>
 </div></div>
 
+<div id="llm" class="overlay hidden"><div class="card">
+  <h2>🧠 KI-Strategen</h2>
+  <div class="sub">Optional entscheidet ein Sprachmodell über Schwerpunkt, Forschung, Krieg, Frieden und Forderungen der KI-Mächte. Bauen, Kämpfen und Nachschub erledigt weiter die eingebaute KI. Das Spiel ist pausiert.</div>
+  <div id="llmBody"></div>
+  <button class="big" id="bLLMClose">Schließen</button>
+</div></div>
 <div id="help" class="overlay hidden"><div class="card">
   <h2>❓ Symbole &amp; Anzeigen</h2>
   <div class="sub">Am Computer: mit der Maus über Anzeigen und Bauknöpfe fahren. Auf dem Handy: Anzeigen antippen, Bauknöpfe lange drücken.</div>

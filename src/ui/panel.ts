@@ -13,6 +13,7 @@ import { refreshCmds } from '../ui/input';
 import { msg } from '../core/events';
 import { hideTip, showTip, tipFor } from '../ui/tooltips';
 import { openTree } from '../ui/tree';
+import { badge } from '../ui/llm';
 
 /* =====================================================================
    Bauleiste
@@ -130,6 +131,7 @@ export function updatePanel(){
     $('#popAi'+pid).textContent=k?(dead?'besiegt':String(Math.floor(A.pop))):'???';
     $('#popAi'+pid+'Bar').style.width=k&&!dead?Math.min(100,A.pop/goalAi*100)+'%':'0';
     $('#popAi'+pid+'Bar').closest('.pb').querySelector('.nm').textContent=k?'👥 '+A.short:'👥 ???';
+    { const B=badge(pid), el=$('#llmB'+pid); if(el){ el.textContent=B.t; el.className='llmB '+B.cls; } }
     const st=$('#stance'+pid), w=atWar(0,pid); st.textContent=!k?'unbekannt':dead?'🏳':w?'⚔ Krieg':'Frieden'; st.style.background=!k||dead?'#3a3a34':w?'#7a2219':'#2a4f7a'; }
 }
 

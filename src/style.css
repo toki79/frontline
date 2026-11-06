@@ -202,3 +202,18 @@ body.held #pauseTag{display:block}
 #tree .tn.win{box-shadow:0 0 0 1px #d6b45a66 inset}
 #tree .xl{color:#d6b45a} #tree .wn{color:#ffd36a;font-weight:700}
 .intelRep{font-size:12px;line-height:1.35;background:#201c12;border-left:3px solid #d6b45a;padding:4px 7px;margin:4px 0;border-radius:3px}
+/* LLM-Strategen */
+#popbar .llmB{font-size:12px;margin-left:4px;min-width:16px;display:inline-block;text-align:center}
+#popbar .llmB.off{opacity:.45}
+#popbar .llmB.busy{animation:llmPulse 1s infinite}
+@keyframes llmPulse{50%{opacity:.35}}
+#llm .card{max-width:min(900px,96vw)}
+#llm .party h3{display:flex;align-items:center;gap:8px}
+#llm .llmB{font-size:13px;font-weight:600}
+#llm .llmB.bad{color:#ffb38a} #llm .llmB.ok{color:#b8a0e0}
+#llm input,#llm select,#llm textarea{background:#11140c;color:#e8e8dc;border:1px solid #3a4430;border-radius:6px;padding:4px 6px;font:inherit}
+#llm .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0}
+#llm label{font-size:13px}
+#llm .llmMsg{font-size:12.5px;min-height:16px;margin:4px 0;color:#d8d8c8}
+#llm .llmLog{white-space:pre-wrap;font-size:11px;max-height:260px;overflow:auto;background:#0c0e08;padding:8px;border-radius:6px}
+#llm code{background:#0c0e08;padding:1px 4px;border-radius:4px}
