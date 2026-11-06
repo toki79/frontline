@@ -974,6 +974,23 @@ describe('Simulation', () => {
     run(30); expect(p.debt ? p.debt.left : 0).toBeLessThan(price);       // Tilgung aus den Steuern
     expect(seen.length).toBeGreaterThan(0);
   });
+  it('KI: Schützen laufen nicht unter eine Reaper-Drohne, sondern weichen aus und holen Flugabwehr', () => {
+    newGame('mittel'); noBandits();
+    for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true;
+    G.t = 400; setWar(0, 1, true, 0);
+    const hq = findBuilding(1, 'hq'); placeBuilding(1, 'barracks', hq.tx + 4, hq.ty + 4, true);
+    const inf = [0, 1, 2, 3].map(k => spawnAt(1, 'inf', hq.x + 3 + k * 0.4, hq.y + 3));
+    const rp = spawnAt(0, 'reaper', hq.x + 3.5, hq.y + 3.5); rp.mode = 'idle';
+    const d0 = inf.map(u => Math.hypot(u.x - rp.x, u.y - rp.y));
+    G.players[1].res.money = 3000; G.players[1].res.metal = 300; G.players[1].res.stone = 300;
+    spawnAt(1, 'pioneer', hq.x + 2, hq.y + 5);
+    for (let i = 0; i < 3; i++) { G.ais[1].defT = 0; aiThink(1); }
+    for (let i = 0; i < 60; i++) { rp.x = hq.x + 3.5; rp.y = hq.y + 3.5; update(0.05); }
+    expect(inf.filter(u => !u.dead).every((u, i) => Math.hypot(u.x - rp.x, u.y - rp.y) >= d0[i])).toBe(true);   // Abstand gewachsen, nicht geschrumpft
+    expect(G.ais[1].airSeenT).toBeGreaterThan(0);
+    G.ais[1].defT = 0; aiThink(1);
+    expect(G.buildings.some(b => !b.dead && b.owner === 1 && (b.type === 'flak' || b.type === 'sam'))).toBe(true);   // Flugabwehr geplant
+  });
   it('Geheimabsprachen: Bündnis gegen die dritte Macht, Preis, Wortbruch, Nichtangriffspakt', () => {
     newGame('mittel'); noBandits();
     for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true;

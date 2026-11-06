@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { EXPORT, AI_WAR, AIS, AI_CHAR, MAJORS, T, FIRE, FUN, TRIBUTE, AI_MIX2, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS } from '../data/config';
+import { EXPORT, AI_WAR, AIS, AI_CHAR, MAJORS, T, FIRE, FUN, TRIBUTE, AI_MIX2, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS, canHit } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, costOf, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -12,7 +12,7 @@ import { aiKnowsThreat, intelEvent, intelLevel } from '../sim/intel';
 import { devOf } from '../sim/devplan';
 import { focusArmy, focusDefense, llmActive } from './strategist';
 import { exclBlock } from '../sim/production';
-import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, findBuilding, hostile, housingQuality, nameFor0, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
+import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, detected, findBuilding, hostile, spotted, housingQuality, nameFor0, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
 import { bound, jointAgainst } from '../sim/pacts';
 import { deterrent, launchNuke } from '../sim/nuke';
@@ -204,8 +204,23 @@ export function aiThink(pid=1){
   // --- Verteidigung (im Krieg oder wenn die Miliz mit jemand anderem verbündet ist) ---
   const rally=aiRally(pid);
   let threat=null,tb=1e9;
+  // Nur Gegner, die man sieht und die die eigenen Truppen auch treffen können – sonst laufen Schützen unter eine Drohne und werden abgeschossen
+  const canFight=e=>army.some(u=>u.def.weapon&&canHit(u.def.weapon,e)), airNear=[];
   if(war||(G.militiaAlly>=0&&G.militiaAlly!==pid)) for(const e of G.units){ if(e.dead||!hostile(pid,e.owner)||e.owner===3) continue;
-    for(const b of myB){const d=distTo(e,b); if(d<13&&d<tb){tb=d;threat=e;}} }
+    let d0=1e9; for(const b of myB){const d=distTo(e,b); if(d<d0) d0=d;} if(d0>=13) continue;
+    const seen=detected(e,pid)&&spotted(pid,e.x,e.y);
+    if(e.def.cls==='air'&&(seen||e.def.weapon)){ airNear.push(e); ai.airSeenT=G.t; if(e.def.armor==='airHigh') ai.highSeenT=G.t; }
+    if(!seen||!canFight(e)) continue;
+    if(d0<tb){tb=d0;threat=e;} }
+  // Bewaffnete Hochflieger (Reaper), gegen die niemand etwas ausrichten kann: Abstand halten statt sich zu sammeln
+  for(const e of airNear){ if(!e.def.weapon) continue; const R=(e.def.weapon.range||6)+2;
+    for(const u of army){ if(u.def.cls==='air'||(u.def.weapon&&canHit(u.def.weapon,e))||G.t<(u.evadeT||0)) continue;
+      const d=dist(u.x,u.y,e.x,e.y); if(d>R) continue;
+      const aa=myB.filter(b=>b.def.weapon&&b.def.weapon.airOnly&&!b.site).sort((a,b)=>dist(a.x,a.y,u.x,u.y)-dist(b.x,b.y,u.x,u.y))[0];
+      const k=(R+3-d)/Math.max(0.5,d), tx=aa?aa.x:u.x+(u.x-e.x)*k, ty=aa?aa.y:u.y+(u.y-e.y)*k;   // unter den Schirm der Flugabwehr oder weg von der Drohne
+      const pp=nearestPassable(tx,ty,u.def.cls); if(pp){ u.evadeT=G.t+6; u.target=null; orderMove([u],pp.x+0.5,pp.y+0.5); } } }
+  // Gegenmittel: Flakpanzer bauen, wenn feindliche Drohnen über der Stadt kreisen
+  if(airNear.length&&!army.some(u=>u.type==='spaag')&&available(pid,'spaag')&&canAfford(pid,'spaag')&&!p.q.factory.length) enqueue(pid,'spaag');
   if(threat&&army.length<5&&available(pid,'volunteer')&&!p.q.hq.some(i=>i.type==='volunteer')&&canAfford(pid,'volunteer')) enqueue(pid,'volunteer');   // Bürgerwehr in der Not
   if(threat){
     for(const u of army.filter(u=>!u.wave||dist(u.x,u.y,threat.x,threat.y)<15))
@@ -304,11 +319,12 @@ export function aiDefense(pid){
   const heavyAir=G.units.filter(u=>!u.dead&&u.owner===F&&(u.def.sortie||u.def.swarm||u.type==='tel')).length;
   // Geheimdienst: bekannte Raketen-/Luftbedrohung des Rivalen -> vorbeugend Flugabwehrraketen
   const warned=['rocketry','aviation','glidebomb','tel','jet','bomb'].some(k=>aiKnowsThreat(pid,F,k));
-  const want={sam:heavyAir?Math.min(3,1+Math.floor(heavyAir/2)):warned?1:0, flak:(enemyDrones>=2?2:0)+(enemyDrones>=5?1:0), sentry:Math.round((2+(threat?2:0))*C.defense*focusDefense(ai)), turret:Math.round(((G.t>300?1:0)+(threat?2:0))*C.defense*focusDefense(ai))};
+  const airRecent=G.t-(ai.airSeenT??-1e9)<300, highRecent=G.t-(ai.highSeenT??-1e9)<300;   // Drohnen über der eigenen Stadt gesichtet
+  const want={sam:heavyAir?Math.min(3,1+Math.floor(heavyAir/2)):warned||highRecent?1:0, flak:Math.max((enemyDrones>=2?2:0)+(enemyDrones>=5?1:0),airRecent?2:0,highRecent?3:0), sentry:Math.round((2+(threat?2:0))*C.defense*focusDefense(ai)), turret:Math.round(((G.t>300?1:0)+(threat?2:0))*C.defense*focusDefense(ai))};
   if(ai.saving){ want.sentry=Math.min(want.sentry,2); want.turret=0; }   // beim Sparen nur das Nötigste
   const dx=MAP_W/2-hq.x, dy=MAP_H/2-hq.y, L=Math.hypot(dx,dy)||1, fx=dx/L, fy=dy/L;
   for(const t of ['sam','flak','sentry','turret']){
-    if(cnt(t)>=want[t]||!available(pid,t)||!canAfford(pid,t)||p.res.money<BUILDINGS[t].cost.money+250) continue;
+    if(cnt(t)>=want[t]||!available(pid,t)||!canAfford(pid,t)||p.res.money<BUILDINGS[t].cost.money+((t==='flak'||t==='sam')&&airRecent?50:250)) continue;   // Flugabwehr in der Not zuerst
     let best=null,bs=1e9;
     for(let k=0;k<40;k++){ const r=4+Math.random()*4, ang=Math.atan2(fy,fx)+(Math.random()-0.5)*1.8;
       const x=Math.floor(hq.x+Math.cos(ang)*r), y=Math.floor(hq.y+Math.sin(ang)*r);
