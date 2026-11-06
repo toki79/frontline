@@ -326,7 +326,7 @@ export const TRADE = {
 };
 // ---------- Drohnen ----------
 // Luftwaffe: Gleitbomben vergrößern die Abwurfweite; nach jedem Einsatz zum Fliegerhorst zurück
-export const AIR = {dropRange:40, dropSpeed:7, dropMax:6, dropAA:{flak:0.12, sam:0.3, spaag:0.12}, glideExtra:12, rearm:25, perBase:4, swarmSize:8, swarmHp:22, swarmRangeExtra:8, interceptR:9, intercept:0.55};
+export const AIR = {bombs:1, dropRange:40, dropSpeed:7, dropMax:6, dropAA:{flak:0.12, sam:0.3, spaag:0.12}, glideExtra:12, rearm:25, perBase:4, swarmSize:8, swarmHp:22, swarmRangeExtra:8, interceptR:9, intercept:0.55};
 export const DRONE = {
   hoverDrain: 0.3,      // Akkuverbrauch beim Schweben (Anteil vom Flug)
   returnAt: 0.25,       // unter diesem Akkustand fliegen Drohnen selbstständig zum Laden heim

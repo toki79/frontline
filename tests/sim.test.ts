@@ -759,6 +759,17 @@ describe('Simulation', () => {
     expect(runUntil(() => jet.mode === 'rtb' || jet.mode === 'rearm', 40)).toBe(true);
     expect(runUntil(() => jet.mode === 'rearm', 40)).toBe(true);
     expect(runUntil(() => jet.mode === 'attack' || tgt.dead, 40)).toBe(true);
+    // Ohne Nachladen keine zweite Bombe – auch nicht mit neuem Angriffsbefehl auf dem Heimweg
+    const t2 = placeBuilding(1, 'barracks', Math.floor(ahq.x) - 9, Math.floor(ahq.y) - 5, false); t2.hp = t2.maxHp = 1e6;
+    expect(runUntil(() => jet.mode === 'idle' || jet.mode === 'attack', 80)).toBe(true);
+    orderAttack([jet], t2);
+    expect(runUntil(() => jet.mode === 'rtb', 80)).toBe(true); expect(jet.bombs).toBe(0);
+    for (let i = 0; i < 100; i++) update(0.05);   // Gleitbombe im Flug
+    const hp0 = t2.hp; expect(hp0).toBeLessThan(1e6);
+    let hits = 0, last = t2.hp;
+    for (let i = 0; i < 20 * 20; i++) { if (jet.mode === 'rtb' || jet.mode === 'idle') orderAttack([jet], t2); update(0.05); if (t2.hp < last) { hits++; last = t2.hp; } if (jet.mode === 'rearm') break; }
+    expect(hits).toBe(0);
+    expect(runUntil(() => jet.mode === 'rearm', 60)).toBe(true);
   });
 
   it('Verband: gemeinsames Tempo, verbundene Waffen stärken die Truppe', () => {

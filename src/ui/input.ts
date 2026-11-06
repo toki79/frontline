@@ -223,7 +223,7 @@ export function updateInfo(){
   if(s.length===1){const e=s[0], f=G.players[e.owner];
     let t=`${e.def.name} · Zustand ${Math.ceil(e.hp)}/${e.maxHp}`+(e.owner!==0?` · ${f.short} (${G.rel[0][e.owner]})`:'');
     if(e.kind==='unit'&&e.def.weapon&&e.def.weapon.kamikaze) t+=e.lurk?' · 🎯 Lauerstellung':' · hält still (🎯 für Lauerstellung)';
-    if(e.kind==='unit'&&e.def.sortie) t+=e.mode==='rtb'?' · ✈ fliegt zum Nachladen heim':e.mode==='rearm'?` · ✈ wird neu bewaffnet (${Math.ceil(e.rearmT)} s)`:' · bereit – Ziel antippen';
+    if(e.kind==='unit'&&e.def.sortie) t+=e.mode==='rtb'?' · ✈ fliegt zum Nachladen heim':e.mode==='rearm'?` · ✈ wird neu bewaffnet (${Math.ceil(e.rearmT)} s)`:(e.bombs??1)>0?' · bereit – Ziel antippen':' · ✈ Bombe abgeworfen – muss zum Fliegerhorst (keiner erreichbar?)';
     if(e.kind==='unit'&&e.def.swarm) t+=` · 🐝 ${Math.max(1,Math.ceil(e.hp/AIR.swarmHp))} Drohnen`;
     if(e.kind==='unit'&&e.def.cls==='air'&&!e.def.sortie&&!(e.def.weapon&&e.def.weapon.kamikaze)) t+=e.mode==='recharge'?' · fliegt zum Laden heim':e.patrol?' · 🛰 auf Aufklärungsflug':' · (🛰 für Aufklärungsflug)';
     if(e.kind==='unit'&&e.def.armor==='airHigh'&&e.owner===0) t+=' · getarnt – nur Radar der Flugabwehr entdeckt sie';

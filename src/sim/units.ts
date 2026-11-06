@@ -44,8 +44,9 @@ export function updateUnit(u,dt){
       else if(dd<=rangeOf(u)){
         firing=true; u.path=null;
         if(d.cls==='inf') u.angle=u.tur;
-        if(Math.abs(angDiff(u.tur,aim))<0.2&&u.cd<=0){ fire(u,t); if(d.upkeep&&G.players[u.owner].fuelShort) u.cd*=2;
-          if(d.sortie) returnToBase(u,t); }   // Flugzeug: Bombe ab, zurück zum Fliegerhorst
+        if(d.sortie&&!armed(u)){ returnToBase(u,t); }   // Bombenschacht leer: erst nachladen
+        else if(Math.abs(angDiff(u.tur,aim))<0.2&&u.cd<=0){ fire(u,t); if(d.upkeep&&G.players[u.owner].fuelShort) u.cd*=2;
+          if(d.sortie){ u.bombs=(u.bombs??AIR.bombs)-1; if(!armed(u)) returnToBase(u,t); } }   // Flugzeug: Bombe ab, zurück zum Fliegerhorst
       } else {
         const lim=chaseLimit(u);
         if(lim===0||(u.mode==='idle'&&dist(u.x,u.y,u.guard.x,u.guard.y)>(lim??LEASH))){u.target=null;}   // Stellung halten: nicht nachlaufen
@@ -115,11 +116,15 @@ function returnToBase(u,t){
   let best=null,bd=1e9; for(const b of G.buildings) if(!b.dead&&!b.site&&!b.contam&&b.owner===u.owner&&b.type==='airbase'){ const d=dist(u.x,u.y,b.x,b.y); if(d<bd){bd=d;best=b;} }
   u.base=best; if(best) setPath(u,best.x,best.y); else { u.mode='idle'; u.guard={x:u.x,y:u.y}; }
 }
+/** hat das Flugzeug noch eine Bombe an Bord? */
+export const armed=u=>(u.bombs??AIR.bombs)>0;
 export function updateSortie(u,dt){
+  // leer und nicht auf dem Heimweg (z. B. neuer Angriffsbefehl): erst zum Fliegerhorst, dann das neue Ziel
+  if(!armed(u)&&u.mode!=='rtb'&&u.mode!=='rearm'&&u.mode!=='move'){ if(G.t<(u.rtbT||0)) return; u.rtbT=G.t+3; returnToBase(u,u.target||u.strike); return; }
   if(u.mode==='rtb'){ const b=u.base; if(!b||b.dead){ returnToBase(u,u.strike); return; }
     if(dist(u.x,u.y,b.x,b.y)<2.5){ u.path=null; u.mode='rearm'; u.rearmT=AIR.rearm; u.cd=AIR.rearm; } else if(!u.path) setPath(u,b.x,b.y); }
   else if(u.mode==='rearm'){ u.rearmT-=dt; u.cd=Math.max(u.cd,u.rearmT); if(u.hp<u.maxHp) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.04*dt);
-    if(u.rearmT<=0){ const t=u.strike; u.strike=null; u.cd=0;
+    if(u.rearmT<=0){ const t=u.strike; u.strike=null; u.cd=0; u.bombs=AIR.bombs;
       if(t&&!t.dead&&hostile(u.owner,t.owner)){ u.target=t; u.mode='attack'; } else { u.mode='idle'; u.guard={x:u.x,y:u.y}; } } }
 }
 /** Waffenreichweite einer Einheit (Gleitbomben verlängern die Abwurfweite der Flugzeuge) */
