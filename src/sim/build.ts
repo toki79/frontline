@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { BUILDINGS, CONSTRUCTION, DENSITY, HAUL, MAP_H, MAP_W, RES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, hasTech, isPlain, lvlOf, nextUpgrade } from '../data/config';
+import { MAJORS, BUILDINGS, CONSTRUCTION, DENSITY, HAUL, MAP_H, MAP_W, RES, RESEARCH, T, TECH_UNLOCKS, TERRAIN, hasTech, isPlain, lvlOf, nextUpgrade } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, costOf, pay } from '../sim/costs';
 import { setPath } from '../sim/pathfinding';
@@ -102,10 +102,11 @@ export const haulEff = w => Math.max(HAUL.min, 1/(1+Math.max(0,w-HAUL.free)/HAUL
 /** Transportwege aller Betriebe neu berechnen (Dijkstra von allen Sammelstellen aus) */
 export function updateRoadNet(){
   G.roadDirty=false;
-  for(const pid of [0,1]){
+  for(const pid of MAJORS){
     const N=MAP_W*MAP_H, cost=new Float64Array(N).fill(Infinity), H=heapOps();   // Float64: sonst Rundungs-Endlosschleife
     for(const d of depots(pid)) for(const i of ringTiles(d.tx,d.ty,d.w,d.h)){ const c=haulStep(i); if(c<cost[i]){ cost[i]=c; H.push(c,i); } }
-    while(H.heap.length){ const [cc,c]=H.pop(); if(cc>cost[c]) continue; const cx=c%MAP_W, cy=(c/MAP_W)|0;
+    const CUT=HAUL.free+HAUL.half*(1/HAUL.min-1)+4;   // weiter weg gilt ohnehin die schlechteste Leistung
+    while(H.heap.length){ const [cc,c]=H.pop(); if(cc>cost[c]||cc>CUT) continue; const cx=c%MAP_W, cy=(c/MAP_W)|0;
       for(const [dx,dy] of N4){ const x=cx+dx,y=cy+dy; if(!inMap(x,y)) continue; const i=idx(x,y);
         const s=haulStep(i); if(s===Infinity) continue; const nc=cc+s; if(nc<cost[i]){ cost[i]=nc; H.push(nc,i); } } }
     if(pid===0) G.haulMap=cost;   // für die Vorschau beim Platzieren
@@ -220,6 +221,14 @@ function jobValid(j,pid){
   if(j.kind==='road') return G.road[j.i]===1&&G.roadOwner[j.i]===pid+1;
   return true;   // return
 }
+/** geplante Straßenfelder einer Macht (einmal je Spielzeitpunkt ermittelt statt für jeden Arbeiter die ganze Karte) */
+const roadCache={t:-1,lists:{}};
+function plannedRoads(pid){
+  if(roadCache.t!==G.t){ roadCache.t=G.t; roadCache.lists={}; }
+  let L=roadCache.lists[pid]; if(L) return L; L=roadCache.lists[pid]=[];
+  for(let i=0;i<G.road.length;i++) if(G.road[i]===1&&G.roadOwner[i]===pid+1) L.push(i);
+  return L;
+}
 function findJob(u){
   const pid=u.owner, p=G.players[pid], load=new Map(), roadTaken=new Set();
   for(const w of G.units) if(!w.dead&&w!==u&&w.owner===pid&&w.job){ if(w.job.kind==='site') load.set(w.job.b.id,(load.get(w.job.b.id)||0)+1); if(w.job.kind==='road') roadTaken.add(w.job.i); }
@@ -238,7 +247,7 @@ function findJob(u){
   }
   // Straßen
   const hasStone=carry&&carry.res==='stone'&&carry.amt>=roadStone();
-  if(hasStone||p.res.stone>=roadStone()) for(let i=0;i<G.road.length;i++){ if(G.road[i]!==1||G.roadOwner[i]!==pid+1||roadTaken.has(i)) continue;
+  if(hasStone||p.res.stone>=roadStone()) for(const i of plannedRoads(pid)){ if(G.road[i]!==1||G.roadOwner[i]!==pid+1||roadTaken.has(i)) continue;
     consider(dist(u.x,u.y,tileX(i),tileY(i))-(hasStone?14:0),{kind:'road',i,phase:hasStone?'go':'fetch'}); }
   // übrig gebliebene Last zurückbringen
   if(!best&&carry){ const d=nearestDepot(pid,u.x,u.y); if(d) best={kind:'return',d}; }

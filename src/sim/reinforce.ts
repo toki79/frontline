@@ -1,4 +1,4 @@
-import { REINFORCE, UNITS } from '../data/config';
+import { MAJORS, REINFORCE, UNITS } from '../data/config';
 import { enqueue, queueName } from '../sim/production';
 import { G } from '../sim/state';
 import { orderMove } from '../sim/orders';
@@ -20,7 +20,7 @@ export function noteLoss(u){
 }
 export function updateReinforce(dt){
   G.reT=(G.reT||0)-dt; if(G.reT>0) return; G.reT=REINFORCE.think;
-  for(const pid of [0,1]){ const R=reinfOf(pid); if(!R.q.length) continue;
+  for(const pid of MAJORS){ const R=reinfOf(pid); if(!R.q.length) continue;
     R.q=R.q.filter(it=>G.t-it.t<REINFORCE.wait);
     for(const it of [...R.q]){ if(!enqueue(pid,it.type)) continue;
       const q=G.players[pid].q[queueName(it.type)], job=q[q.length-1]; job.grp=it.grp; job.re=true;

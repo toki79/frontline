@@ -1,4 +1,5 @@
-import { aiThink } from '../ai/kastrova';
+import { aiThinkAll } from '../ai/kastrova';
+import { isMajor } from '../data/config';
 import { militiaThink } from '../ai/militia';
 import { banditThink } from '../ai/bandits';
 import { updateTrade } from '../sim/trade';
@@ -23,8 +24,8 @@ import { updateRoadNet } from '../sim/build';
    ===================================================================== */
 export function update(dt){
   G.t+=dt;
-  for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(p.id<2) updateEconomy(p.id,dt); if(G.over) return;}
-  G.ai.thinkT-=dt; if(G.ai.thinkT<=0){G.ai.thinkT=G.diff.think; aiThink();}
+  for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(isMajor(p.id)) updateEconomy(p.id,dt); if(G.over) return;}
+  aiThinkAll(dt);
   G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute();}
   if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}

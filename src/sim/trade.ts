@@ -4,7 +4,8 @@ import { distTo } from '../sim/combat';
 import { needLevel } from '../sim/market';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
-import { findBuilding, freeTileAround, makeUnit } from '../sim/world';
+import { addAtt, atWar, attOf, findBuilding, freeTileAround, makeUnit } from '../sim/world';
+import { isAI } from '../data/config';
 import { msg } from '../core/events';
 
 /* =====================================================================
@@ -24,10 +25,10 @@ export function evalContract(b,give,get){
   const P=G.players[b], recv=worth(b,give.res,give.amt), cost=worth(b,get.res,get.amt);
   const canSupply=P.res[get.res]>=get.amt*1.5||G.profile[b].rich.includes(get.res);
   const reasons=[];
-  if(G.war) reasons.push('Krieg');
+  if(atWar(0,b)) reasons.push('Krieg');
   if(!canSupply) reasons.push(`zu wenig ${RES[get.res].name}`);
   if(give.res===get.res) reasons.push('gleiche Ware');
-  if(G.aiAtt<-30) reasons.push('Misstrauen');
+  if(attOf(b,0)<-30) reasons.push('Misstrauen');
   if(G.contracts.filter(c=>c.a===0&&c.b===b).length>=TRADE.maxContracts) reasons.push('genug Verträge');
   const ratio=recv/Math.max(1,cost);
   if(ratio<TRADE.margin) reasons.push('Angebot zu schwach');
@@ -40,14 +41,14 @@ export function proposeContract(a,b,give,get){
   if(!findBuilding(a,'kontor')) return {ok:false,reasons:['kein Handelskontor']};
   const e=evalContract(b,give,get); if(!e.ok) return e;
   const c: Contract={id:G.nextId++, a, b, give:{...give}, get:{...get}, next:G.t+5, miss:[0,0], done:0, since:G.t};
-  G.contracts.push(c); G.aiAtt=Math.min(100,G.aiAtt+5);
+  G.contracts.push(c); addAtt(b,a,5);
   return {ok:true, c};
 }
 export function cancelContract(c,by,why?){
   const i=G.contracts.indexOf(c); if(i<0) return; G.contracts.splice(i,1);
   if(c.a===0||c.b===0){ const other=c.a===0?c.b:c.a;
     msg(by===0?`Handelsvertrag mit ${G.players[other].short} gekündigt.`:`📜 ${G.players[by].short} kündigt den Handelsvertrag${why?` (${why})`:''}.`,'#d6b45a'); }
-  if(by===0) G.aiAtt=Math.max(-100,G.aiAtt-8);
+  if(by===0) addAtt(c.a===0?c.b:c.a,0,-8);
 }
 /** Endpunkt einer Handelsroute: Handelskontor, sonst Rathaus */
 export const tradePost=pid=>findBuilding(pid,'kontor')||findBuilding(pid,'hq');
@@ -64,13 +65,13 @@ function dispatch(c,from,to,res,amt){
 /** jede Sekunde: fällige Lieferungen abschicken, Verträge prüfen */
 export function updateTrade(){
   for(const c of [...G.contracts]){
-    if(G.war){ cancelContract(c,c.b,'Krieg'); continue; }
+    if(atWar(c.a,c.b)){ cancelContract(c,c.b,'Krieg'); continue; }
     if(G.t>=c.next){ c.next=G.t+TRADE.period;
       dispatch(c,c.a,c.b,c.give.res,c.give.amt); dispatch(c,c.b,c.a,c.get.res,c.get.amt); }
     if(c.miss[0]>=TRADE.missLimit){ cancelContract(c,c.b,'ihr habt nicht geliefert'); continue; }
-    if(c.miss[1]>=TRADE.missLimit){ cancelContract(c,c.a,'Kastrova liefert nicht'); continue; }
+    if(c.miss[1]>=TRADE.missLimit){ cancelContract(c,c.a,`${G.players[c.b].short} liefert nicht`); continue; }
     // KI prüft gelegentlich, ob sich der Vertrag noch lohnt
-    if(c.b===1&&Math.random()<1/45){ const r=worth(1,c.give.res,c.give.amt)/Math.max(1,worth(1,c.get.res,c.get.amt)); if(r<0.7) cancelContract(c,1,'lohnt sich nicht mehr'); }
+    if(isAI(c.b)&&Math.random()<1/45){ const r=worth(c.b,c.give.res,c.give.amt)/Math.max(1,worth(c.b,c.get.res,c.get.amt)); if(r<0.7) cancelContract(c,c.b,'lohnt sich nicht mehr'); }
   }
 }
 /** Karawane: fährt zum Ziel und liefert ab */
@@ -78,7 +79,7 @@ export function updateCaravan(u){
   if(!u.dest||u.dead) return;
   if(u.dest.dead){ u.dest=tradePost(u.dest.owner)||null; if(!u.dest){ u.dead=true; return; } setPath(u,u.dest.x,u.dest.y); }
   if(distTo(u,u.dest)<1.4){ const R=G.players[u.dest.owner]; R.res[u.cargoRes]+=u.cargoAmt;
-    const c=G.contracts.find(c=>c.id===u.contract); if(c){ c.done++; if(c.b===1) G.aiAtt=Math.min(100,G.aiAtt+0.5); }
+    const c=G.contracts.find(c=>c.id===u.contract); if(c){ c.done++; if(isAI(c.b)) addAtt(c.b,c.a,0.5); }
     if(u.dest.owner===0) msg(`🚚 Handelskarawane angekommen: +${u.cargoAmt} ${RES[u.cargoRes].icon}`,'#9fd88a');
     u.dead=true; return; }
   if(!u.path||u.pathI>=u.path.length){ u.repathT=(u.repathT||0)-1; if(u.repathT<=0){ u.repathT=3; setPath(u,u.dest.x,u.dest.y); } }
@@ -87,9 +88,9 @@ export function updateCaravan(u){
 export function updateDiplomat(u){
   if(u.mission===undefined||u.mission===null) return;
   const hq=findBuilding(u.mission,'hq'); if(!hq){ u.mission=null; return; }
-  if(G.war&&u.mission===1){ u.mission=null; if(u.owner===0) msg('Im Krieg empfängt Kastrova keine Diplomaten.','#ffb38a'); return; }
+  if(atWar(u.owner,u.mission)){ u.mission=null; if(u.owner===0) msg(`Im Krieg empfängt ${G.players[hq.owner].short} keine Diplomaten.`,'#ffb38a'); return; }
   if(distTo(u,hq)<1.3){ G.embassy[u.owner][u.mission]=true; u.dead=true; G.sel=G.sel.filter(s=>s!==u);
-    if(u.owner===0){ msg(`🏛 Botschaft bei ${G.players[u.mission].name} eröffnet – Handelsverträge sind jetzt über 🤝 möglich.`,'#9fd88a'); G.aiAtt=Math.min(100,G.aiAtt+6); } }
+    if(u.owner===0){ msg(`🏛 Botschaft bei ${G.players[u.mission].name} eröffnet – Handelsverträge sind jetzt über 🤝 möglich.`,'#9fd88a'); addAtt(u.mission,0,6); } }
 }
 export function sendDiplomats(units,target){
   let n=0; for(const u of units){ if(!u.def.diplomat) continue; u.mission=target.owner; u.mode='move'; u.goal={x:target.x,y:target.y}; setPath(u,target.x,target.y); n++; } return n;

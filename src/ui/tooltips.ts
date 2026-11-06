@@ -1,13 +1,13 @@
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, DEPOSIT, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { AIS, AI_CHAR, BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, DEPOSIT, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
 import { lacking } from '../sim/costs';
 import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
 import { tradeTerms } from '../sim/market';
 import { missingReq } from '../sim/production';
 import { G } from '../sim/state';
-import { countBuildings } from '../sim/world';
+import { atWar, countBuildings } from '../sim/world';
 import { $ } from '../ui/dom';
 import { costHtml, costLong, f1 } from '../ui/format';
 
@@ -112,7 +112,7 @@ export function regionNote(res){ const pr=G.profile[0]; return pr.scarce.include
 export const HUD_TIPS: Record<string, ()=>string> = {
   money:()=>{const p=G.players[0],r: any=p.rate||{money:0,export:0,expBy:{}};
     const ex=r.export>0.05?`<br>+${f1(r.export)} $/s aus dem Handelskontor (${Object.entries(r.expBy).map(([k,v])=>f1(v)+' '+RES[k].icon+'/s').join(', ')})`:'';
-    return `<b>$ Geld: ${fmt(p.res.money)}</b><br>+${f1(r.money)} $/s Steuern von ${Math.floor(p.pop)} Einwohnern – mehr Einwohner = mehr Geld.${ex}<br><span class="dim">Weitere Quellen: Handel mit Kastrova (zahlt viel für ihren Engpass), Milizmarkt, Beute. Ein Handelskontor exportiert Überschüsse dauerhaft.</span>`;},
+    return `<b>$ Geld: ${fmt(p.res.money)}</b><br>+${f1(r.money)} $/s Steuern von ${Math.floor(p.pop)} Einwohnern – mehr Einwohner = mehr Geld.${ex}<br><span class="dim">Weitere Quellen: Handel mit Kastrova und Veloria (zahlen viel für ihren Engpass), Milizmarkt, Beute. Ein Handelskontor exportiert Überschüsse dauerhaft.</span>`;},
   food:()=>{const p=G.players[0],r=p.rate||{foodProd:0,eat:0};const t=p.foodRate<0&&p.res.food>0?`<br><span style="color:#ff9a8a">Vorrat reicht noch ca. ${Math.round(p.res.food/-p.foodRate)} s.</span>`:'';
     return `<b>🌾 Nahrung: ${fmt(p.res.food)}</b><br>Erzeugung +${f1(r.foodProd)}/s (Bauernhöfe, Rathaus) − Verbrauch ${f1(r.eat)}/s (${Math.floor(p.pop)} Einwohner) = <b>${p.foodRate>=0?'+':''}${f1(p.foodRate)}/s</b>.${t}<br><span class="dim">Ein Bauernhof ernährt ${Math.round(2.5*G.profile[0].fert/ECON.foodPerHead)} Einwohner. Ohne Nahrung schrumpft die Stadt.</span>${regionNote('food')}`;},
   wood:()=>{const p=G.players[0],r=p.rate||{wood:0},n=countBuildings(0,'lumber');return `<b>🪵 Holz: ${fmt(p.res.wood)}</b><br>+${f1(r.wood||0)}/s von ${n} Holzfäller${n===1?'':'n'}.<br><span class="dim">Holzfäller am Waldrand bauen – sie holzen den Wald nach und nach ab. Gebraucht für Wohnhäuser, Bauernhöfe, Kaserne, Mine, Steinbruch und Kontor. </span>${regionNote('wood')}`;},
@@ -121,9 +121,9 @@ export const HUD_TIPS: Record<string, ()=>string> = {
   oil:()=>{const p=G.players[0],n=G.units.filter(u=>u.owner===0&&u.def.harvester).length,rf=countBuildings(0,'refinery');return `<b>🛢 Öl: ${fmt(p.res.oil)}</b><br>+${f1(p.rate?p.rate.oil||0:0)}/s aus ${rf} Raffinerie${rf===1?'':'n'} (je max. 3/s) · ${n} Tanklaster. Mehr Laster als die Raffinerie verarbeiten kann, bringen nichts – dann warten sie. Öl braucht man für Fahrzeuge; Überschuss am Milizmarkt verkaufen (zurzeit 100 🛢 → $${tradeTerms(0,'sellOil').get.money}; jeder Verkauf drückt den Preis).<br><span class="dim">Raffinerie bauen → Tanklaster fördert automatisch.</span>${regionNote('oil')}`;},
   pop:()=>{const p=G.players[0];const why={unzufrieden:'Unzufriedenheit – Einwohner wandern ab!',hunger:'Hungersnot – Bevölkerung schrumpft!',wohnraum:'Wohnraum voll – Wohnhaus bauen.',nahrung:'Nahrung sinkt – Wachstum gebremst.',strom:'Strommangel – Wachstum halbiert.',laerm:`Freie Wohnungen liegen neben Industrie – Wachstum nur ${Math.round((p.growQ||1)*100)} %.`}[p.growBlock];
     return `<b>👥 Einwohner: ${Math.floor(p.pop)} von ${p.cap} Wohnraum</b><br>${G.mode==='race'?`Siegziel: ${ECON.target} Einwohner (Balken).`:`Stadtstufe: <b>${ECON.ranks[rankOf(p.pop)][1]}</b> · Balken = Weg zur nächsten Stufe (${nextMilestone(p.pop)}).`} Wachstum zurzeit ${p.growth>=0?'+':''}${f1((p.growth||0)*60)} pro Minute.<br>Neue Bewohner ziehen zuerst in die ruhigsten Häuser.${why?`<br><span style="color:#ffb38a">${why}</span>`:''}<br><span class="dim">Soldaten kosten Einwohner. Zerstörte Wohnhäuser vertreiben Bewohner.</span>`;},
-  popAi:()=>{const A=G.players[1];if(!G.known[0][1]) return '<b>Unbekannte Macht</b><br>Noch kein Kontakt. Erkunde das Tal, um herauszufinden, wer hier noch lebt.';return `<b>👥 Kastrova: ${Math.floor(A.pop)} Einwohner</b><br>${G.mode==='race'?`Wer zuerst ${ECON.target} erreicht, gewinnt.`:`Stadtstufe: ${ECON.ranks[rankOf(A.pop)][1]}.`} Liegt ihr deutlich vorn, wird Kastrova misstrauisch und rüstet auf.`;},
+  popAi1:()=>popAiTip(1), popAi4:()=>popAiTip(4),
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
-  stance:()=>G.war?'<b>⚔ Krieg mit Kastrova</b><br>Einheiten greifen sich gegenseitig an. Zerstörte Gebäude bringen dem Angreifer Beute. Frieden über 🤝 anbieten.':'<b>Frieden mit Kastrova</b><br>Niemand schießt. Kastrova kann aber Forderungen stellen oder den Krieg erklären, wenn ihr zu schnell wachst oder schwach seid.',
+  stance1:()=>stanceTip(1), stance4:()=>stanceTip(4),
 };
 HUD_TIPS.happy=()=>{ const p=G.players[0], h=p.happy??0.8, why=(p.moodWhy||[]).slice().sort((a,b)=>b.amt-a.amt);
   return `<b>Zufriedenheit: ${Math.round(h*100)} %</b> (Ziel ${Math.round((p.moodTarget??h)*100)} %)<br>`+
@@ -156,3 +156,11 @@ $$('[data-tip]').forEach(el=>{
 });
 document.addEventListener('pointerdown',e=>{ if(tipAnchor&&!tipAnchor.contains(e.target)) hideTip(); },true);
 }
+
+function popAiTip(pid){ const A=G.players[pid];
+  if(!G.known[0][pid]) return '<b>Unbekannte Macht</b><br>Noch kein Kontakt. Erkunde das Tal, um herauszufinden, wer hier noch lebt.';
+  if(G.beaten&&G.beaten[pid]) return `<b>🏳 ${A.short} ist besiegt.</b>`;
+  return `<b>👥 ${A.short}: ${Math.floor(A.pop)} Einwohner</b> · ${AI_CHAR[pid].label}<br>${G.mode==='race'?`Wer zuerst ${ECON.target} erreicht, gewinnt.`:`Stadtstufe: ${ECON.ranks[rankOf(A.pop)][1]}.`} Liegt ihr deutlich vorn, wird ${A.short} misstrauisch und rüstet auf.`; }
+function stanceTip(pid){ const A=G.players[pid], other=AIS.find(o=>o!==pid), ow=atWar(pid,other)&&G.known[0][other]?`<br>${A.short} führt gerade Krieg gegen ${G.players[other].short}.`:'';
+  return (atWar(0,pid)?`<b>⚔ Krieg mit ${A.short}</b><br>Einheiten greifen sich gegenseitig an. Zerstörte Gebäude bringen dem Angreifer Beute. Frieden über 🤝 anbieten.`
+    :`<b>Frieden mit ${A.short}</b><br>Niemand schießt. ${A.short} kann aber Forderungen stellen oder den Krieg erklären, wenn ihr zu schnell wachst oder schwach seid.`)+ow; }

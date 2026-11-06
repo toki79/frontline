@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { DEPOSIT, capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { MAJORS, isAI, isMajor, AI_CHAR, DEPOSIT, capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -9,25 +9,41 @@ import { msg } from '../core/events';
 /* =====================================================================
    Beziehungen
    ===================================================================== */
+const wkey=(a,b)=>a<b?a+'-'+b:b+'-'+a;
+/** Krieg zwischen zwei Großmächten? */
+export const atWar=(a,b)=>a!==b&&!!(G.wars&&G.wars[wkey(a,b)]);
+/** steht eine Macht mit irgendwem im Krieg? */
+export const anyWar=pid=>MAJORS.some(o=>o!==pid&&atWar(pid,o));
+export const foesOf=pid=>MAJORS.filter(o=>o!==pid&&atWar(pid,o));
+/** Name einer Macht aus Sicht des Spielers (unbekannt bleibt unbekannt) */
+export const nameFor0=pid=>pid===0?'Aldoria':G.known[0][pid]?G.players[pid].short:'eine unbekannte Macht';
 export function updateRel(){
   const r=G.rel, set=(a,b,v)=>{r[a][b]=v;r[b][a]=v;};
-  set(0,1, G.war?'feind':'neutral');
-  for(const pid of [0,1]){
+  for(const a of MAJORS) for(const b of MAJORS) if(a<b) set(a,b, atWar(a,b)?'feind':'neutral');
+  for(const pid of MAJORS){
     let v='neutral';
-    if(G.militiaWar[pid]) v='feind'; else if(G.militiaAlly===pid) v='verbündet'; else if(G.militiaAlly===1-pid&&G.war) v='feind';
+    if(G.militiaWar[pid]) v='feind'; else if(G.militiaAlly===pid) v='verbündet'; else if(G.militiaAlly>=0&&atWar(G.militiaAlly,pid)) v='feind';
     set(2,pid,v);
   }
 }
 export const hostile=(a,b)=>a!==b&&G.rel[a][b]==='feind';
-export function setWar(on,by?){
-  if(G.war===on) return; G.war=on; updateRel();
+/** Haltung einer KI-Macht gegenüber einer anderen Macht ändern (−100 … 100) */
+export function addAtt(ai,o,d){ const A=G.ais&&G.ais[ai]; if(!A) return; A.att[o]=Math.max(-100,Math.min(100,(A.att[o]||0)+d)); }
+export const attOf=(ai,o)=>(G.ais&&G.ais[ai]&&G.ais[ai].att[o])||0;
+/** Krieg erklären oder Frieden schließen (a, b: Großmächte; by: wer es tut) */
+export function setWar(a,b,on,by?){
+  if(a===b||atWar(a,b)===on) return; G.wars[wkey(a,b)]=on; updateRel();
+  const pl=a===0||b===0, other=a===0?b:a, actor=by??a, target=actor===a?b:a;
   if(on){
-    G.aiAtt=Math.min(G.aiAtt,-20);
-    if(G.embassy&&(G.embassy[0][1]||G.embassy[1][0])){ G.embassy[0][1]=G.embassy[1][0]=false; msg('🏛 Die Botschaften wurden geschlossen.','#ffb38a'); }
-    msg(by===0?'Ihr habt Kastrova den Krieg erklärt.':'⚔ Kastrova hat Aldoria den Krieg erklärt!','#ff8a7a');
+    for(const [x,o] of [[a,b],[b,a]]) if(isAI(x)) G.ais[x].att[o]=Math.min(attOf(x,o),-20);
+    if(G.embassy&&(G.embassy[a][b]||G.embassy[b][a])){ G.embassy[a][b]=G.embassy[b][a]=false; if(pl) msg('🏛 Die Botschaften wurden geschlossen.','#ffb38a'); }
+    if(pl) msg(actor===0?`Ihr habt ${G.players[other].short} den Krieg erklärt.`:`⚔ ${G.players[other].short} hat Aldoria den Krieg erklärt!`,'#ff8a7a');
+    else if(G.known[0][a]||G.known[0][b]) msg(`📰 Krieg im Tal: ${nameFor0(actor)} hat ${nameFor0(target)} den Krieg erklärt.`,'#d6b45a');
   } else {
-    msg('Frieden mit Kastrova geschlossen.','#9fd88a');
-    for(const u of G.units){ if(u.target&&!hostile(u.owner,u.target.owner)) u.target=null; if(u.owner===1&&u.wave){u.wave=false;const r=aiRally();orderMove([u],r.x,r.y);} }
+    if(pl) msg(`Frieden mit ${G.players[other].short} geschlossen.`,'#9fd88a');
+    else if(G.known[0][a]||G.known[0][b]) msg(`📰 ${nameFor0(a)} und ${nameFor0(b)} haben Frieden geschlossen.`,'#d6b45a');
+    for(const u of G.units){ if(u.target&&!hostile(u.owner,u.target.owner)) u.target=null;
+      if(u.wave&&(u.owner===a||u.owner===b)&&(u.waveFoe===undefined||u.waveFoe===(u.owner===a?b:a))){u.wave=false;u.waveFoe=undefined;const r=aiRally(u.owner);orderMove([u],r.x,r.y);} }
   }
 }
 export function armyStr(pid){let s=0;for(const u of G.units) if(!u.dead&&u.owner===pid&&u.def.weapon) s+=(u.def.cost.money||100)*(1+(u.def.cost.metal||0)/100)*(u.hp/u.maxHp);return s;}
@@ -58,7 +74,7 @@ export function nearestPassable(tx,ty,cls,maxR=12){
   return null;
 }
 export function makeUnit(pid,type,x,y){
-  const d=UNITS[type], a=pid===1?Math.PI*0.75:pid===0?-Math.PI*0.25:Math.PI/2;
+  const d=UNITS[type], a=isMajor(pid)?Math.atan2(MAP_H/2-y,MAP_W/2-x):Math.PI/2;   // Blick zur Talmitte
   const u: Entity={id:G.nextId++, kind:'unit', type, def:d, owner:pid, x, y, hp:d.hp, maxHp:d.hp, armor:d.armor, angle:a, tur:a,
     mode:'idle', guard:{x,y}, goal:null, path:null, pathI:0, target:null, cd:0, scanT:Math.random()*0.4, repathT:0,
     cargo:0, hs:null, stuck:0, oilTile:-1, ref:null, wave:false, raid:false, born:G.t};
@@ -74,7 +90,7 @@ export function depositTiles(b,arr){ const out=[], R=DEPOSIT.r;
 export function placeBuilding(pid,type,tx,ty,initial,site=false){
   const d=BUILDINGS[type];
   const b: Entity={id:G.nextId++, kind:'building', type, def:d, owner:pid, tx, ty, w:d.w, h:d.h, x:tx+d.w/2, y:ty+d.h/2,
-    hp:d.hp, maxHp:d.hp, armor:d.def?'fort':'building', tur:pid===1?Math.PI*0.75:-Math.PI*0.25, cd:0, scanT:0, target:null, born:initial?-9:G.t, empty:false};
+    hp:d.hp, maxHp:d.hp, armor:d.def?'fort':'building', tur:Math.atan2(MAP_H/2-ty,MAP_W/2-tx), cd:0, scanT:0, target:null, born:initial?-9:G.t, empty:false};
   if(d.needsOre) b.oreTiles=depositTiles(b,G.ore);
   if(d.needsRock) b.rockTiles=depositTiles(b,G.rock);
   if(site){ b.site=true; b.progress=0; b.hp=d.hp*0.1; b.lastHit=G.t; }
@@ -106,21 +122,21 @@ export function refreshQuality(){
   G.qDirty=false;
 }
 // ---------- Sicht & Nebel des Krieges ----------
-// vis (Spieler) und vis1 (Kastrova): 0 = unerforscht, 1 = erkundet, 2 = gerade in Sicht.
-// Ohne Nebel sieht der Spieler alles; Kastrova hat immer ihre eigene Sicht (Erstkontakt, Raketenwerfer).
+// vis (Spieler) und visAi[pid] (KI-Mächte): 0 = unerforscht, 1 = erkundet, 2 = gerade in Sicht.
+// Ohne Nebel sieht der Spieler alles; die KI hat immer ihre eigene Sicht (Erstkontakt, Raketenwerfer).
 // Hochfliegende Drohnen (airHigh) sind getarnt: nur Radar der Flugabwehr oder eigenes Feuer verrät sie.
 export const fogOn=()=>!!(G&&G.fog);
 export function seesFor(pid,o){ return o===pid||(o===2&&G.militiaAlly===pid); }
 export function seesFor0(o){ return seesFor(0,o); }
-export const visOf=pid=>pid===0?G.vis:G.vis1;
+export const visOf=pid=>{ if(pid===0) return G.vis; G.visAi=G.visAi||{}; return G.visAi[pid]||(G.visAi[pid]=new Uint8Array(MAP_W*MAP_H)); };
 /** ist ein Feld für eine Partei gerade aufgeklärt? */
-export function spotted(pid,x,y){ if(pid>1) return false; if(pid===0&&!G.fog) return true; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)&&visOf(pid)[idx(tx,ty)]===2; }
+export function spotted(pid,x,y){ if(!isMajor(pid)) return false; if(pid===0&&!G.fog) return true; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)&&visOf(pid)[idx(tx,ty)]===2; }
 /** Hochflieger für eine Partei entdeckt? (andere Einheiten immer) */
 export function detected(e,pid){ if(e.carried) return false; return e.kind!=='unit'||e.def.armor!=='airHigh'||seesFor(pid,e.owner)||!!(e.det&&e.det[pid]); }
 export function updateVision(){
-  G.vis1=G.vis1||new Uint8Array(MAP_W*MAP_H);
-  for(const pid of [0,1]){
+  for(const pid of MAJORS){
     if(pid===0&&!G.fog) continue;
+    if(pid!==0&&!G.buildings.some(b=>!b.dead&&b.owner===pid)) continue;   // besiegte Macht sieht nichts mehr
     const v=visOf(pid); for(let i=0;i<v.length;i++) if(v[i]===2) v[i]=1;
     const reveal=(x,y,r)=>{ const r2=r*r; for(let ty=Math.max(0,Math.floor(y-r));ty<=Math.min(MAP_H-1,Math.ceil(y+r));ty++)for(let tx=Math.max(0,Math.floor(x-r));tx<=Math.min(MAP_W-1,Math.ceil(x+r));tx++){
       const dx=tx+0.5-x, dy=ty+0.5-y; if(dx*dx+dy*dy<=r2) v[ty*MAP_W+tx]=2; } };
@@ -130,20 +146,20 @@ export function updateVision(){
   // Tarnung: Radar der Flugabwehr (fertig) erfasst Hochflieger im Umkreis; wer feuert, verrät sich kurz
   const radars=[...G.buildings.filter(b=>!b.dead&&!b.site&&b.def.radar), ...G.units.filter(u=>!u.dead&&u.def.radar)];
   for(const u of G.units){ if(u.dead||u.def.armor!=='airHigh') continue; const rev=G.t<(u.revealT||-1);
-    u.det=[0,1,2,3].map(pid=>rev||radars.some(r=>r.owner===pid&&Math.hypot(r.x-u.x,r.y-u.y)<=r.def.radar)); }
+    u.det=[0,1,2,3,4].map(pid=>rev||radars.some(r=>r.owner===pid&&Math.hypot(r.x-u.x,r.y-u.y)<=r.def.radar)); }
   for(const b of G.buildings) if(!b.dead&&!b.seen&&inSightRect(b)) b.seen=true;
   // Erstkontakt
-  for(const pid of [0,1]) for(const o of [0,1,2]){ if(o===pid||G.known[pid][o]) continue;
+  for(const pid of MAJORS) for(const o of [...MAJORS,2]){ if(o===pid||G.known[pid][o]) continue;
     const seen=G.units.some(u=>!u.dead&&u.owner===o&&detected(u,pid)&&spotted(pid,u.x,u.y))||G.buildings.some(b=>!b.dead&&b.owner===o&&spotted(pid,b.x,b.y));
     if(seen) makeContact(pid,o); }
 }
 /** Erstkontakt zwischen zwei Parteien */
 export function makeContact(pid,o){
   if(G.known[pid][o]) return; G.known[pid][o]=true;
-  if(pid===0&&o===1){ msg('🔭 Erstkontakt: Wir sind auf die Föderation Kastrova gestoßen! Diplomatie und Handel sind jetzt möglich (🤝).','#d6b45a');
-    msg(`Geheimdienst: Kastrova hat ${G.regionText1}.`,'#d6b45a'); }
+  if(pid===0&&isAI(o)){ const P=G.players[o]; msg(`🔭 Erstkontakt: Wir sind auf ${P.name} gestoßen – eine ${AI_CHAR[o].label}. Diplomatie und Handel sind jetzt möglich (🤝).`,'#d6b45a');
+    if(G.regionTexts) msg(`Geheimdienst: ${P.short} hat ${G.regionTexts[o]}.`,'#d6b45a'); }
   if(pid===0&&o===2) msg('🔭 Erstkontakt: die Grenzmiliz von Belgor auf der Flussinsel – sie betreibt einen Markt (🤝).','#d6b45a');
-  if(pid===1&&o===0) msg('⚠ Späher Kastrovas haben unsere Stadt entdeckt.','#ffb38a');
+  if(isAI(pid)&&o===0) msg(`⚠ Späher ${G.players[pid].short}s haben unsere Stadt entdeckt.`,'#ffb38a');
 }
 export function tileVis(x,y){ if(!G.fog) return 2; const tx=Math.floor(x),ty=Math.floor(y); return inMap(tx,ty)?G.vis[idx(tx,ty)]:0; }
 export function inSightRect(b){ if(!G.fog) return true; for(let y=b.ty;y<b.ty+b.h;y++)for(let x=b.tx;x<b.tx+b.w;x++) if(G.vis[idx(x,y)]===2) return true; return false; }
@@ -180,6 +196,6 @@ export function spawnUnit(pid,type,prod){
     if(r) orderMove([u], r.x+0.5, r.y+0.5);
   }
   if(pid===0) G.stats.built++;
-  if(pid===1&&d.cls==='air'){ if(d.weapon&&d.weapon.kamikaze) u.lurk=true; else { u.patrol=true; u.mode='patrol'; u.path=null; } }   // KI: FPV lauern, Aufklärer fliegen los
+  if(isAI(pid)&&d.cls==='air'){ if(d.weapon&&d.weapon.kamikaze) u.lurk=true; else { u.patrol=true; u.mode='patrol'; u.path=null; } }   // KI: FPV lauern, Aufklärer fliegen los
   return u;
 }

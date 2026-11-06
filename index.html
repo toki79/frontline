@@ -18,14 +18,16 @@
   </div>
   <div class="tb"><button id="bHelp" title="Symbole &amp; Hilfe">❓</button><button id="bDev" title="Stadtentwicklung">🏙<span class="lbl"> Stadt</span></button><button id="bForces">🪖<span class="lbl"> Kräfte</span></button><button id="bDiplo">🤝<span class="lbl"> Diplomatie</span></button><button id="bMenu">⏸<span class="lbl"> Menü</span></button></div>
 </div>
+<div id="pauseTag">⏸ Pause – P oder Leertaste setzt fort</div>
 <div id="popbar">
   <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span><span id="happy" data-tip="happy">😊</span></div>
-  <div class="pb" data-tip="popAi"><span class="nm">👥 Kastrova</span><b id="popAi">0</b><i><em id="popAiBar" style="background:#cc4a3c"></em></i><span id="stance" data-tip="stance"></span></div>
+  <div class="pb" data-tip="popAi1"><span class="nm">👥 ???</span><b id="popAi1">0</b><i><em id="popAi1Bar" style="background:#cc4a3c"></em></i><span class="stance" id="stance1" data-tip="stance1"></span></div>
+  <div class="pb" data-tip="popAi4"><span class="nm">👥 ???</span><b id="popAi4">0</b><i><em id="popAi4Bar" style="background:#3fae7a"></em></i><span class="stance" id="stance4" data-tip="stance4"></span></div>
 </div>
 <div id="log"></div>
 <canvas id="mini" width="124" height="124"></canvas>
 <div id="panel">
-  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><button data-tab="forsch">Forschung</button><span class="sp"></span><span class="hint" id="hint">Lang drücken = Info</span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
+  <div class="tabs"><button data-tab="bau" class="on">Gebäude</button><button data-tab="vert">Verteidigung</button><button data-tab="truppen">Truppen</button><button data-tab="forsch">Forschung</button><span class="sp"></span><span class="hint" id="hint"><span class="touchOnly">Lang drücken = Info</span><span class="mouseOnly">Maus drüber = Info · Rechtsklick = abbrechen</span></span><button id="bFold" title="Leiste ein-/ausklappen">▾</button></div>
   <div id="chips"></div>
   <div id="items"></div>
 </div>
@@ -103,7 +105,7 @@
     <b>Wirtschaft:</b> Wohnhaus = +50 Platz · Bauernhof = Nahrung · Mine (direkt an grauen Erzfelsen) = Metall · Raffinerie + Tanklaster = Öl · Steuern der Einwohner = Geld · Kraftwerk = Strom. Am Milizmarkt (Diplomatie) kannst du handeln.<br>
     <b>Krieg:</b> Wer ein Gebäude zerstört oder einen Tanklaster abschießt, erbeutet einen Teil der Vorräte des Gegners.<br>
     <b>Touch:</b> Tippen = auswählen/Befehl (Boden = bewegen, Feind = angreifen, Ölfeld = fördern) · Wischen = Karte verschieben · Zwei Finger = Zoom · <b>▢ Rahmen</b> = mehrere wählen · Doppeltipp = alle dieses Typs<br>
-    <b>Maus:</b> Links = auswählen/befehlen, Links ziehen = Rahmen, Rechts = Befehl, Rechts ziehen = schieben, Rad = Zoom, Pfeiltasten, A = Angriffsbewegung, S = Stopp
+    <b>Maus:</b> Links = auswählen/befehlen, Links ziehen = Rahmen, Rechts = Befehl, Rechts ziehen = schieben, Rad = Zoom, Maus an den Bildschirmrand = scrollen.<br><b>Tastatur:</b> Pfeiltasten = scrollen, A = Angriffsbewegung, S = Stopp, P oder Leertaste = Pause, H = zum Rathaus, Strg+Ziffer = Gruppe speichern, Ziffer = Gruppe wählen (zweimal = hinspringen)
   </div>
 </div></div>
 

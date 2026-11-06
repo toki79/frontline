@@ -1,5 +1,5 @@
 import { dist } from '../core/util';
-import { MISSION } from '../data/config';
+import { MISSION, isMajor } from '../data/config';
 import { distTo } from '../sim/combat';
 import { orderLurk, orderMove, orderPatrol } from '../sim/orders';
 import { G } from '../sim/state';
@@ -52,7 +52,7 @@ export function updateMission(u,dt){
     if(u.target&&!u.target.dead) { u.quietT=0; return; }
     let best=null, bd=1e9; const A=u.area;
     for(const e of G.units){ if(e.dead||!hostile(u.owner,e.owner)||!detected(e,u.owner)) continue; if(e.def.cls==='air'&&!(u.def.weapon&&(u.def.weapon.type==='flak'||u.def.weapon.type==='autocannon'||u.def.weapon.type==='bullet'))) continue;
-      const da=dist(e.x,e.y,A.x,A.y); if(da>A.r) continue; if(u.owner<2&&!spotted(u.owner,e.x,e.y)) continue; const d=dist(u.x,u.y,e.x,e.y); if(d<bd){bd=d;best=e;} }
+      const da=dist(e.x,e.y,A.x,A.y); if(da>A.r) continue; if(isMajor(u.owner)&&!spotted(u.owner,e.x,e.y)) continue; const d=dist(u.x,u.y,e.x,e.y); if(d<bd){bd=d;best=e;} }
     for(const b of G.buildings){ if(b.dead||!hostile(u.owner,b.owner)) continue; if(u.order==='clear'&&b.type!=='camp') continue;
       if(distTo({x:A.x,y:A.y},b)>A.r) continue; if(u.owner===0&&!b.seen&&G.fog) continue; const d=distTo(u,b)+1; if(d<bd){bd=d;best=b;} }
     if(best){ u.target=best; u.quietT=0; return; }

@@ -135,18 +135,38 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
   c.fillStyle=type==='farm'?'#7a6842':type==='house'?'#7f8a5a':type==='park'?'#5f8a3e':'#8e8c80'; c.fillRect(1,1,W-2,H-2);
   c.strokeStyle='#5e5d55'; c.lineWidth=1; c.strokeRect(1.5,1.5,W-3,H-3);
   const box=(x,y,ww,hh,f,s?)=>{c.fillStyle=f;c.fillRect(x,y,ww,hh);if(s){c.strokeStyle=s;c.strokeRect(x+0.5,y+0.5,ww-1,hh-1);}};
-  const roof=(x,y,ww,hh)=>{box(x,y,ww,hh,col,dark);c.fillStyle='rgba(0,0,0,.22)';c.fillRect(x,y+hh/2,ww,hh/2);c.strokeStyle=dark;c.beginPath();c.moveTo(x,y+hh/2);c.lineTo(x+ww,y+hh/2);c.stroke();};
+  // Satteldach: sonnige obere Hälfte, schattige untere, Ziegelreihen, heller First, Kamin
+  const roof=(x,y,ww,hh,chim=true)=>{ c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(x+2,y+3,ww,hh);
+    box(x,y,ww,hh,col,dark); c.fillStyle='rgba(255,250,230,.16)'; c.fillRect(x+1,y+1,ww-2,hh/2-1); c.fillStyle='rgba(0,0,0,.24)'; c.fillRect(x+1,y+hh/2,ww-2,hh/2-1);
+    c.strokeStyle='rgba(0,0,0,.16)'; c.lineWidth=0.8; c.beginPath(); for(let k=y+3;k<y+hh-1;k+=3){ if(Math.abs(k-(y+hh/2))<1.2) continue; c.moveTo(x+1,k); c.lineTo(x+ww-1,k); } c.stroke();
+    c.strokeStyle='rgba(255,245,220,.45)'; c.lineWidth=1.2; c.beginPath(); c.moveTo(x+1,y+hh/2); c.lineTo(x+ww-1,y+hh/2); c.stroke(); c.lineWidth=1;
+    if(chim&&ww>14){ c.fillStyle='#6b5a4c'; c.fillRect(x+ww*0.7,y+2,4,5); c.fillStyle='#3a302a'; c.fillRect(x+ww*0.7+0.8,y+2.8,2.4,1.6); } };
   switch(type){
     case 'hq':
-      box(6,10,W-12,H-18,col,dark); box(10,14,W-20,H-26,dark);
-      c.fillStyle='rgba(255,255,255,.15)'; c.fillRect(10,14,W-20,4);
+      c.fillStyle='#8a8676'; c.fillRect(4,H-14,W-8,10);   // Vorplatz
+      roof(6,8,W-12,H-26,false); roof(10,H-30,22,16,false); roof(W-32,H-30,22,16,false);   // Haupthaus und Seitenflügel
+      box(W/2-7,H/2-13,14,14,'#b8b09a','#5e5a4c'); c.fillStyle=dark; c.beginPath(); c.moveTo(W/2-8,H/2-13); c.lineTo(W/2,H/2-20); c.lineTo(W/2+8,H/2-13); c.closePath(); c.fill();   // Turm
+      c.fillStyle='#e8e2cc'; c.beginPath(); c.arc(W/2,H/2-6,3.5,0,7); c.fill();
+      c.fillStyle='#d9c27a'; c.fillRect(W/2-5,H-12,10,6);
       c.fillStyle='#cfcfc6'; c.beginPath(); c.arc(W-18,18,8,0,7); c.fill(); c.strokeStyle='#666'; c.stroke();
       c.strokeStyle='#555'; c.beginPath(); c.moveTo(W-18,18); c.lineTo(W-18+Math.cos(tt)*8,18+Math.sin(tt)*8); c.stroke();
       c.strokeStyle='#333'; c.lineWidth=1.5; c.beginPath(); c.moveTo(14,22); c.lineTo(14,4); c.stroke();
       c.fillStyle=col; c.fillRect(14,4,10,6);
       box(W/2-8,H-10,16,8,'#444');
       break;
+    case 'depot': {   // Lagerhalle: Wellblechdach, Rolltor, Kisten
+      c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(7,7,W-10,H-14);
+      const rx=5, ry=5, rw=W-10, rh=H-16;
+      c.fillStyle='#9aa0a2'; c.fillRect(rx,ry,rw/2,rh); c.fillStyle='#7b8183'; c.fillRect(rx+rw/2,ry,rw/2,rh);
+      c.strokeStyle='rgba(0,0,0,.18)'; c.beginPath(); for(let k=rx+3;k<rx+rw;k+=3.5){ c.moveTo(k,ry+1); c.lineTo(k,ry+rh-1); } c.stroke();
+      c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(rx+rw/2-1,ry,2,rh); c.strokeStyle='#4f5456'; c.strokeRect(rx+0.5,ry+0.5,rw-1,rh-1);
+      c.fillStyle=col; c.fillRect(rx,ry+rh-4,rw,4);
+      c.fillStyle='#5b5f60'; c.fillRect(W/2-7,H-12,14,8); c.strokeStyle='#3d4041'; c.beginPath(); for(let k=H-11;k<H-4;k+=2){ c.moveTo(W/2-7,k); c.lineTo(W/2+7,k); } c.stroke();
+      for(const [bx,by] of [[6,H-10],[11,H-8],[W-14,H-9]]){ c.fillStyle='#a07a4a'; c.fillRect(bx,by,5,5); c.strokeStyle='#5e4528'; c.strokeRect(bx+0.5,by+0.5,4,4); }
+      break; }
     case 'house':
+      c.fillStyle='#6f8a4a'; c.fillRect(2,2,W-4,H-4);   // Garten
+      c.fillStyle='#9c8e72'; c.fillRect(16,24,3,H-26); c.fillRect(W-17,2,3,H-26);   // Wege
       roof(4,4,26,20); roof(W-28,H-24,24,20);
       c.fillStyle='#5e7a3e'; c.beginPath(); c.arc(W-14,14,6,0,7); c.fill(); c.beginPath(); c.arc(12,H-12,5,0,7); c.fill();
       c.fillStyle='#e8d890'; c.fillRect(9,26,4,3); c.fillRect(W-22,H-3,4,2);

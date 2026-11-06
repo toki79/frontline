@@ -1,11 +1,12 @@
 import { $$ } from './dom';
 import { fmt } from '../core/util';
-import { BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType } from '../data/config';
+import { AIS, BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType } from '../data/config';
 import { drawBuildingShape, drawFeature, drawRoad, drawUnitShape } from '../render/draw';
 import { canAfford, lacking } from '../sim/costs';
 import { nextMilestone } from '../sim/economy';
 import { cancelItem, enqueue, missingReq, queueName } from '../sim/production';
 import { G } from '../sim/state';
+import { atWar } from '../sim/world';
 import { $ } from '../ui/dom';
 import { costHtml } from '../ui/format';
 import { refreshCmds } from '../ui/input';
@@ -94,7 +95,7 @@ export function buildClick(k){
   enqueue(0,k);
 }
 export function updatePanel(){
-  if(!G) return; const p=G.players[0], A=G.players[1];
+  if(!G) return; const p=G.players[0];
   for(const [k,b] of (Object.entries(ui.btns) as [string, any][])){
     const qn=queueName(k), q=qn?p.q[qn]:[], miss=missingReq(0,k);
     const sites=BUILDINGS[k]?G.buildings.filter(x=>!x.dead&&x.site&&x.owner===0&&x.type===k).length:0;
@@ -122,12 +123,13 @@ export function updatePanel(){
   const pw=$('#power'); pw.textContent=`⚡ ${p.use}/${p.power}`; pw.classList.toggle('low',p.use>p.power);
   $('#popMe').textContent=`${Math.floor(p.pop)}/${p.cap}`;
   { const h=p.happy??0.8, el=$('#happy'); el.textContent=`${h>=0.75?'😊':h>=0.5?'😐':h>=0.35?'😟':'😠'} ${Math.round(h*100)} %`; el.classList.toggle('low',h<0.5); }
-  const goalMe=G.mode==='race'?ECON.target:nextMilestone(p.pop), goalAi=G.mode==='race'?ECON.target:nextMilestone(A.pop);
+  const goalMe=G.mode==='race'?ECON.target:nextMilestone(p.pop);
   $('#popMeBar').style.width=Math.min(100,p.pop/goalMe*100)+'%';
-  $('#popAi').textContent=G.known[0][1]?String(Math.floor(A.pop)):'???';
-  $('#popAiBar').style.width=G.known[0][1]?Math.min(100,A.pop/goalAi*100)+'%':'0';
-  $('#popAiBar').closest('.pb').querySelector('.nm').textContent=G.known[0][1]?'👥 Kastrova':'👥 ???';
-  const st=$('#stance'); st.textContent=!G.known[0][1]?'unbekannt':G.war?'⚔ Krieg':'Frieden'; st.style.background=!G.known[0][1]?'#3a3a34':G.war?'#7a2219':'#2a4f7a';
+  for(const pid of AIS){ const A=G.players[pid], k=G.known[0][pid], dead=G.beaten&&G.beaten[pid], goalAi=G.mode==='race'?ECON.target:nextMilestone(A.pop);
+    $('#popAi'+pid).textContent=k?(dead?'besiegt':String(Math.floor(A.pop))):'???';
+    $('#popAi'+pid+'Bar').style.width=k&&!dead?Math.min(100,A.pop/goalAi*100)+'%':'0';
+    $('#popAi'+pid+'Bar').closest('.pb').querySelector('.nm').textContent=k?'👥 '+A.short:'👥 ???';
+    const st=$('#stance'+pid), w=atWar(0,pid); st.textContent=!k?'unbekannt':dead?'🏳':w?'⚔ Krieg':'Frieden'; st.style.background=!k||dead?'#3a3a34':w?'#7a2219':'#2a4f7a'; }
 }
 
 export function init(){

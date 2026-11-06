@@ -1,5 +1,5 @@
 import { dist } from '../core/util';
-import { CONSTRUCTION, FIRE, FOREST, MAP_H, MAP_W, T, lvlMul } from '../data/config';
+import { MAJORS, isMajor, CONSTRUCTION, FIRE, FOREST, MAP_H, MAP_W, T, lvlMul } from '../data/config';
 import { idx, inMap } from '../core/util';
 import { fieldTileFree, works } from '../sim/build';
 import { ignite, touching } from '../sim/combat';
@@ -16,7 +16,7 @@ import { funCoverage } from '../sim/devplan';
 const station = b => b.def.fireR && !b.dead && !b.site && !b.contam;
 /** liegt das Gebäude im Schutzbereich einer eigenen Feuerwache? */
 export function covered(b){ for(const s of G.buildings) if(s.owner===b.owner&&station(s)&&dist(s.x,s.y,b.x,b.y)<=s.def.fireR*(1+0.25*((s.lvl||1)-1))) return true; return false; }
-const burnable = b => !b.dead && !b.def.def && b.type!=='bunker' && b.type!=='camp' && b.owner<2;
+const burnable = b => !b.dead && !b.def.def && b.type!=='bunker' && b.type!=='camp' && isMajor(b.owner);
 /** Anteil der eigenen Gebäude im Schutz einer Feuerwache */
 export function fireCoverage(pid){ const own=G.buildings.filter(b=>burnable(b)&&!b.site&&b.owner===pid); if(!own.length) return 1;
   return own.filter(b=>b.fireCov).length/own.length; }
@@ -40,8 +40,8 @@ export function updateCity(dt){
   updateForest();
   const st=G.buildings.filter(station);
   for(const b of G.buildings) if(burnable(b)) b.fireCov=st.some(s=>s.owner===b.owner&&dist(s.x,s.y,b.x,b.y)<=s.def.fireR*(1+0.25*((s.lvl||1)-1)));
-  G.funCov=[funCoverage(0),funCoverage(1)];
-  for(const pid of [0,1]){ const p=G.players[pid]; if(p.pop<FIRE.minPop) continue;
+  G.funCov=[]; for(const pid of MAJORS) G.funCov[pid]=funCoverage(pid);
+  for(const pid of MAJORS){ const p=G.players[pid]; if(p.pop<FIRE.minPop) continue;
     const k=Math.min(2,p.pop/1000);   // größere Städte: mehr Brandgefahr
     for(const b of G.buildings){ if(!burnable(b)||b.owner!==pid||b.site||b.fire>0) continue;
       const pre=FIRE.outbreak*(1+k)*4*(b.fireCov?FIRE.stationOutbreak:1); if(Math.random()>=pre) continue;   // grobe Vorauswahl, dann Nachbarn zählen

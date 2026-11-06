@@ -1,8 +1,8 @@
 import { idx, inMap } from '../core/util';
-import { CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
-import { findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
+import { anyWar, atWar, findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
 import { canPlaceRoad, clearForest, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
 import { joinGroup } from '../sim/reinforce';
@@ -29,7 +29,7 @@ export function missingReq(pid,type){
   return miss;
 }
 /** Notstand: Stadt kürzlich angegriffen oder Krieg */
-export const emergency = pid => G.war&&pid<2 || !!(G.players[pid].lastAttack&&G.t-G.players[pid].lastAttack.t<EMERGENCY.window);
+export const emergency = pid => isMajor(pid)&&anyWar(pid) || !!(G.players[pid].lastAttack&&G.t-G.players[pid].lastAttack.t<EMERGENCY.window);
 export const available=(pid,type)=>missingReq(pid,type).length===0;
 export function enqueue(pid,type){
   const p=G.players[pid], qn=queueName(type), q=p.q[qn]; if(!q) return false;
@@ -59,10 +59,10 @@ export function updateProduction(pid,dt){
       if(qn==='research'){ const R=RESEARCH[it.type]; q.shift(); p.done=p.done||{}; p.done[it.type]=true; if(R.level) p.tech=Math.max(p.tech,R.level);
         const what=R.level?`Stufe ${R.level}: ${TECH_UNLOCKS[R.level]}`:`${R.name}: ${R.desc}`;
         if(pid===0) msg(`${R.icon||'🎓'} Erforscht – ${what}.`,'#9fd88a');
-        else if(G.known[0][1]&&(R.level||it.type==='bomb'||it.type==='ai'||it.type==='physics')) msg(it.type==='bomb'?'☢ Geheimdienst: Kastrova betreibt ein Atomwaffenprogramm!':`Geheimdienst: Kastrova hat „${R.name}“ erforscht.`,it.type==='bomb'?'#ff8a7a':'#d6b45a'); }
+        else if(isMajor(pid)&&G.known[0][pid]&&(R.level||it.type==='bomb'||it.type==='ai'||it.type==='physics')) msg(it.type==='bomb'?`☢ Geheimdienst: ${p.short} betreibt ein Atomwaffenprogramm!`:`Geheimdienst: ${p.short} hat „${R.name}“ erforscht.`,it.type==='bomb'?'#ff8a7a':'#d6b45a'); }
       else if(UNITS[it.type].stored){ q.shift(); p.nukes=(p.nukes||0)+1;
-        if(pid===0) msg('☢ Eine Atomrakete ist einsatzbereit. Schon ihr Besitz schreckt Kastrova ab.','#ffd36a');
-        else if(G.known[0][1]) msg('☢☢ Geheimdienst: Kastrova besitzt jetzt eine Atomrakete!','#ff8a7a'); }
+        if(pid===0) msg('☢ Eine Atomrakete ist einsatzbereit. Schon ihr Besitz schreckt die anderen Mächte ab.','#ffd36a');
+        else if(G.known[0][pid]) msg(`☢☢ Geheimdienst: ${p.short} besitzt jetzt eine Atomrakete!`,'#ff8a7a'); }
       else { const nu=spawnUnit(pid,it.type,producer); if(nu){ q.shift(); if(it.grp) joinGroup(nu,it); } else it.t=it.time; }   // Ersatz stößt zum Verband
     }
   }

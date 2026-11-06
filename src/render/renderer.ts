@@ -1,4 +1,4 @@
-import { renderTerrain, repaintTile } from './terrain';
+import { drawTerrain, drawWaterAnim, renderTerrain, repaintTile } from './terrain';
 import { dist, hash, idx, inMap } from '../core/util';
 import { capOf, AIR, BANDITS, DEPOSIT, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
@@ -40,15 +40,33 @@ function drawRanges(c,sel){
       if(best) ring(best.x,best.y,R,'rgba(170,140,255,.7)',true,`Funkreichweite ${R}`); }
   }
 }
+/** weicher Schlagschatten (Sonne von links oben) */
+function softShadow(c,b){ const px=b.tx*TILE, py=b.ty*TILE, W=b.w*TILE, H=b.h*TILE, d=b.type==='wall'?3:6+Math.min(b.w,b.h)*2;
+  c.fillStyle='rgba(8,12,4,.13)'; c.fillRect(px+d*0.6,py+d*0.75,W,H); c.fillStyle='rgba(8,12,4,.09)'; c.fillRect(px+d,py+d*1.2,W+1,H+1); }
+/** Licht von links oben, Schatten rechts unten – macht flache Gebäude plastisch */
+function sunLight(c,b){ const px=b.tx*TILE, py=b.ty*TILE, W=b.w*TILE, H=b.h*TILE;
+  const g=c.createLinearGradient(px,py,px+W,py+H); g.addColorStop(0,'rgba(255,248,225,.16)'); g.addColorStop(0.45,'rgba(255,248,225,0)'); g.addColorStop(1,'rgba(0,0,0,.18)');
+  c.fillStyle=g; c.fillRect(px+1,py+1,W-2,H-2); }
+/** Nebel des Krieges: ein Bildpunkt je Feld, geglättet hochskaliert -> weiche Ränder */
+let fogCv=null, fogT=-1;
+function drawFog(c){
+  if(!fogCv||fogCv.width!==MAP_W){ fogCv=document.createElement('canvas'); fogCv.width=MAP_W; fogCv.height=MAP_H; fogT=-1; }
+  const now=performance.now();
+  if(now-fogT>200){ fogT=now; const g=fogCv.getContext('2d'), im=g.createImageData(MAP_W,MAP_H), v=G.vis;
+    for(let i=0;i<v.length;i++){ const k=i*4; im.data[k]=7; im.data[k+1]=9; im.data[k+2]=5; im.data[k+3]=v[i]===2?0:v[i]===1?128:246; }
+    g.putImageData(im,0,0); }
+  c.save(); c.imageSmoothingEnabled=true; c.drawImage(fogCv,0,0,MAP_W,MAP_H,0,0,MAP_W*TILE,MAP_H*TILE); c.restore();
+}
 export function render(){
   const c=ctx; c.setTransform(1,0,0,1,0,0); c.fillStyle='#14170f'; c.fillRect(0,0,cv.width,cv.height);
   if(!G) return;
   if(!G.terrCanvas){ renderTerrain(); G.terrChanged.length=0; }   // Gelände wird einmal pro Karte vorgezeichnet
   while(G.terrChanged.length) repaintTile(G.terrChanged.pop());
   const z=cam.zoom*dpr; c.setTransform(z,0,0,z,-cam.x*z,-cam.y*z);
-  c.drawImage(G.terrCanvas,0,0);
   const vx0=cam.x/TILE, vy0=cam.y/TILE, vx1=vx0+VW/cam.zoom/TILE, vy1=vy0+VH/cam.zoom/TILE;
   const tx0=Math.max(0,Math.floor(vx0)), ty0=Math.max(0,Math.floor(vy0)), tx1=Math.min(MAP_W-1,Math.ceil(vx1)), ty1=Math.min(MAP_H-1,Math.ceil(vy1));
+  drawTerrain(c,vx0,vy0,vx1,vy1,z);
+  if(z>=0.6) drawWaterAnim(c,tx0,ty0,tx1,ty1,performance.now()/1000);
   const vis=(x,y,m=2)=>x>vx0-m&&x<vx1+m&&y>vy0-m&&y<vy1+m;
   for(const s of G.scorch){ if(!vis(s.x,s.y)) continue; const a=Math.max(0,1-(G.t-s.t)/90)*0.45; if(a<=0) continue;
     c.fillStyle=`rgba(25,20,12,${a})`; c.beginPath(); c.arc(s.x*TILE,s.y*TILE,s.r*TILE,0,7); c.fill(); }
@@ -125,7 +143,7 @@ export function render(){
     const k=Math.min(1,(G.t-b.born)/0.4);
     c.save(); if(k<1){c.translate(b.x*TILE,b.y*TILE);c.scale(0.6+0.4*k,0.6+0.4*k);c.translate(-b.x*TILE,-b.y*TILE);c.globalAlpha=0.5+0.5*k;}
     if(b.readyT&&G.t<b.readyT) c.globalAlpha=0.55;
-    if(b.site) drawSite(c,b,f.col,f.dark); else drawBuildingShape(c,b.type,f.col,f.dark,b.tx*TILE,b.ty*TILE,b.w,b.h,b.tur,b.empty,b.lvl||1); c.restore();
+    if(b.site) drawSite(c,b,f.col,f.dark); else { softShadow(c,b); drawBuildingShape(c,b.type,f.col,f.dark,b.tx*TILE,b.ty*TILE,b.w,b.h,b.tur,b.empty,b.lvl||1); if(b.type!=='wall') sunLight(c,b); } c.restore();
     if((b.lvl||1)>1){ c.fillStyle='#000a'; c.fillRect(b.tx*TILE+2,b.ty*TILE+2,13,11); c.fillStyle='#ffd36a'; c.font='bold 9px sans-serif'; c.fillText(b.lvl===2?'II':'III',b.tx*TILE+(b.lvl===2?5:3.5),b.ty*TILE+11); }   // Ausbaustufe
     if(b.upg){ c.strokeStyle='#d8c040'; c.lineWidth=1; c.setLineDash([3,3]); c.strokeRect(b.tx*TILE+2,b.ty*TILE+2,b.w*TILE-4,b.h*TILE-4); c.setLineDash([]);   // Gerüst
       c.fillStyle='#000a'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-11,b.w*TILE-8,4); c.fillStyle='#d8c040'; c.fillRect(b.tx*TILE+4,b.ty*TILE+b.h*TILE-11,(b.w*TILE-8)*b.upg.t/b.upg.time,4); }
@@ -170,8 +188,7 @@ export function render(){
     else if(e.k==='marker'){c.strokeStyle=e.col;c.globalAlpha=1-k;c.lineWidth=2;c.beginPath();c.arc(e.x*TILE,e.y*TILE,12*(1-k)+3,0,7);c.stroke();c.globalAlpha=1;}
     else if(e.k==='loot'){c.globalAlpha=Math.min(1,(1-k)*2);c.font='bold 13px sans-serif';const tw=c.measureText(e.txt).width;c.fillStyle='#000c';c.fillRect(e.x*TILE-tw/2-4,e.y*TILE-30-k*20,tw+8,17);c.fillStyle=e.col;c.fillText(e.txt,e.x*TILE-tw/2,e.y*TILE-17-k*20);c.globalAlpha=1;}
   }
-  if(G.fog){ for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){ const v=G.vis[idx(x,y)]; if(v===2) continue;
-      c.fillStyle=v===0?'rgba(7,9,5,.96)':'rgba(7,9,5,.5)'; c.fillRect(x*TILE-0.5,y*TILE-0.5,TILE+1,TILE+1); } }
+  if(G.fog) drawFog(c);
   for(const e of G.fx){ if(e.age<0||e.k!=='nuke') continue; const k=e.age/e.life, R=e.r*TILE;   // Atompilz: sichtbar auch im Nebel
     if(k<0.12){ c.fillStyle=`rgba(255,255,240,${1-k/0.12})`; c.beginPath(); c.arc(e.x*TILE,e.y*TILE,R*1.6*(k/0.12+0.2),0,7); c.fill(); }
     const g=c.createRadialGradient(e.x*TILE,e.y*TILE,0,e.x*TILE,e.y*TILE,R*(0.3+k*0.9)); g.addColorStop(0,`rgba(255,240,170,${(1-k)*0.95})`); g.addColorStop(0.5,`rgba(255,120,30,${(1-k)*0.8})`); g.addColorStop(1,'rgba(90,40,20,0)');

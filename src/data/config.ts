@@ -6,7 +6,7 @@
    TERRAIN, DAMAGE, DIFFICULTY, ECON, CONSTRUCTION. Neue Einheit = neuer
    Eintrag (+ Zeichnung in render/draw.ts).
    ===================================================================== */
-export const TILE = 32, MAP_W = 96, MAP_H = 96, BUILD_RADIUS = 5, LEASH = 6;
+export const TILE = 32, MAP_W = 144, MAP_H = 144, BUILD_RADIUS = 5, LEASH = 6;
 // Notstand: Bürgerwehr bei Angriff, Beute nur aus passenden Gebäuden
 export const EMERGENCY = {window:120, maxVolunteers:8, disband:150, wageFree:true};
 // Beute beim Zerstören: Geld nur aus Rathaus (Stadtkasse) und Kontor; Betriebe verlieren ihr eigenes Erzeugnis
@@ -276,7 +276,21 @@ export const FACTIONS = [
   {name:'Föderation Kastrova',   short:'Kastrova', leader:'Marschall Varek', col:'#cc4a3c', dark:'#6e1d15'},
   {name:'Grenzmiliz von Belgor', short:'Miliz',    leader:'Hauptmann Dorin', col:'#c9a640', dark:'#6a5317'},
   {name:'Räuberbanden',          short:'Räuber',   leader:'–',               col:'#8a8a82', dark:'#3a3a34'},
+  {name:'Handelsbund Veloria',   short:'Veloria',  leader:'Kanzlerin Mirela', col:'#3fae7a', dark:'#145236'},
 ];
+// Großmächte (Städte mit Wirtschaft) und die KI-Mächte darunter. Miliz (2) und Räuber (3) sind Nebenparteien.
+export const MAJORS = [0,1,4], AIS = [1,4];
+export const isMajor = (p:number) => p===0||p===1||p===4;
+export const isAI = (p:number) => p===1||p===4;
+// Charakter der KI-Mächte: Kastrova ist eine Militärmacht, Veloria eine Handelsmacht
+export const AI_CHAR = {
+  1: {key:'militar', label:'Militärmacht', aggr:1.1, army:1.2, trade:0.7, gifts:1.0, defense:1.0, peace:0,   say:{
+      war:'„Ihr habt es so gewollt. Kastrova holt sich, was es braucht.“', talk:'„Der Krieg kostet beide Seiten. Wir könnten reden – zu unseren Bedingungen.“', lose:'„… Vielleicht war dieser Krieg ein Fehler.“',
+      lead:'„Ihr wachst zu schnell. Das beobachten wir mit großer Sorge.“', need:'„Unsere Vorräte sind knapp. Ein guter Nachbar würde helfen.“', friend:'„Ein verlässlicher Nachbar. So soll es bleiben.“', base:'„Kastrova wünscht Frieden – solange er uns nützt.“'}},
+  4: {key:'handel',  label:'Handelsmacht', aggr:0.7, army:0.9, trade:1.4, gifts:1.4, defense:1.4, peace:0.6, say:{
+      war:'„Krieg ist schlecht fürs Geschäft – aber wir können ihn uns leisten.“', talk:'„Jeder Tag Krieg kostet. Lasst uns rechnen statt schießen.“', lose:'„Genug. Veloria will Frieden – nennt Euren Preis.“',
+      lead:'„Euer Wachstum beunruhigt den Rat. Wir rüsten nur zur Vorsicht.“', need:'„Die Lager sind leer. Wer liefert, wird gut bezahlt.“', friend:'„Ein Handelspartner, wie wir ihn uns wünschen.“', base:'„Veloria handelt mit jedem, der zahlt.“'}},
+};
 // ---------- Einsätze ----------
 export const MISSION = {
   digTime: 6,           // Sekunden, bis sich Truppen in Stellung eingegraben haben
@@ -315,7 +329,9 @@ export const DRONE = {
 };
 // ---------- Räuber ----------
 export const BANDITS = {
-  camps: [[9,13],[15,27],[26,40],[3,36]],   // Lager im Entwurfsmaß (64er-Karte, Aldoria-Seite), werden gespiegelt
+  camps: [[8,86],[50,100]],   // Lager am Rand jeder Stadt (Aldoria-Seite, wird für jede Macht gespiegelt)
+  campsA: [[14,36]],          // in der Wildnis zwischen Aldoria und Kastrova
+  campsB: [[58,136]],         // an den Flussgrenzen zwischen Nachbarn
   guard: 3,             // Räuber je Lager zu Beginn
   max: 6,               // höchstens so viele je Lager (wächst mit der Zeit)
   spawn: 35,            // Sekunden bis Nachschub
@@ -338,7 +354,7 @@ export const DIFFICULTY = {
 export const AI_MIX2 = ['tel','swarm','jet','amphib','para'];   // Spätzeit-Waffen der KI, sobald erforscht
 export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','spaag','drone','apc','ifv','at','jammer','mlrs','reaper','drone','mbt'];
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
-// Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt. Der fünfte ist normal.
+// Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt, Veloria dazwischen.
 export const REGION = {
   res:     ['food','wood','stone','metal','oil'],
   scarce:  {food:'kaum grüne Wiesen (Höfe auf karger Steppe)', wood:'kaum Wald in Stadtnähe', stone:'keine Felsen in Stadtnähe', metal:'kaum Erz in Stadtnähe', oil:'keine Ölfelder in Stadtnähe'},

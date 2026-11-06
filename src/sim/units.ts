@@ -1,9 +1,9 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
+import { isMajor, mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
-import { detected, hostile, nearestPassable, passable, tileCost } from '../sim/world';
+import { detected, hostile, nearestPassable, passable, tileCost, visOf } from '../sim/world';
 import { msg } from '../core/events';
 import { updateRider } from '../sim/transport';
 import { updateWorker } from '../sim/build';
@@ -141,7 +141,7 @@ function updateDroneDuty(u,home){
       else { u.mode='idle'; u.guard={x:u.x,y:u.y}; } }
     return; }
   if(u.mode==='patrol'&&(!u.path||u.pathI>=u.path.length)){   // nächster Wegpunkt: bevorzugt Unerforschtes bzw. gerade nicht Gesehenes
-    const vis=u.owner===0?G.vis:G.vis1, A=u.patrolArea; let best=null,bs=-1e9;
+    const vis=visOf(u.owner), A=u.patrolArea; let best=null,bs=-1e9;
     for(let k=0;k<10;k++){ const a=Math.random()*6.283, rr=A?Math.sqrt(Math.random())*A.r:0;
       const x=A?Math.max(1,Math.min(MAP_W-1,A.x+Math.cos(a)*rr)):2+Math.random()*(MAP_W-4), y=A?Math.max(1,Math.min(MAP_H-1,A.y+Math.sin(a)*rr)):2+Math.random()*(MAP_H-4), i=Math.floor(y)*MAP_W+Math.floor(x);
       const v=vis?vis[i]:1, s=(v===0?30:v===1?12:0)+Math.min(dist(u.x,u.y,x,y),30)*0.4+Math.random()*5; if(s>bs){bs=s;best={x,y};} }
@@ -152,7 +152,7 @@ export function updateBuilding(b,dt){
   // Selbstreparatur, wenn längere Zeit kein Beschuss
   if(b.fire>0){ updateFire(b,dt); if(b.dead) return; }
   if(b.site) return;   // Baustelle: Zustand wächst mit dem Baufortschritt
-  if(b.owner<2&&b.hp<b.maxHp&&G.t-(b.lastHit||-99)>12) b.hp=Math.min(b.maxHp,b.hp+b.maxHp*0.012*dt);
+  if(isMajor(b.owner)&&b.hp<b.maxHp&&G.t-(b.lastHit||-99)>12) b.hp=Math.min(b.maxHp,b.hp+b.maxHp*0.012*dt);
   const w=b.def.weapon; if(!w) return;
   if(b.readyT&&G.t<b.readyT) return;   // im Bau
   b.cd-=dt;

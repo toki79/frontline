@@ -1,4 +1,4 @@
-import { DEV, FUN, UPGRADES, lvlOf, nextUpgrade } from '../data/config';
+import { AIS, MAJORS, isAI, DEV, FUN, UPGRADES, lvlOf, nextUpgrade } from '../data/config';
 import { startUpgrade, upgradeBlock, upgradeEffect } from '../sim/build';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -13,7 +13,7 @@ import { msg } from '../core/events';
 export function devOf(pid){
   G.dev=G.dev||{};
   if(!G.dev[pid]){ G.dev[pid]=JSON.parse(JSON.stringify(DEV.defaults));
-    if(pid===1){ Object.assign(G.dev[1].prio,{wohnen:2, nahrung:2, militaer:1}); G.dev[1].release={money:0.3, wood:0.5, stone:0.5, metal:0.3}; } }
+    if(isAI(pid)){ Object.assign(G.dev[pid].prio,{wohnen:2, nahrung:2, militaer:1}); G.dev[pid].release={money:0.3, wood:0.5, stone:0.5, metal:0.3}; } }
   return G.dev[pid];
 }
 export const catOf = type => Object.keys(DEV.cats).find(c=>DEV.cats[c].types.includes(type));
@@ -46,4 +46,4 @@ export function devThink(pid){
   if(best){ const U=nextUpgrade(best); if(startUpgrade(pid,best)){ best.autoUp=true;
     if(pid===0) msg(`🏙 Die Bürger bauen aus: ${best.def.name.replace(/­/g,'')} → ${U.name} (${upgradeEffect(best.type,U)}).`,'#9fd88a'); } }
 }
-export function updateDev(dt){ G.devT=(G.devT||0)-dt; if(G.devT>0) return; G.devT=DEV.think; for(const pid of [0,1]) devThink(pid); }
+export function updateDev(dt){ G.devT=(G.devT||0)-dt; if(G.devT>0) return; G.devT=DEV.think; for(const pid of MAJORS) devThink(pid); }

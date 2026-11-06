@@ -12,15 +12,29 @@ import { msg } from '../core/events';
 const KEY = (s: string) => 'frontlinie.save.'+s, MKEY = (s: string) => 'frontlinie.meta.'+s;
 export const SLOTS = ['1','2','3'];
 function meta(slot: string){ try{ const m=localStorage.getItem(MKEY(slot)); return m?JSON.parse(m):null; }catch(e){ return null; } }
-export function saveTo(slot: string, quiet=false){
+/* Spielstände werden mit gzip gepackt (CompressionStream) – die große Karte passt sonst kaum in den Browser-Speicher */
+const canGz = typeof CompressionStream!=='undefined';
+async function pack(str: string){
+  if(!canGz) return str;
+  const buf=await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer(), b=new Uint8Array(buf);
+  let s=''; for(let i=0;i<b.length;i+=0x8000) s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000) as any);
+  return 'gz:'+btoa(s);
+}
+async function unpack(s: string){
+  if(!s.startsWith('gz:')) return s;
+  const bin=atob(s.slice(3)), b=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i);
+  return await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+export async function saveTo(slot: string, quiet=false){
   if(!G||G.over) return false;
-  try{ localStorage.setItem(KEY(slot),serialize()); localStorage.setItem(MKEY(slot),JSON.stringify(saveMeta()));
-    if(!quiet) msg(`💾 Spielstand gespeichert (${slot==='auto'?'automatisch':'Platz '+slot}).`,'#9fd88a'); return true; }
+  try{ const raw=serialize(), m=JSON.stringify(saveMeta()), data=await pack(raw);   // Stand sofort festhalten, dann packen
+    localStorage.setItem(KEY(slot),data); localStorage.setItem(MKEY(slot),m);
+    if(!quiet) msg(`💾 Spielstand gespeichert (${slot==='auto'?'automatisch':'Platz '+slot}, ${Math.max(1,Math.round(data.length/1024))} KB).`,'#9fd88a'); return true; }
   catch(e){ if(!quiet) msg('⚠ Speichern fehlgeschlagen – der Browser-Speicher ist voll oder gesperrt.','#ff8a7a'); return false; }
 }
-export function loadFrom(slot: string){
+export async function loadFrom(slot: string){
   const s=localStorage.getItem(KEY(slot)); if(!s) return false;
-  try{ loadGame(s); }catch(e){ msg('⚠ Spielstand konnte nicht geladen werden: '+e.message,'#ff8a7a'); return false; }
+  try{ loadGame(await unpack(s)); }catch(e){ msg('⚠ Spielstand konnte nicht geladen werden: '+e.message,'#ff8a7a'); return false; }
   $('#log').innerHTML='';
   const hq=findBuilding(0,'hq')||G.buildings.find(b=>b.owner===0)||{x:20,y:70};
   cam.zoom=VW<700?0.85:1; centerOn(hq.x,hq.y); setTab('bau');
@@ -38,8 +52,8 @@ export function renderSaves(){
 }
 export function init(onLoaded: ()=>void){
   $('#saves').addEventListener('click',e=>{ const b=(e.target as HTMLElement).closest('button') as HTMLButtonElement; if(!b||b.disabled) return;
-    if(b.dataset.save){ saveTo(b.dataset.save); renderSaves(); }
-    else if(b.dataset.load&&loadFrom(b.dataset.load)) onLoaded(); });
+    if(b.dataset.save){ saveTo(b.dataset.save).then(renderSaves); }
+    else if(b.dataset.load) loadFrom(b.dataset.load).then(ok=>{ if(ok) onLoaded(); }); });
   renderSaves();
 }
 /** aus der Hauptschleife: alle 60 Spielsekunden automatisch speichern */

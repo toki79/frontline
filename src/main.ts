@@ -26,16 +26,20 @@ let last = performance.now();
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (G && !G.paused && !G.over) {
-    // Tastatur-Scrollen (Pfeiltasten)
-    const k = input.keys, sp = 700 * dt / cam.zoom;
+    // Scrollen: Pfeiltasten oder Maus am Bildschirmrand (nur über der Karte, nicht beim Ziehen)
+    const k = input.keys, sp = 700 * dt / cam.zoom, m = input.mouse, E = 6;
     if (k.has('arrowup')) cam.y -= sp; if (k.has('arrowdown')) cam.y += sp;
     if (k.has('arrowleft')) cam.x -= sp; if (k.has('arrowright')) cam.x += sp;
+    if (m && m.on && !input.drag && document.hasFocus()) {
+      if (m.x <= E) cam.x -= sp; if (m.x >= innerWidth - 1 - E) cam.x += sp;
+      if (m.y <= E) cam.y -= sp; if (m.y >= innerHeight - 1 - E) cam.y += sp;
+    }
     clampCam();
-    update(dt);
+    if (!G.hold) update(dt);
   }
   render();
   if (G) {
-    G.uiT -= dt; if (G.uiT <= 0) { G.uiT = 0.2; updatePanel(); refreshCmds(); }
+    G.uiT -= dt; if (G.uiT <= 0) { G.uiT = 0.2; updatePanel(); refreshCmds(); document.body.classList.toggle('held', !!G.hold && !G.over); }
     G.advT = (G.advT || 0) - dt; if (G.advT <= 0 && !G.paused) { G.advT = 1; updateAdvisor(); }
     G.miniT -= dt; if (G.miniT <= 0) { G.miniT = 0.15; renderMini(); }
     autosave();

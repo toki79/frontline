@@ -1,11 +1,11 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { dugFactor } from '../sim/missions';
-import { coverAt, detected, hostile, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
+import { coverAt, detected, hostile, nameFor0, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { bailOut } from '../sim/transport';
 import { noteLoss } from '../sim/reinforce';
@@ -71,7 +71,7 @@ export function applyDamage(t,dmg,type,src){
   if(t.dead) return;
   let m=DAMAGE[type][t.armor]; if(m===undefined) m=1;
   if(t.kind==='unit'&&t.def.cls==='inf'&&type!=='hellfire') m*=1-coverAt(t.x,t.y);   // Reaper treffen von oben: Deckung hilft nicht
-  if(t.kind==='unit'&&t.owner<2&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
+  if(t.kind==='unit'&&isMajor(t.owner)&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
   if(t.cage&&CAGE[type]) m*=CAGE[type];
   if(src&&src.cmb) m*=1+COMBINED.dmg;   // verbundene Waffen
   if(src&&src.kind==='building'&&src.def&&src.def.def) m*=FORTIFY.dmgOut;   // Stellungen: vorbereitete Schussfelder
@@ -86,10 +86,10 @@ export function applyDamage(t,dmg,type,src){
 }
 export function onAttacked(t,src){
   const v=t.owner, a=src.owner; if(v===a) return;
-  if((v===0&&a===1)||(v===1&&a===0)) G.ai.lastCombat=G.t;
+  if(isMajor(v)&&isMajor(a)){ if(isAI(v)) G.ais[v].lastCombat=G.t; if(isAI(a)) G.ais[a].lastCombat=G.t; }
   if(v===2&&!G.militiaWar[a]){
     G.militiaWar[a]=true; G.attitude[a]=-100; if(G.militiaAlly===a) G.militiaAlly=-1; updateRel();
-    msg(a===0?'Ihr habt die Grenzmiliz angegriffen – sie erklärt euch den Krieg!':'Kastrova hat die Grenzmiliz angegriffen. Die Miliz kämpft jetzt gegen Kastrova.', a===0?'#ff8a7a':'#d6b45a');
+    if(a===0) msg('Ihr habt die Grenzmiliz angegriffen – sie erklärt euch den Krieg!','#ff8a7a'); else if(G.known[0][a]) msg(`${G.players[a].short} hat die Grenzmiliz angegriffen. Die Miliz kämpft jetzt gegen ${G.players[a].short}.`,'#d6b45a');
   } else if(v===2) G.attitude[a]=Math.max(-100,G.attitude[a]-0.5);
   if(t.kind==='unit'&&t.def.weapon&&!t.target&&t.mode!=='move'&&hostile(v,a)&&!src.dead) t.target=src;
   G.players[v].lastAttack={t:G.t,x:t.x,y:t.y};
@@ -122,7 +122,7 @@ export function loot(e,src){
   const txt=keys.map(k=>`+${got[k]} ${RES[k].icon}`).join(' ');
   if(ko===0){ G.stats.loot+=keys.reduce((s,k)=>s+got[k],0); msg('Beute: '+txt,'#9fd88a'); }
   else if(vo===0) msg(`${G.players[ko].short} erbeutet: ${txt}`,'#ff8a7a');
-  if(ko===1) G.ai.lootSince+=keys.reduce((s,k)=>s+got[k],0);
+  if(isAI(ko)) G.ais[ko].lootSince+=keys.reduce((s,k)=>s+got[k],0);
   fxAdd({k:'loot',x:e.x,y:e.y,txt,col:ko===0?'#9fd88a':'#ff9a8a',life:2.2});
 }
 export function destroy(e,src){
@@ -137,13 +137,13 @@ export function destroy(e,src){
     for(const n of touching(e)) ignite(n);   // Feuer springt auf direkt angrenzende Gebäude über
     if(e.type==='npp'&&!e.site){ msg('☢ Kernschmelze! Das zerstörte Kernkraftwerk verstrahlt die Umgebung.','#ff5a4a'); const M=NUKE.meltdown; blast(e.x,e.y,M.radius,M.dmg,M.fallout,null); }
     // Bewohner fliehen, wenn Wohnraum zerstört wird
-    if(e.def.cap&&e.owner<2){ const V=G.players[e.owner], lost=Math.floor(Math.min(Math.max(0,V.pop-ECON.minPop),capOf(e)*0.5));
-      if(lost>0){ V.pop-=lost; if(e.owner===0) msg(`−${lost} Einwohner sind geflohen.`,'#ff8a7a'); else if(src&&src.owner===0) msg(`Kastrova verliert ${lost} Einwohner.`,'#9fd88a'); } }
+    if(e.def.cap&&isMajor(e.owner)){ const V=G.players[e.owner], lost=Math.floor(Math.min(Math.max(0,V.pop-ECON.minPop),capOf(e)*0.5));
+      if(lost>0){ V.pop-=lost; if(e.owner===0) msg(`−${lost} Einwohner sind geflohen.`,'#ff8a7a'); else if(src&&src.owner===0) msg(`${G.players[e.owner].short} verliert ${lost} Einwohner.`,'#9fd88a'); } }
     if(e.owner===0&&e.type!=='wall') msg((e.site?'Baustelle verloren: ':'Gebäude verloren: ')+e.def.name,'#ff8a7a');
-    if(e.owner===1&&src&&src.owner===0&&e.type!=='wall') msg('Feindliches Gebäude zerstört: '+e.def.name,'#9fd88a');
+    if(isAI(e.owner)&&src&&src.owner===0&&e.type!=='wall') msg('Feindliches Gebäude zerstört: '+e.def.name,'#9fd88a');
     if(e.type==='bunker') msg('Der Milizbunker ist gefallen – der Markt ist geschlossen.','#d6b45a');
     if(e.type==='camp'&&src&&src.owner===0) msg('🏴 Räuberlager ausgehoben! Die Gegend ist jetzt sicherer.','#9fd88a');
-    if(e.type==='camp'&&src&&src.owner===1) msg('Kastrova hat ein Räuberlager ausgehoben.','#d6b45a');
+    if(e.type==='camp'&&src&&isAI(src.owner)&&G.known[0][src.owner]) msg(`${G.players[src.owner].short} hat ein Räuberlager ausgehoben.`,'#d6b45a');
     checkVictory();
   } else {
     const big=e.def.cls==='veh'; if(e.def.cls==='air') fxAdd({k:'boom',x:e.x,y:e.y,r:0.3,life:0.3});
@@ -178,8 +178,11 @@ export function updateFire(b,dt){
 export function checkVictory(){
   if(G.over) return;
   const civ=pid=>G.buildings.filter(b=>!b.dead&&b.owner===pid&&!b.def.def).length;
-  if(civ(1)===0) endGame(true,'Kastrova ist militärisch besiegt.');
-  else if(civ(0)===0) endGame(false,'Eure Stadt ist gefallen.');
+  if(civ(0)===0){ endGame(false,'Eure Stadt ist gefallen.'); return; }
+  G.beaten=G.beaten||{};
+  for(const pid of MAJORS) if(pid!==0&&!G.beaten[pid]&&civ(pid)===0){ G.beaten[pid]=true;
+    msg(`🏳 ${nameFor0(pid)} ist besiegt – die Stadt liegt in Trümmern.`,'#ffd36a'); }
+  if(MAJORS.every(pid=>pid===0||G.beaten[pid])) endGame(true,'Alle Rivalen im Tal sind besiegt – Aldoria herrscht über das Tal.');
 }
 export function endGame(win,reason){
   G.over=true; G.result={win,reason};

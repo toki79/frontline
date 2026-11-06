@@ -23,7 +23,7 @@ export function orderDrop(pid,units,x,y){
   for(const u of us){ u.carried=true; u.carrier=f; u.target=null; u.path=null; u.order=null; u.grp=u.grp; }
   G.sel=G.sel.filter(s=>!us.includes(s));
   G.flights=(G.flights||[]).concat([f]);
-  if(pid===1&&G.known[0][1]) msg('🪂 Geheimdienst: Feindliche Transportmaschine im Anflug!','#ff8a7a');
+  if(pid!==0&&hostile(pid,0)&&G.known[0][pid]) msg('🪂 Geheimdienst: Feindliche Transportmaschine im Anflug!','#ff8a7a');
   return us.length;
 }
 export function updateFlights(dt){

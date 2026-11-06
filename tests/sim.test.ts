@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
-import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact } from '../src/sim/world';
+import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar } from '../src/sim/world';
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
@@ -237,7 +237,7 @@ describe('Simulation', () => {
     newGame('mittel');
     const hq = findBuilding(0, 'hq'), x = hq.tx + 8, y = hq.ty - 4, i = idx(x, y);
     G.feat[i] = FEAT.MINE; G.featOwner[i] = 1;
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const drive = (u) => { u.mode = 'move'; u.goal = {x: x + 2.5, y: y + 0.5}; u.path = [{x: x + 0.5, y: y + 0.5}, {x: x + 2.5, y: y + 0.5}]; u.pathI = 0; };
     const inf = spawnAt(1, 'inf', x - 1 + 0.5, y + 0.5); drive(inf);
     run(4); expect(G.feat[i]).toBe(FEAT.MINE);
@@ -258,7 +258,7 @@ describe('Simulation', () => {
 
   it('Tarnung: Hochflieger ohne Radar nicht angreifbar, mit Flak schon', () => {
     newGame('mittel');
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const k = findBuilding(1, 'hq');
     const r = spawnAt(0, 'spy', k.x + 6, k.y + 6); r.mode = 'idle';
     const t = spawnAt(1, 'ifv', k.x + 7, k.y + 6);
@@ -272,7 +272,7 @@ describe('Simulation', () => {
 
   it('Raketenwerfer schießt weit, aber nur auf aufgeklärte Ziele', () => {
     newGame('mittel', false);
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     G.fog = true; G.vis.fill(0);
     const hq = findBuilding(0, 'hq'), mx = hq.tx + 7, my = hq.ty - 5;
     const m = spawnAt(0, 'mlrs', mx + 0.5, my + 0.5), tg = placeBuilding(1, 'house', mx, my - 19, true);
@@ -286,7 +286,7 @@ describe('Simulation', () => {
 
   it('FPV-Drohne: lauert nur, wenn eingestellt', () => {
     newGame('mittel');
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const d = spawnAt(0, 'drone', 30.5, 60.5); d.mode = 'idle'; d.guard = {x:30.5, y:60.5};
     const e = spawnAt(1, 'mbt', 33.5, 60.5); e.mode = 'idle';   // Panzerkanone trifft keine Drohnen
     run(2); expect(d.dead).toBeFalsy();
@@ -326,7 +326,7 @@ describe('Simulation', () => {
 
   it('Räuber-Überfall: Schonfrist, Vorwarnung, Plündern statt Zerstören', () => {
     const msgs: string[] = []; on('msg', (m: string) => msgs.push(m));
-    newGame('mittel'); G.ai.peaceCool = 1e9;
+    newGame('mittel'); G.ais[1].peaceCool = 1e9;
     for (const u of G.units) if (u.owner === 0 && u.def.weapon) u.dead = true;   // ohne Wache
     const c = G.buildings.find(b => b.type === 'camp' && b.x < 48 && b.y > 40);
     const tx = Math.floor(c.x) + 7, ty = Math.floor(c.y) + 7;
@@ -389,7 +389,7 @@ describe('Simulation', () => {
 
   it('Kamikazedrohnen gegen Panzer, Käfig schützt', () => {
     newGame('mittel');
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const hq = findBuilding(1, 'hq');
     const t1 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 8), t2 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 10); t2.cage = true;
     applyDamage(t1, 80, 'drone', {owner:0, dead:true, x:0, y:0}); applyDamage(t2, 80, 'drone', {owner:0, dead:true, x:0, y:0});
@@ -413,7 +413,7 @@ describe('Simulation', () => {
 
   it('Störsender lässt feindliche FPV-Drohnen abstürzen', () => {
     newGame('mittel');
-    setWar(true, 0); G.ai.peaceCool = 1e9;
+    setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const k = findBuilding(1, 'hq');
     noBandits();
     const j = spawnAt(1, 'jammer', k.x + 6, k.y + 6);
@@ -510,7 +510,7 @@ describe('Simulation', () => {
     const ahq = findBuilding(1, 'hq'), aPop = G.players[1].pop;
     expect(launchNuke(0, ahq.x, ahq.y)).toBe(true);
     expect(p.nukes).toBe(0);
-    expect(G.war).toBe(true);
+    expect(atWar(0, 1)).toBe(true);
     expect(runUntil(() => G.fallout.length > 0, 60)).toBe(true);
     expect(ahq.dead).toBeFalsy();                          // Regierungsbunker übersteht den Schlag …
     expect(ahq.hp).toBeLessThanOrEqual(ahq.maxHp * NUKE.hqKeep + 1);   // … schwer beschädigt
@@ -538,8 +538,8 @@ describe('Simulation', () => {
       P.nukes = nuke ? 1 : 0;
       for (let i = 0; i < 8; i++) spawnAt(1, 'mbt', ahq.x + (i % 4) - 2, ahq.y + 3 + Math.floor(i / 4));
       let hostileAct = false;
-      for (let k = 0; k < 40; k++) { P.pop = 400; P.cap = 500; A.pop = 150; G.t = Math.max(G.t, G.diff.grace + 1); G.ai.cool = 0;
-        aiThink(); if (G.war || (G.offer && G.offer.type === 'demand')) { hostileAct = true; break; } G.offer = null; G.t += 5; }
+      for (let k = 0; k < 40; k++) { P.pop = 400; P.cap = 500; A.pop = 150; G.t = Math.max(G.t, G.diff.grace + 1); G.ais[1].cool = 0;
+        aiThink(1); if (atWar(0, 1) || (G.offer && G.offer.type === 'demand')) { hostileAct = true; break; } G.offer = null; G.t += 5; }
       return hostileAct;
     };
     expect(tryIt(false)).toBe(true);
@@ -621,25 +621,25 @@ describe('Simulation', () => {
   });
 
   it('Tribut: Kastrova gibt nur aus Furcht nach – Geld, Dauerzahlung, Land', () => {
-    newGame('mittel'); noBandits(); makeContact(0, 1); makeContact(1, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); makeContact(0, 1); makeContact(1, 0); G.ais[1].peaceCool = 1e9;
     const A = G.players[1], P = G.players[0], hq = findBuilding(0, 'hq');
-    A.res.money = 3000; aiThink();
-    expect(evalTribute('money', 800, false).ok).toBe(false);              // ohne Übermacht keine Furcht
+    A.res.money = 3000; aiThink(1);
+    expect(evalTribute(1, 'money', 800, false).ok).toBe(false);              // ohne Übermacht keine Furcht
     for (let i = 0; i < 14; i++) spawnAt(0, 'mbt', hq.x + 3 + (i % 4), hq.y - 4 - Math.floor(i / 4));
     for (const u of G.units) if (u.owner === 1 && u.def.weapon) u.dead = true;
-    aiThink();
-    expect(evalTribute('money', 300, false).ok).toBe(true);
+    aiThink(1);
+    expect(evalTribute(1, 'money', 300, false).ok).toBe(true);
     const m0 = P.res.money;
-    expect(demandTribute('money', 300, false)).toBe('ok');
+    expect(demandTribute(1, 'money', 300, false)).toBe('ok');
     expect(P.res.money).toBe(m0 + 300);
-    expect(demandTribute('money', 300, false)).toBe('wartet');            // Abkühlzeit
-    G.tribCool = 0; A.res.food = 2000; A.pop = 600; update(0.05);         // Dauerzahlung bemisst sich am Einkommen
-    expect(demandTribute('food', 100, true)).toBe('ok');
+    expect(demandTribute(1, 'money', 300, false)).toBe('wartet');            // Abkühlzeit
+    G.tribCool = {}; A.res.food = 2000; A.pop = 600; update(0.05);         // Dauerzahlung bemisst sich am Einkommen
+    expect(demandTribute(1, 'food', 100, true)).toBe('ok');
     const f0 = P.res.food; run(62);
-    expect(G.tribute && G.tribute.paid).toBeGreaterThan(0);
-    P.nukes = 1; G.tribCool = 0; aiThink();
-    const L = landOffer(); expect(L.length).toBeGreaterThan(0);
-    expect(demandTribute('land', 0, false)).toBe('ok');
+    expect(G.tributes && G.tributes[0] && G.tributes[0].paid).toBeGreaterThan(0);
+    P.nukes = 1; G.tribCool = {}; aiThink(1);
+    const L = landOffer(1); expect(L.length).toBeGreaterThan(0);
+    expect(demandTribute(1, 'land', 0, false)).toBe('ok');
     expect(L.every(b => b.owner === 0)).toBe(true);
     expect(f0).toBeGreaterThan(0);
   });
@@ -661,7 +661,7 @@ describe('Simulation', () => {
   });
 
   it('Reaper: schwer zu treffen, tödlich für Schützen, jagt auf Patrouille', () => {
-    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const r = spawnAt(0, 'reaper', 40, 40); const inf = spawnAt(1, 'inf', 43, 40);
     applyDamage(inf, 70, 'hellfire', r); expect(inf.dead).toBe(true);      // ein Treffer, ein Trupp
     const hp0 = r.hp; applyDamage(r, 24, 'flak', inf); expect(hp0 - r.hp).toBeLessThan(30);
@@ -715,7 +715,7 @@ describe('Simulation', () => {
   });
 
   it('Ballistische Rakete: große Reichweite, Flächenschaden, Flugabwehrraketen fangen ab', () => {
-    newGame('mittel'); noBandits(); G.fog = false; setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); G.fog = false; setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const ahq = findBuilding(1, 'hq');
     const tel = spawnAt(0, 'tel', ahq.x - 30, ahq.y + 4);
     const tgt = placeBuilding(1, 'depot', Math.floor(ahq.x) - 6, Math.floor(ahq.y) + 4, false);
@@ -732,7 +732,7 @@ describe('Simulation', () => {
   });
 
   it('Drohnenschwarm: mehrere Treffer, Störsender wirkungslos', () => {
-    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const hq = findBuilding(0, 'hq'), x = hq.x + 6, y = hq.y - 8;
     const sw = spawnAt(0, 'swarm', x, y);
     const v = [spawnAt(1, 'ifv', x + 3, y), spawnAt(1, 'ifv', x + 3.5, y + 1.2), spawnAt(1, 'jammer', x + 4, y - 1)];
@@ -743,7 +743,7 @@ describe('Simulation', () => {
   });
 
   it('Jagdbomber: Angriff, Rückkehr zum Fliegerhorst, erneuter Anflug; Gleitbomben verlängern die Reichweite', () => {
-    newGame('mittel'); noBandits(); G.fog = false; setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); G.fog = false; setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const p = G.players[0], hq = findBuilding(0, 'hq'), ahq = findBuilding(1, 'hq');
     builtNearHq('airbase'); builtNearHq('power'); builtNearHq('power');
     const jet = spawnAt(0, 'jet', hq.x + 2, hq.y + 2);
@@ -756,7 +756,7 @@ describe('Simulation', () => {
   });
 
   it('Verband: gemeinsames Tempo, verbundene Waffen stärken die Truppe', () => {
-    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const hq = findBuilding(0, 'hq');
     const us = [spawnAt(0, 'inf', hq.x + 4, hq.y - 4), spawnAt(0, 'inf', hq.x + 4.6, hq.y - 4), spawnAt(0, 'mbt', hq.x + 5, hq.y - 5), spawnAt(0, 'spaag', hq.x + 5.5, hq.y - 4)];
     const g = makeGroup(0, us); run(1.5);
@@ -773,7 +773,7 @@ describe('Simulation', () => {
   });
 
   it('Mannschaftstransporter: einsteigen, geschützt fahren, absitzen; zerstört = abspringen', () => {
-    newGame('mittel'); noBandits(); setWar(true, 0); G.ai.peaceCool = 1e9;
+    newGame('mittel'); noBandits(); setWar(0, 1, true, 0); G.ais[1].peaceCool = 1e9;
     const hq = findBuilding(0, 'hq'), apc = spawnAt(0, 'apc', hq.x + 5, hq.y - 5);
     const inf = [spawnAt(0, 'inf', hq.x + 3, hq.y - 4), spawnAt(0, 'inf', hq.x + 3.5, hq.y - 5), spawnAt(0, 'at', hq.x + 4, hq.y - 3)];
     expect(orderBoard(inf, apc)).toBe(3);
@@ -838,6 +838,46 @@ describe('Simulation', () => {
     expect(msgs.some(t => t.includes('Region'))).toBe(true);
   });
 
+  it('Drei Mächte: faire Karte, Wege zwischen allen Städten und zur Insel', () => {
+    newGame('mittel');
+    const hq = [0, 1, 4].map(p => findBuilding(p, 'hq'));
+    expect(hq.every(Boolean)).toBe(true);
+    // Kastrova ist Aldoria an der Diagonale gespiegelt, Veloria waagrecht
+    expect([hq[1].tx, hq[1].ty]).toEqual([hq[0].ty, hq[0].tx]);
+    expect([hq[2].tx, hq[2].ty]).toEqual([MAP_W - 3 - hq[0].tx, hq[0].ty]);
+    // Gelände der Heimatgebiete gespiegelt gleich
+    let same = 0, n = 0; for (let y = 100; y < 140; y++) for (let x = 2; x < 40; x++) { n++; if (G.terr[idx(x, y)] === G.terr[idx(MAP_W - 1 - x, y)] && G.terr[idx(x, y)] === G.terr[idx(y, x)]) same++; }
+    expect(same / n).toBeGreaterThan(0.6);   // Ressourcenprofile unterscheiden sich, das Gelände kaum
+    const bk = findBuilding(2, 'bunker');
+    for (const [a, b] of [[hq[0], hq[1]], [hq[0], hq[2]], [hq[1], hq[2]], [hq[0], bk], [hq[1], bk], [hq[2], bk]])
+      expect(findPath(a.tx + 1, a.ty + 4, b.tx + 1, b.ty + 4, 'veh'), 'Weg fehlt').toBeTruthy();
+    expect(G.buildings.filter(b => b.type === 'camp').length).toBeGreaterThanOrEqual(9);
+  });
+  it('KI gegen KI: Krieg, Forderungen und Frieden unter den Mächten', () => {
+    newGame('mittel'); noBandits();
+    makeContact(1, 4); makeContact(4, 1); makeContact(0, 1); makeContact(0, 4);
+    setWar(1, 4, true, 1);
+    expect(atWar(1, 4)).toBe(true); expect(atWar(0, 1)).toBe(false);
+    expect(G.rel[1][4]).toBe('feind'); expect(G.rel[0][4]).toBe('neutral');
+    aiThink(1); aiThink(4);
+    expect(G.ais[1].foe).toBe(4); expect(G.ais[4].foe).toBe(1);   // Kriegsgegner ist der Rivale
+    // Einheiten verschiedener KI-Mächte bekämpfen sich
+    const h1 = findBuilding(1, 'hq'), u1 = spawnAt(1, 'inf', 70, 100), u4 = spawnAt(4, 'inf', 72, 100);
+    run(8); expect(u1.dead || u4.dead || u1.hp < u1.maxHp || u4.hp < u4.maxHp).toBe(true);
+    setWar(1, 4, false, 4); expect(atWar(1, 4)).toBe(false);
+    // Spieler erklärt Veloria den Krieg – Kastrova bleibt neutral
+    setWar(0, 4, true, 0); expect(atWar(0, 4)).toBe(true); expect(atWar(0, 1)).toBe(false);
+    expect(G.ais[4].att[0]).toBeLessThanOrEqual(-20);
+    expect(h1).toBeTruthy();
+  });
+  it('Sieg erst, wenn alle Rivalen besiegt sind', () => {
+    newGame('mittel'); noBandits();
+    const civ = p => G.buildings.filter(b => !b.dead && b.owner === p && !b.def.def);
+    for (const b of civ(1)) destroy(b, null);
+    run(1); expect(G.over).toBe(false); expect(G.beaten && G.beaten[1]).toBe(true);
+    for (const b of civ(4)) destroy(b, null);
+    run(1); expect(G.over).toBe(true);
+  });
   it('läuft 10 Spielminuten ohne Fehler (Endlos-Modus)', () => {
     newGame('mittel');
     run(600);

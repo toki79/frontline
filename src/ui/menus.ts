@@ -1,5 +1,5 @@
 import { $$ } from './dom';
-import { ECON } from '../data/config';
+import { AIS, ECON } from '../data/config';
 import { G, newGame, setG } from '../sim/state';
 import { on } from '../core/events';
 import { fmt } from '../core/util';
@@ -29,10 +29,10 @@ function showEnd(win:boolean, reason:string){
   const mm=Math.floor(G.t/60), ss=String(Math.floor(G.t%60)).padStart(2,'0');
   $('#endTitle').textContent=win?'SIEG':'NIEDERLAGE';
   $('#endTitle').style.color=win?'#9fd88a':'#ff8a7a';
-  $('#endText').innerHTML=reason+`<br><br>Spielzeit: ${mm}:${ss} · Einwohner: ${Math.floor(G.players[0].pop)} (Kastrova ${Math.floor(G.players[1].pop)})<br>Einheiten gebaut: ${G.stats.built} · verloren: ${G.stats.lost} · Abschüsse: ${G.stats.kills} · Beute: ${fmt(G.stats.loot)}`;
+  $('#endText').innerHTML=reason+`<br><br>Spielzeit: ${mm}:${ss} · Einwohner: ${Math.floor(G.players[0].pop)} (${AIS.map(p=>`${G.players[p].short} ${Math.floor(G.players[p].pop)}`).join(', ')})<br>Einheiten gebaut: ${G.stats.built} · verloren: ${G.stats.lost} · Abschüsse: ${G.stats.kills} · Beute: ${fmt(G.stats.loot)}`;
   $('#end').classList.remove('hidden');
 }
-export function openDiplo(){ if(!G||G.over||G.offer) return; hideTip(); G.paused=true; $('#reply').textContent=''; G.tribLast=null; renderDiplo(); $('#diplo').classList.remove('hidden'); }
+export function openDiplo(){ if(!G||G.over||G.offer) return; hideTip(); G.paused=true; $('#reply').textContent=''; G.tribLast={}; renderDiplo(); $('#diplo').classList.remove('hidden'); }
 
 export function init(){
 on('gameover',showEnd);

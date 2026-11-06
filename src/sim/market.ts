@@ -2,7 +2,7 @@ import { clamp } from '../core/util';
 import { BASEVAL, LOT, REGION } from '../data/config';
 import { G, isRich, isScarce } from '../sim/state';
 import { siteLacks } from '../sim/build';
-import { countBuildings, findBuilding } from '../sim/world';
+import { addAtt, atWar, attOf, countBuildings, findBuilding } from '../sim/world';
 
 /* =====================================================================
    Markt der Miliz
@@ -47,24 +47,24 @@ export function needLevel(pid,res){
   if(isScarce(pid,res)) n+=0.6; if(isRich(pid,res)) n-=0.6;
   return clamp(n,-1.5,2.5);
 }
-// Kastrovas Anfragen am Markt: kauft, was knapp ist (teuer bei Not), verkauft Überschuss (günstiger, je größer er ist)
-export function aiQuotes(){
-  const out=[], A=G.players[1], att=1+clamp(G.aiAtt,-50,50)/500;
-  for(const r of REGION.res){ const n=needLevel(1,r), base=BASEVAL[r]*LOT[r];
+// Anfragen einer KI-Macht: kauft, was knapp ist (teuer bei Not), verkauft Überschuss (günstiger, je größer er ist)
+export function aiQuotes(pid=1){
+  const out=[], A=G.players[pid], att=1+clamp(attOf(pid,0),-50,50)/500;
+  for(const r of REGION.res){ const n=needLevel(pid,r), base=BASEVAL[r]*LOT[r];
     if(n>=0.6) out.push({side:'buy',res:r,amt:LOT[r],n,urgent:n>=1.5,price:Math.max(5,Math.round(base*(0.9+0.55*n)*att/5)*5)});
     else if(n<=-0.5&&A.res[r]>=LOT[r]*2) out.push({side:'sell',res:r,amt:LOT[r],n,price:Math.max(5,Math.round(base*(1.25+0.25*n)/att/5)*5)});
   }
   return out;
 }
-export function tradeAI(side,res){
-  if(G.war) return 'krieg';
-  if(!G.known[0][1]) return 'kein';
-  const q=aiQuotes().find(q=>q.side===side&&q.res===res); if(!q) return 'kein';
-  const P=G.players[0], A=G.players[1];
+export function tradeAI(pid,side,res){
+  if(atWar(0,pid)) return 'krieg';
+  if(!G.known[0][pid]) return 'kein';
+  const q=aiQuotes(pid).find(q=>q.side===side&&q.res===res); if(!q) return 'kein';
+  const P=G.players[0], A=G.players[pid];
   if(side==='buy'){ if(P.res[res]<q.amt) return 'arm'; if(A.res.money<q.price) return 'pleite';
-    P.res[res]-=q.amt; A.res[res]+=q.amt; A.res.money-=q.price; P.res.money+=q.price; G.aiAtt=Math.min(100,G.aiAtt+(q.urgent?6:3)); }
+    P.res[res]-=q.amt; A.res[res]+=q.amt; A.res.money-=q.price; P.res.money+=q.price; addAtt(pid,0,q.urgent?6:3); }
   else { if(P.res.money<q.price) return 'arm';
-    P.res.money-=q.price; A.res.money+=q.price; A.res[res]-=q.amt; P.res[res]+=q.amt; G.aiAtt=Math.min(100,G.aiAtt+2); }
-  G.ai.tradedT=G.t; return 'ok';
+    P.res.money-=q.price; A.res.money+=q.price; A.res[res]-=q.amt; P.res[res]+=q.amt; addAtt(pid,0,2); }
+  const ai=G.ais[pid]; (ai.tradedBy=ai.tradedBy||{})[0]=G.t; return 'ok';
 }
 export function marketTrend(key){ const f=priceFactor(key), t=TRADES[key]; if(t.sell) return f<0.6?' 📉 Markt gesättigt':f<0.95?' ↘':''; return f>1.4?' 📈 knapp':f>1.05?' ↗':''; }

@@ -12,7 +12,7 @@ import type { Game } from './types';
    • def (Spielwerte) wird nicht gespeichert, sondern aus config.ts ergänzt –
      so wirken Balance-Änderungen auch auf alte Spielstände.
    ===================================================================== */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;   // 2: drei Mächte, große Karte
 const SKIP = new Set(['terrCanvas','miniBg','haulMap','field','terrChanged','sel','hover','placing','fx','projectiles','reach','reachT','reachV','rng','lastPaint','boxMode','amoveMode','escortMode']);
 const TA: Record<string, any> = { Uint8Array, Int32Array, Float32Array, Float64Array };
 
@@ -32,7 +32,7 @@ export function serialize(g: Game = G): string {
 }
 export function deserialize(str: string): Game {
   const o=JSON.parse(str,(k,v)=>v&&typeof v==='object'&&v.__ta?fromB64(v.__ta,v.d):v);
-  if(!o||o.v!==SAVE_VERSION) throw new Error('Spielstand passt nicht zu dieser Version');
+  if(!o||o.v!==SAVE_VERSION) throw new Error('Spielstand stammt aus einer älteren Version (vor der großen Karte mit drei Mächten)');
   const g=o.g, map=new Map();
   for(const e of [...g.units,...g.buildings]) map.set(e.id,e);
   for(const u of g.units) u.def=UNITS[u.type];
@@ -51,4 +51,4 @@ export function deserialize(str: string): Game {
 /** Spielstand laden und aktivieren */
 export function loadGame(str: string){ const g=deserialize(str); setG(g); return g; }
 /** kurze Beschreibung für die Speicherplatz-Liste */
-export function saveMeta(g: Game = G){ return {t:g.t, pop:Math.floor(g.players[0].pop), diff:g.diffKey, date:Date.now(), war:!!g.war}; }
+export function saveMeta(g: Game = G){ return {t:g.t, pop:Math.floor(g.players[0].pop), diff:g.diffKey, date:Date.now(), war:!!(g.wars&&Object.values(g.wars).some(v=>v))}; }

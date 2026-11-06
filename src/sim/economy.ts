@@ -1,9 +1,9 @@
-import { DEPOSIT, capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { isAI, DEPOSIT, capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
 import { G } from '../sim/state';
-import { depositTiles, refreshQuality } from '../sim/world';
+import { anyWar, depositTiles, refreshQuality } from '../sim/world';
 import { clearForest, hauls, works } from '../sim/build';
 import { msg } from '../core/events';
 import { emergency } from '../sim/production';
@@ -21,7 +21,7 @@ function forestNear(b){
 }
 const dd=(b,i)=>Math.abs(i%MAP_W+0.5-b.x)+Math.abs(((i/MAP_W)|0)+0.5-b.y);
 export function updateEconomy(pid,dt){
-  const p=G.players[pid], mul=pid===1?G.diff.incomeMul:1, powOk=p.use<=p.power, bf=p.broke?ECON.brokeFactor:1;
+  const p=G.players[pid], mul=isAI(pid)?G.diff.incomeMul:1, powOk=p.use<=p.power, bf=p.broke?ECON.brokeFactor:1;
   let foodProd=0, metalProd=0, oilProd=0, woodProd=0, stoneProd=0, mines=0, minesEmpty=0, linked=0, unlinked=0;
   let upkeep=0, noAccess=0;
   for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid) continue;
@@ -83,7 +83,7 @@ export function updateEconomy(pid,dt){
   target-=pen(!!p.lastAttack&&G.t-p.lastAttack.t<60,MOOD.attacked,'Angriffe auf die Stadt');
   { const core=G.buildings.filter(b=>!b.dead&&b.owner===pid&&(b.type==='hq'||b.def.cap));
     target-=pen(G.buildings.some(c=>!c.dead&&c.type==='camp'&&core.some(h=>dist(c.x,c.y,h.x,h.y)<MOOD.banditR)),MOOD.bandits,'Räuber in Stadtnähe'); }
-  target-=pen(G.war,MOOD.war,'Krieg');
+  target-=pen(anyWar(pid),MOOD.war,'Krieg');
   { const fc=(G.funCov&&G.funCov[pid])??1; target-=pen(fc<1,MOOD.fun*(1-fc),'zu wenig Unterhaltung (Park, Theater, Schwimmbad …)'); }
   target-=pen(G.t-(p.lastFire??-999)<60,MOOD.fires,'Brände in der Stadt');
   target-=pen(G.t<(p.shockUntil||0),NUKE.shockMood,'Entsetzen über den eigenen Atomschlag');

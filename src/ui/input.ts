@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { AIR, COMBINED, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { isAI, AIR, COMBINED, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
 import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
@@ -23,7 +23,7 @@ import { costHtml, f1 } from '../ui/format';
 import { msg } from '../core/events';
 import { WEAPON_INFO } from '../ui/tooltips';
 
-export const input={pts:new Map(),drag:null,pinch:null,box:null,keys:new Set(),lastTap:{t:0,id:-1}};
+export const input={pts:new Map(),drag:null,pinch:null,box:null,keys:new Set(),lastTap:{t:0,id:-1},mouse:null as any,lastGrp:null as any};
 export const endPtr=e=>{
   if(!G) return;
   input.pts.delete(e.pointerId);
@@ -118,7 +118,7 @@ function nukeTap(w){
   msg(`☢ Ziel markiert.${own?' ⚠ EIGENE GEBÄUDE IM SPRENGRADIUS!':''} Zum Start dieselbe Stelle noch einmal antippen – ✕ bricht ab.`,'#ff8a7a'); refreshCmds();
 }
 export function command(ent,w,mine){
-  if(ent&&ent.owner===1&&ent.type==='hq'&&mine.some(u=>u.def.diplomat)&&!hostile(0,1)){ const n=sendDiplomats(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8d27a',life:0.6}); msg(`🎩 ${n} Diplomat${n===1?'':'en'} unterwegs zu ${G.players[1].name}.`); return; }
+  if(ent&&isAI(ent.owner)&&ent.type==='hq'&&mine.some(u=>u.def.diplomat)&&!hostile(0,ent.owner)){ const n=sendDiplomats(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#e8d27a',life:0.6}); msg(`🎩 ${n} Diplomat${n===1?'':'en'} unterwegs zu ${G.players[1].name}.`); return; }
   if(ent&&ent.owner!==0){
     if(hostile(0,ent.owner)){ orderAttack(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#ff5a4a',life:0.5}); return; }
     const r=G.rel[0][ent.owner];
@@ -281,7 +281,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 cv.addEventListener('pointermove',e=>{
   if(!G) return;
-  if(e.pointerType==='mouse') G.hover=toWorld(e.clientX,e.clientY);
+  if(e.pointerType==='mouse'){ G.hover=toWorld(e.clientX,e.clientY); input.mouse={x:e.clientX,y:e.clientY,on:true}; }
   if(!input.pts.has(e.pointerId)) return;
   input.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(input.pinch&&input.pts.size===2){const [a,b]=[...input.pts.values()];const d=dist(a.x,a.y,b.x,b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
@@ -300,9 +300,23 @@ cv.addEventListener('pointermove',e=>{
 });
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',e=>{input.pts.delete(e.pointerId);input.drag=null;input.box=null;input.pinch=null;});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('pointerleave',e=>{ if(e.pointerType==='mouse'&&input.mouse) input.mouse.on=false; });
 cv.addEventListener('wheel',e=>{e.preventDefault();if(G)zoomAt(e.clientX,e.clientY,cam.zoom*Math.exp(-e.deltaY*0.0015));},{passive:false});
-addEventListener('keydown',e=>{ if(!G) return; input.keys.add(e.key.toLowerCase());
+addEventListener('keydown',e=>{ if(!G) return;
+  const tg=e.target as HTMLElement; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT')) return;
+  input.keys.add(e.key.toLowerCase());
   const k=e.key.toLowerCase();
+  // Truppengruppen: Strg/Alt + Ziffer speichert die Auswahl, Ziffer wählt sie, zweimal schnell = Kamera hin
+  const dg=/^Digit([0-9])$/.exec(e.code);
+  if(dg&&!e.metaKey){ const n=dg[1]; G.cgroups=G.cgroups||{}; e.preventDefault();
+    if(e.ctrlKey||e.altKey){ const ids=myUnitsSel().map(u=>u.id); if(ids.length){ G.cgroups[n]=ids; msg(`Gruppe ${n}: ${ids.length} Einheiten gespeichert (Taste ${n} wählt sie).`,'#9fd88a'); } return; }
+    const L=(G.cgroups[n]||[]).map(id=>G.units.find(u=>u.id===id&&!u.dead)).filter(Boolean);
+    if(!L.length) return;
+    const now=performance.now();
+    if(input.lastGrp&&input.lastGrp.n===n&&now-input.lastGrp.t<400){ const cx=L.reduce((s,u)=>s+u.x,0)/L.length, cy=L.reduce((s,u)=>s+u.y,0)/L.length; cam.x=cx*TILE-VW/cam.zoom/2; cam.y=cy*TILE-VH/cam.zoom/2; clampCam(); }
+    input.lastGrp={n,t:now}; G.sel=L; refreshCmds(); return; }
+  if((k==='p'||k===' ')&&!e.repeat&&!G.over){ e.preventDefault(); G.hold=!G.hold; return; }   // Pause
+  if(k==='h'&&!e.repeat){ const hq=G.buildings.find(b=>!b.dead&&b.owner===0&&b.type==='hq'); if(hq){ cam.x=hq.x*TILE-VW/cam.zoom/2; cam.y=hq.y*TILE-VH/cam.zoom/2; clampCam(); } return; }
   if(k==='escape'){G.placing=null;G.roadStart=null;G.amoveMode=false;G.orderMode=null;G.orderPending=null;G.sel=[];refreshCmds();}
   if(k==='s'&&!e.repeat) cmd('stop');
   if(k==='a'&&!e.repeat) cmd('amove');
