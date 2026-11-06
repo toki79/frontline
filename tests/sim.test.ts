@@ -17,7 +17,7 @@ import { depositTiles } from '../src/sim/world';
 import { findPath } from '../src/sim/pathfinding';
 import { devOf } from '../src/sim/devplan';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
-import { applyDamage, destroy } from '../src/sim/combat';
+import { applyDamage, continueGame, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
 import { applyOrder } from '../src/sim/missions';
@@ -933,6 +933,12 @@ describe('Simulation', () => {
     const p = G.players[0]; p.done = {worldtrade: true}; p.res.money = VICTORY.wealth + 1000;
     run(VICTORY.hold - 10); expect(G.over).toBe(false);
     run(15); expect(G.over).toBe(true);
+    // Weiterspielen: Welthandel einer KI beendet das Spiel danach nicht mehr
+    newGame('mittel'); noBandits();
+    const K = G.players[1]; K.done = {worldtrade: true}; K.res.money = VICTORY.wealth + 1000;
+    run(VICTORY.hold + 5); expect(G.over).toBe(true); expect(G.result.win).toBe(false); expect(G.result.cont).toBe(true);
+    expect(continueGame()).toBe(true); expect(G.over).toBe(false);
+    run(VICTORY.hold + 10); expect(G.over).toBe(false); expect(G.freePlay).toBe(true);
     newGame('mittel'); noBandits();
     const A = G.players[4]; A.res.money = 1e6; A.res.metal = 1e5; A.res.oil = 1e5;
     const h = findBuilding(4, 'hq'); placeBuilding(4, 'university', h.tx - 4, h.ty - 4, true);

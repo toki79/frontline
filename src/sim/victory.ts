@@ -21,8 +21,8 @@ export function updateVictory(){
     if(pid!==0&&share>=VICTORY.warnAt&&!p.wealthWarn){ p.wealthWarn=true;
       intelEvent(pid,'victory','worldtrade',{txt:`hat schon ${Math.round(share*100)} % des Vermögens für den Wirtschaftssieg beisammen.`, counter:INTEL.threats.worldtrade.counter}); }
     if(share>=1){ p.wealthT=(p.wealthT||0)+1;
-      if(p.wealthT===1) msg(pid===0?`🌐 Aldoria hält ${VICTORY.wealth.toLocaleString('de-DE')} $ Vermögen – noch ${VICTORY.hold} s, dann ist der Wirtschaftssieg da!`:`⚠ ${p.short} hält ein Vermögen von ${VICTORY.wealth.toLocaleString('de-DE')} $ – in ${VICTORY.hold} s gewinnt es den Wirtschaftssieg! Krieg, Plünderung oder Tribut können das verhindern.`, pid===0?'#9fd88a':'#ff8a7a');
-      if(p.wealthT>=VICTORY.hold){ endGame(pid===0, pid===0?'Aldoria beherrscht den Welthandel – Wirtschaftssieg!':`${p.short} beherrscht den Welthandel – Wirtschaftssieg für ${p.short}.`); return; } }
-    else { if(p.wealthT>0&&pid!==0) msg(`${p.short} hat das Vermögen für den Wirtschaftssieg nicht halten können.`,'#9fd88a'); p.wealthT=0; }
+      if(p.wealthT===1&&!G.freePlay) msg(pid===0?`🌐 Aldoria hält ${VICTORY.wealth.toLocaleString('de-DE')} $ Vermögen – noch ${VICTORY.hold} s, dann ist der Wirtschaftssieg da!`:`⚠ ${p.short} hält ein Vermögen von ${VICTORY.wealth.toLocaleString('de-DE')} $ – in ${VICTORY.hold} s gewinnt es den Wirtschaftssieg! Krieg, Plünderung oder Tribut können das verhindern.`, pid===0?'#9fd88a':'#ff8a7a');
+      if(p.wealthT>=VICTORY.hold&&!(G.freePlay&&p.wealthT>VICTORY.hold)){ endGame(pid===0, pid===0?'Aldoria beherrscht den Welthandel – Wirtschaftssieg!':`${p.short} beherrscht den Welthandel – Wirtschaftssieg für ${p.short}.`); return; } }
+    else { if(p.wealthT>0&&pid!==0&&!G.freePlay) msg(`${p.short} hat das Vermögen für den Wirtschaftssieg nicht halten können.`,'#9fd88a'); p.wealthT=0; }
   }
 }

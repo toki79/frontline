@@ -10,6 +10,7 @@ import { updateAdvisor } from '../ui/advisor';
 import { diploAction, renderDiplo } from '../ui/diplomacy';
 import { $ } from '../ui/dom';
 import { hideTip } from '../ui/tooltips';
+import { continueGame } from '../sim/combat';
 import { init as initSaves, renderSaves } from '../ui/saves';
 
 /* =====================================================================
@@ -30,6 +31,8 @@ function showEnd(win:boolean, reason:string){
   $('#endTitle').textContent=win?'SIEG':'NIEDERLAGE';
   $('#endTitle').style.color=win?'#9fd88a':'#ff8a7a';
   $('#endText').innerHTML=reason+`<br><br>Spielzeit: ${mm}:${ss} · Einwohner: ${Math.floor(G.players[0].pop)} (${AIS.map(p=>`${G.players[p].short} ${Math.floor(G.players[p].pop)}`).join(', ')})<br>Einheiten gebaut: ${G.stats.built} · verloren: ${G.stats.lost} · Abschüsse: ${G.stats.kills} · Beute: ${fmt(G.stats.loot)}`;
+  const c=!!(G.result&&G.result.cont); $('#bContinue').style.display=c?'block':'none';
+  if(c) $('#bContinue').textContent=win?'▶ Weiterspielen (freies Spiel)':'▶ Trotzdem weiterspielen';
   $('#end').classList.remove('hidden');
 }
 export function openDiplo(){ if(!G||G.over||G.offer) return; hideTip(); G.paused=true; $('#reply').textContent=''; G.tribLast={}; renderDiplo(); $('#diplo').classList.remove('hidden'); }
@@ -47,5 +50,6 @@ $('#bHelp').addEventListener('click',()=>{ hideTip(); if(G&&!G.over) G.paused=tr
 $('#bHelpClose').addEventListener('click',()=>{ $('#help').classList.add('hidden'); if(G) G.paused=!!G.offer; });
 $('#bDiploClose').addEventListener('click',()=>{ $('#diplo').classList.add('hidden'); if(G) G.paused=false; updateAdvisor(); });
 $('#diploBody').addEventListener('click',e=>{const b=e.target.closest('button[data-a]'); if(b&&!b.disabled) diploAction(b.dataset.a);});
+$('#bContinue').addEventListener('click',()=>{ if(continueGame()){ $('#end').classList.add('hidden'); updateAdvisor(); } });
 $('#bAgain').addEventListener('click',()=>{ $('#start').classList.remove('ingame'); $('#end').classList.add('hidden'); $('#bResume').style.display='none'; $('#start').classList.remove('hidden'); setG(null); });
 }

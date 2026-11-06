@@ -180,13 +180,26 @@ export function updateFire(b,dt){
 export function checkVictory(){
   if(G.over) return;
   const civ=pid=>G.buildings.filter(b=>!b.dead&&b.owner===pid&&!b.def.def).length;
-  if(civ(0)===0){ endGame(false,'Eure Stadt ist gefallen.'); return; }
+  if(civ(0)===0){ endGame(false,'Eure Stadt ist gefallen.','lost'); return; }
   G.beaten=G.beaten||{};
   for(const pid of MAJORS) if(pid!==0&&!G.beaten[pid]&&civ(pid)===0){ G.beaten[pid]=true;
     msg(`🏳 ${nameFor0(pid)} ist besiegt – die Stadt liegt in Trümmern.`,'#ffd36a'); }
-  if(MAJORS.every(pid=>pid===0||G.beaten[pid])) endGame(true,'Alle Rivalen im Tal sind besiegt – Aldoria herrscht über das Tal.');
+  if(MAJORS.every(pid=>pid===0||G.beaten[pid])) endGame(true,'Alle Rivalen im Tal sind besiegt – Aldoria herrscht über das Tal.','mil');
 }
-export function endGame(win,reason){
-  G.over=true; G.result={win,reason};
+/** Spielende. kind: 'mil' (alle Rivalen besiegt), 'alt' (Sondersieg: Kernfusion, Welthandel, Einwohnerrennen), 'lost' (eigene Stadt gefallen).
+ *  Nach „Weiterspielen“ beenden Sondersiege das Spiel nicht mehr – sie werden nur noch gemeldet. */
+export function endGame(win,reason,kind='alt'){
+  if(G.freePlay&&kind==='alt'){ G.altSeen=G.altSeen||{}; if(!G.altSeen[reason]){ G.altSeen[reason]=true; msg(`🏁 ${reason} (Freies Spiel – es geht weiter.)`,win?'#9fd88a':'#ffb38a'); } return; }
+  if(kind==='mil'&&G.milDone) return;
+  G.over=true; G.result={win,reason,kind,cont:kind!=='lost'};
   emit('gameover',win,reason);
+}
+/** nach einem Sieg oder einer Niederlage durch Sondersieg einfach weiterspielen */
+export function continueGame(){
+  if(!G.over||!G.result||!G.result.cont) return false;
+  if(G.result.kind==='mil') G.milDone=true;
+  G.over=false; G.freePlay=true; G.paused=false;
+  for(const p of G.players) p.wealthT=0;
+  msg('▶ Freies Spiel: Kernfusion, Welthandel und Einwohnerziel beenden das Spiel nicht mehr. Verliert ihr eure Stadt, ist es aber vorbei.','#d6b45a');
+  return true;
 }
