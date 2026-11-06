@@ -221,7 +221,7 @@ describe('Simulation', () => {
     expect(countBuildings(1)).toBeGreaterThan(4);
     const sc = G.profile[1].scarce;   // sind Holz UND Stein knapp, kauft die KI zu statt selbst abzubauen
     if (!(sc.includes('wood') && sc.includes('stone'))) expect(countBuildings(1, 'lumber', true) + countBuildings(1, 'quarry', true)).toBeGreaterThan(0);
-    expect(G.players[1].pop).toBeGreaterThan(40);
+    expect(runUntil(() => G.players[1].pop > 40, 180)).toBe(true);   // auf manchen Karten dauert das erste Wohnhaus etwas länger als 5 min
   });
 
   it('Verteidigung: geplant und bezahlt, Pioniere bauen sie vor Ort', () => {
