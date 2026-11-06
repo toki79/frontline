@@ -17,10 +17,10 @@ type Mode = 'builtin'|'ollama'|'cloud';
 type CloudCfg = {key:string, model:string, url?:string};
 type Cfg = {mode:Mode, url:string, model:string, provider:string, cloud:Record<string,CloudCfg>, interval:number, timeout:number, temp:number, persona:string};
 /** Cloud-Anbieter: Adresse der OpenAI-kompatiblen Schnittstelle (Claude: eigene Schnittstelle) */
-export const PROVIDERS: Record<string,{name:string, url:string, kind:'openai'|'anthropic', hint:string, ph:string}> = {
-  openrouter:{name:'OpenRouter', url:'https://openrouter.ai/api/v1', kind:'openai', hint:'Viele Modelle über einen Schlüssel, einige davon kostenlos (mit Grenzen).', ph:'z. B. ein Modell mit „:free“'},
+export const PROVIDERS: Record<string,{name:string, url:string, kind:'openai'|'anthropic', hint:string, ph:string, extra?:any}> = {
+  openrouter:{name:'OpenRouter', url:'https://openrouter.ai/api/v1', kind:'openai', hint:'Viele Modelle über einen Schlüssel, einige davon kostenlos (mit Grenzen).', ph:'z. B. ein Modell mit „:free“', extra:[{reasoning:{effort:'low', exclude:true}}]},
   groq:      {name:'Groq', url:'https://api.groq.com/openai/v1', kind:'openai', hint:'Sehr schnelle Antworten, kostenloses Kontingent mit Grenzen.', ph:'Modell aus „Modelle laden“'},
-  gemini:    {name:'Google Gemini', url:'https://generativelanguage.googleapis.com/v1beta/openai', kind:'openai', hint:'Kostenloses Kontingent mit Grenzen (Google-Konto).', ph:'z. B. gemini-…-flash'},
+  gemini:    {name:'Google Gemini', url:'https://generativelanguage.googleapis.com/v1beta/openai', kind:'openai', hint:'Kostenloses Kontingent mit Grenzen (Google-Konto). Am schnellsten: Flash-Lite.', ph:'z. B. gemini-…-flash-lite', extra:[{reasoning_effort:'none'},{reasoning_effort:'low'}]},   // ohne langes „Nachdenken“ – sonst oft zu langsam (neuere Modelle kennen nur „low“)
   mistral:   {name:'Mistral', url:'https://api.mistral.ai/v1', kind:'openai', hint:'Europäischer Anbieter.', ph:'Modell aus „Modelle laden“'},
   openai:    {name:'OpenAI', url:'https://api.openai.com/v1', kind:'openai', hint:'Kostenpflichtig pro Anfrage.', ph:'Modell aus „Modelle laden“'},
   anthropic: {name:'Anthropic (Claude)', url:'https://api.anthropic.com/v1', kind:'anthropic', hint:'Kostenpflichtig pro Anfrage.', ph:'z. B. claude-haiku-5-5'},
@@ -31,7 +31,7 @@ const def=(pid):Cfg=>({mode:'builtin', url:'http://localhost:11434', model:'', p
   persona:pid===1?'Marschall Varek: misstrauisch, stolz, rachsüchtig – respektiert nur Stärke.':'Kanzlerin Mirela: kühl kalkulierend, sucht Gewinn und Ausgleich, führt Krieg nur, wenn er sich lohnt.'});
 export const llmCfg: {ais:Record<number,Cfg>, showReasons:boolean} = load();
 function load(){ let o:any={}; try{ o=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
-  const ais={}; for(const pid of AIS){ const c={...def(pid), ...((o.ais||{})[pid]||{})}; if(!['builtin','ollama','cloud'].includes(c.mode)) c.mode='builtin'; if(!PROVIDERS[c.provider]) c.provider='openrouter'; c.cloud=c.cloud||{}; ais[pid]=c; }
+  const ais={}; for(const pid of AIS){ const c={...def(pid), ...((o.ais||{})[pid]||{})}; if(!['builtin','ollama','cloud'].includes(c.mode)) c.mode='builtin'; if(!PROVIDERS[c.provider]) c.provider='openrouter'; c.cloud=c.cloud||{}; if(c.timeout===25) c.timeout=STRATEGIST.timeout; ais[pid]=c; }
   return {ais, showReasons:!!o.showReasons}; }
 export function saveCfg(){ try{ localStorage.setItem(KEY,JSON.stringify(llmCfg)); }catch(e){} }
 const cc=(c:Cfg)=>c.cloud[c.provider]||(c.cloud[c.provider]={key:'', model:'', url:''});
@@ -51,7 +51,7 @@ const originHint=()=>/^(null|file:)/.test(location.origin)?'*':location.origin;
 function hint(e,c:Cfg){
   const url=c.mode==='ollama'?c.url:cloudUrl(c);
   if(mixedContent(url)) return 'Der Browser blockiert unverschlüsselte Adressen (http) anderer Rechner von dieser https-Seite – nutze https (z. B. Tailscale Serve) oder localhost.';
-  if(e&&e.name==='AbortError') return 'Zeitlimit überschritten – Modell zu langsam oder lädt noch.';
+  if(e&&e.name==='AbortError') return `Zeitlimit (${c.timeout} s) überschritten – das Modell denkt zu lange, ist überlastet oder lädt noch. Zeitlimit erhöhen (z. B. 60 s) oder ein schnelleres Modell wählen${c.mode==='cloud'&&c.provider==='gemini'?' (Flash-Lite)':''}.`;
   if(e instanceof TypeError) return c.mode==='ollama'?`Keine Verbindung – läuft Ollama? Ist OLLAMA_ORIGINS gesetzt (z. B. auf ${originHint()})?`:'Keine Verbindung – Adresse falsch, offline, oder der Anbieter erlaubt keinen Zugriff direkt aus dem Browser.';
   return String(e&&e.message||e);
 }
@@ -73,11 +73,16 @@ async function complete(c:Cfg, system:string, user:string, schema:any, timeout:n
       body:JSON.stringify({model:C.model, max_tokens:600, temperature:Math.min(1,c.temp), system, messages:[{role:'user',content:user}]})},timeout);
     return ((j.content||[]).find(x=>x.type==='text')||{}).text||''; }
   const H={'Content-Type':'application/json'}; if(C.key) H['Authorization']='Bearer '+C.key;
-  const body:any={model:C.model, temperature:c.temp, messages:[{role:'system',content:system},{role:'user',content:user}], response_format:{type:'json_object'}};
-  try{ const j=await req(url+'/chat/completions',{method:'POST',headers:H,body:JSON.stringify(body)},timeout); return (j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||''; }
-  catch(e){ if(e.status!==400) throw e;   // manche Modelle kennen kein JSON-Format: ohne nochmal
-    delete body.response_format; const j=await req(url+'/chat/completions',{method:'POST',headers:H,body:JSON.stringify(body)},timeout); return (j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||''; }
+  const body0:any={model:C.model, temperature:c.temp, messages:[{role:'system',content:system},{role:'user',content:user}]};
+  const out=j=>(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||'';
+  // Varianten der Reihe nach: mit JSON-Format und Denk-Einstellung, dann ohne (manche Modelle lehnen einzelne Felder mit 400 ab)
+  const tries=[...(P.extra||[]).map(x=>({...body0,response_format:{type:'json_object'},...x})), {...body0,response_format:{type:'json_object'}}, body0];
+  const key=P.name+'|'+C.model; let i=Math.min(okVariant[key]||0,tries.length-1), last=null;
+  for(;i<tries.length;i++){ try{ const r=out(await req(url+'/chat/completions',{method:'POST',headers:H,body:JSON.stringify(tries[i])},timeout)); okVariant[key]=i; return r; }
+    catch(e){ last=e; if(e.status!==400) throw e; } }
+  throw last;
 }
+const okVariant: Record<string,number> = {};   // welche Variante bei welchem Modell funktioniert hat
 /** Liste der Modelle (Ollama oder Anbieter) */
 export async function listModels(c:Cfg){
   try{
@@ -200,8 +205,8 @@ export function init(){
         if(mi&&!mi.value&&L.length&&c.mode==='ollama'){ c.model=L[0]; mi.value=c.model; saveCfg(); }
         head(box,pid); }
       catch(err){ out.textContent='⚠ '+err.message; } }
-    if(b.dataset.act==='test'){ const t0=performance.now();
+    if(b.dataset.act==='test'){ const t0=performance.now(), tick=setInterval(()=>{ out.textContent=`… wartet auf Antwort (${Math.round((performance.now()-t0)/1000)} s von höchstens ${c.timeout} s)`; },500);
       try{ const tx=await complete(c,'Antworte nur mit JSON.','Antworte mit {"ok": true}',{type:'object',properties:{ok:{type:'boolean'}},required:['ok']},c.timeout);
         const d=parseDecision(tx); out.textContent=d&&d.ok?`✓ ${activeModel(c)} (${sourceName(c)}) antwortet (${((performance.now()-t0)/1000).toFixed(1)} s).`:`Antwort erhalten, aber nicht wie erwartet: ${(tx||'').slice(0,120)}`; }
-      catch(err){ out.textContent='⚠ '+hint(err,c); } } });
+      catch(err){ out.textContent='⚠ '+hint(err,c); } finally{ clearInterval(tick); } } });
 }

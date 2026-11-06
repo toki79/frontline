@@ -357,7 +357,7 @@ export const DIFFICULTY = {
   schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35, aiTech:0.45},
 };
 // LLM-Stratege (optional, siehe ui/llm.ts): Gültigkeit einer Entscheidung, Grenzen für Forderungen und Geschenke
-export const STRATEGIST = {ttl:180, interval:45, timeout:25, demand:{money:[100,1500], res:[50,400]}, gift:200};
+export const STRATEGIST = {ttl:180, interval:45, timeout:45, demand:{money:[100,1500], res:[50,400]}, gift:200};
 // KI gegen KI: frühestens nach minT Sekunden und mit höherer Angriffslust
 export const AI_WAR = {minT:1200, aggr:1.4, minDur:150, peaceCool:600, fund:0.3};   // fund: Anteil der Steuern, den die KI fürs nächste Schlüsselgebäude/Forschung zurücklegt   // minDur: so lange dauert ein Krieg mindestens, bevor Frieden angeboten wird
 export const AI_MIX2 = ['tel','swarm','jet','heavy','amphib','para'];   // Spätzeit-Waffen der KI, sobald erforscht
