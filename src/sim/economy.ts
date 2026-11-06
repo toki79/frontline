@@ -1,9 +1,10 @@
-import { isAI, DEPOSIT, capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
+import { RTREE, isAI, DEPOSIT, capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
 import { endGame } from '../sim/combat';
 import { G } from '../sim/state';
 import { anyWar, depositTiles, refreshQuality } from '../sim/world';
+import { mastery } from '../sim/intel';
 import { clearForest, hauls, works } from '../sim/build';
 import { msg } from '../core/events';
 import { emergency } from '../sim/production';
@@ -89,11 +90,12 @@ export function updateEconomy(pid,dt){
   target-=pen(G.t<(p.shockUntil||0),NUKE.shockMood,'Entsetzen über den eigenen Atomschlag');
   target-=pen(G.t<(p.bombedUntil||0),NUKE.victimMood,'Atomschlag auf unser Land');
   target-=pen(G.buildings.some(b=>!b.dead&&b.owner===pid&&b.def.cap&&inFallout(b)<1),NUKE.radiationMood,'Strahlung in Wohngebieten');
+  if(hasTech(p,'philosophy')) target+=RTREE.philosophy.mood;   // aufgeklärte Bürger
   p.moodWhy=why; p.moodTarget=Math.max(0,target);
   if(p.happy===undefined) p.happy=MOOD.start;
   p.happy+=(p.moodTarget-p.happy)*Math.min(1,MOOD.speed*dt);
   const taxF=Math.min(1.1,MOOD.taxBase+MOOD.taxPer*p.happy);
-  const tax=p.pop*ECON.taxPerHead*taxF*mul, adminShare=ECON.adminMax*p.pop/(p.pop+ECON.adminHalf)*(hasTech(p,'computing')?ECON.adminIT:1), admin=tax*adminShare;
+  const tax=p.pop*ECON.taxPerHead*taxF*mul*(mastery(p,'wirt')?RTREE.mastery.wirt.tax:1), adminShare=ECON.adminMax*p.pop/(p.pop+ECON.adminHalf)*(hasTech(p,'computing')?ECON.adminIT:1), admin=tax*adminShare;
   p.res.money+=(tax-admin)*dt;
   // Handelskontore: verkaufen Überschüsse über der Reserve
   let cap=0, exp=0, expBy={}; for(const b of G.buildings) if(b.owner===pid&&b.def.export&&works(b)) cap+=b.def.export*lvlMul(b)*(powOk?1:0.5);

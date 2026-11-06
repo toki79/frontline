@@ -1,4 +1,6 @@
 import { aiThinkAll } from '../ai/kastrova';
+import { updateIntel } from '../sim/intel';
+import { updateVictory } from '../sim/victory';
 import { isMajor } from '../data/config';
 import { militiaThink } from '../ai/militia';
 import { banditThink } from '../ai/bandits';
@@ -26,7 +28,7 @@ export function update(dt){
   G.t+=dt;
   for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(isMajor(p.id)) updateEconomy(p.id,dt); if(G.over) return;}
   aiThinkAll(dt);
-  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute();}
+  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute(); updateIntel(); updateVictory(); if(G.over) return;}
   if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}
   for(const k in G.market) G.market[k]=Math.max(0,G.market[k]-MARKET_RECOVER*dt);

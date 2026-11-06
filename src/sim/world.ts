@@ -1,7 +1,7 @@
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
-import { MAJORS, isAI, isMajor, AI_CHAR, DEPOSIT, capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { AI_WAR, MAJORS, isAI, isMajor, AI_CHAR, DEPOSIT, capOf, lvlMul, BUILDINGS, CONSTRUCTION, DENSITY, FEAT, MAP_H, MAP_W, NOISE_R, STORAGE, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
@@ -16,7 +16,7 @@ export const atWar=(a,b)=>a!==b&&!!(G.wars&&G.wars[wkey(a,b)]);
 export const anyWar=pid=>MAJORS.some(o=>o!==pid&&atWar(pid,o));
 export const foesOf=pid=>MAJORS.filter(o=>o!==pid&&atWar(pid,o));
 /** Name einer Macht aus Sicht des Spielers (unbekannt bleibt unbekannt) */
-export const nameFor0=pid=>pid===0?'Aldoria':G.known[0][pid]?G.players[pid].short:'eine unbekannte Macht';
+export const nameFor0=(pid,dat=false)=>pid===0?'Aldoria':G.known[0][pid]?G.players[pid].short:dat?'einer unbekannten Macht':'eine unbekannte Macht';
 export function updateRel(){
   const r=G.rel, set=(a,b,v)=>{r[a][b]=v;r[b][a]=v;};
   for(const a of MAJORS) for(const b of MAJORS) if(a<b) set(a,b, atWar(a,b)?'feind':'neutral');
@@ -38,8 +38,9 @@ export function setWar(a,b,on,by?){
     for(const [x,o] of [[a,b],[b,a]]) if(isAI(x)) G.ais[x].att[o]=Math.min(attOf(x,o),-20);
     if(G.embassy&&(G.embassy[a][b]||G.embassy[b][a])){ G.embassy[a][b]=G.embassy[b][a]=false; if(pl) msg('🏛 Die Botschaften wurden geschlossen.','#ffb38a'); }
     if(pl) msg(actor===0?`Ihr habt ${G.players[other].short} den Krieg erklärt.`:`⚔ ${G.players[other].short} hat Aldoria den Krieg erklärt!`,'#ff8a7a');
-    else if(G.known[0][a]||G.known[0][b]) msg(`📰 Krieg im Tal: ${nameFor0(actor)} hat ${nameFor0(target)} den Krieg erklärt.`,'#d6b45a');
+    else if(G.known[0][a]||G.known[0][b]) msg(`📰 Krieg im Tal: ${nameFor0(actor)} hat ${nameFor0(target,true)} den Krieg erklärt.`,'#d6b45a');
   } else {
+    for(const x of [a,b]) if(isAI(x)&&G.ais[x]) G.ais[x].cool=Math.max(G.ais[x].cool||0,G.t+(pl?120:AI_WAR.peaceCool));   // nach dem Frieden eine Weile Ruhe
     if(pl) msg(`Frieden mit ${G.players[other].short} geschlossen.`,'#9fd88a');
     else if(G.known[0][a]||G.known[0][b]) msg(`📰 ${nameFor0(a)} und ${nameFor0(b)} haben Frieden geschlossen.`,'#d6b45a');
     for(const u of G.units){ if(u.target&&!hostile(u.owner,u.target.owner)) u.target=null;

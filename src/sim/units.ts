@@ -1,5 +1,5 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { isMajor, mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
+import { RTREE, isMajor, mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
@@ -211,7 +211,7 @@ export function updateProjectiles(dt){
       for(const b of G.buildings){ if(b.dead||b.site||b.contam||b.type!=='sam'||!hostile(b.owner,p.src.owner)||p.icp.includes(b.id)) continue;
         if(dist(b.x,b.y,p.x,p.y)>AIR.interceptR) continue; p.icp.push(b.id);
         fxAdd({k:'tracer',x1:b.x,y1:b.y,x2:p.x,y2:p.y,life:0.25,col:'#9fd0ff'});
-        if(Math.random()<AIR.intercept){ p.done=true; fxAdd({k:'boom',x:p.x,y:p.y,r:0.6,life:0.6});
+        if(Math.random()<AIR.intercept+(hasTech(G.players[b.owner],'missiledef')?RTREE.missiledef.intercept:0)){ p.done=true; fxAdd({k:'boom',x:p.x,y:p.y,r:0.6,life:0.6});
           if(b.owner===0) msg(`🛡 Abgefangen: ${p.type==='ballistic'?'ballistische Rakete':'Gleitbombe'} über der Stadt zerstört.`,'#9fd88a'); break; } }
       if(p.done) continue;
       const dx=p.lx-p.x,dy=p.ly-p.y,L=Math.hypot(dx,dy),s=p.speed*dt;

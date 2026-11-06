@@ -100,6 +100,7 @@ export function advise(){
   if(G.t<70) T.push({p:31,txt:`<b>Eure Region:</b> ${regionText(0)}. ${metAIs.length?'Eure Nachbarn haben, was euch fehlt – handelt (🤝) oder holt es euch.':'Was euch fehlt, gibt es anderswo im Tal – erkundet die Umgebung.'}`});
   if(!countBuildings(0,'kontor')&&(p.res.oil>600||p.res.food>1000||p.res.metal>600)) T.push({p:34,txt:`<b>Überschuss im Lager</b> (🛢 ${fmt(p.res.oil)} · 🌾 ${fmt(p.res.food)} · ⛏ ${fmt(p.res.metal)}). Ein Handelskontor exportiert ihn laufend gegen Geld.`,act:B('kontor')});
   if(p.res.oil>300&&marketOpen(0)) T.push({p:20,txt:`<b>${fmt(p.res.oil)} Öl</b> auf Lager. Am Milizmarkt bekommst du Geld dafür.`,act:{label:'🤝 Markt',fn:openDiplo}});
+  if(metAIs.length&&G.t>600&&!has('intel')&&p.res.money>900) T.push({p:29,txt:'<b>Kein Geheimdienst:</b> Ein Nachrichtendienst meldet, wenn die Nachbarn Raketen, Jagdbomber oder schwere Panzer entwickeln – mit Empfehlung, wie ihr euch wappnet.',act:B('intel')});
   if(!sites.length&&G.t>20&&p.res.money>=300) T.push({p:28,txt:'<b>Keine Baustelle offen.</b> Deine Bauarbeiter warten – jeder Bauauftrag bringt die Stadt voran.',act:{label:'Gebäude',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
   if(G.mode==='race'&&p.pop>=ECON.target*0.85) T.push({p:15,txt:`Nur noch <b>${Math.ceil(ECON.target-p.pop)} Einwohner</b> bis zum Sieg! Kastrova wird jetzt alles versuchen, euch aufzuhalten.`});
   T.sort((a,b)=>b.p-a.p);

@@ -103,7 +103,7 @@ export const ECON = {
   foodPerHead: 0.02,    // Nahrung pro Einwohner und Sekunde
   taxPerHead: 0.05,     // Geld pro Einwohner und Sekunde
   // Unterhalt in $/s je fertigem Gebäude (fehlt = 0)
-  upkeep: {lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
+  upkeep: {intel:0.5, lumber:0.1, quarry:0.15, farm:0.1, power:0.4, mine:0.3, refinery:0.5, barracks:0.4, factory:1.5, kontor:0.3,
            university:1.2, droneshop:1.0, depot:0.15, block:0.2, greenhouse:0.3, datacenter:2, npp:3, enrich:4, silo:2, sentry:0.1, turret:0.25, atpost:0.2, flak:0.25, sam:0.4, airbase:2.5, gbunker:0.4, derrick:0.8, forester:0.1, park:0.1, theater:0.6, pool:1.0, stadium:2.2, firest:0.5},
   wagePerPop: 0.025,    // Sold je Einwohner, der als Soldat/Arbeiter dient ($/s)
   // Stadtverwaltung: Anteil der Steuern, wächst mit der Stadtgröße, bleibt aber unter adminMax
@@ -179,6 +179,8 @@ export const UNITS = {
           weapon:{type:'autocannon', dmg:15, range:5, rof:0.5}, prod:'factory', req:[], desc:'Schnell, gut gegen Infanterie'},
   mbt:   {name:'Kampfpanzer', cls:'veh', cost:{money:450, metal:120, oil:70, pop:4}, time:20, hp:650, upkeep:0.1, combat:true, armor:'heavy', speed:1.55, sight:7, size:0.72,
           weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge'},
+  heavy: {name:'Schwerer Kampf\u00ADpanzer', cls:'veh', cost:{money:900, metal:260, oil:120, pop:5}, time:30, hp:1300, upkeep:0.18, combat:true, armor:'heavy', speed:1.1, sight:7, size:0.85, research:'heavyarmor',
+          weapon:{type:'shell', dmg:120, range:6, rof:2.8}, prod:'factory', req:[], desc:'Doppelt gepanzert, schwere Kanone – langsam. Gegenmittel: Panzerabwehr, Panzerminen, Artillerie'},
   spaag: {name:'Flakpanzer', cls:'veh', tech:1, cost:{money:400, metal:70, oil:30, pop:3}, time:12, hp:300, upkeep:0.06, combat:true, armor:'light', speed:2.0, sight:8, size:0.62, radar:8.5,
           weapon:{type:'flak', dmg:20, range:8, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
   jammer:{name:'Störsender', cls:'veh', tech:1, cost:{money:350, metal:40, oil:20, pop:2}, time:10, hp:220, upkeep:0.04, armor:'light', speed:1.9, sight:7, size:0.6, jam:true,
@@ -240,6 +242,8 @@ export const BUILDINGS = {
   pool:    {name:'Schwimm\u00ADbad',  w:3,h:2, hp:600,  power:-30, cost:{money:1400, stone:200, metal:40}, time:18, req:[], fun:600, sight:3, desc:'Unterhaltung für 600 Einwohner'},
   stadium: {name:'Stadion',       w:3,h:3, hp:1200, power:-40, cost:{money:3500, stone:500, metal:150}, time:30, req:[], research:'urban', fun:1600, noise:0.2, sight:4, desc:'Unterhaltung für 1600 Einwohner'},
   firest:  {name:'Feuer\u00ADwache',  w:2,h:2, hp:700,  power:-10, cost:{money:600, wood:40, stone:80}, time:10, req:[], fireR:11, sight:4, desc:'Löscht Brände im Umkreis von 11 Feldern schnell und verhindert, dass sie übergreifen'},
+  intel:   {name:'Nachrichten\u00ADdienst', w:2,h:2, hp:600, power:-20, cost:{money:700, wood:40, stone:80}, time:12, req:[], sight:4,
+            desc:'Geheimdienst: meldet, was die anderen Mächte erforschen, bauen und planen – mit Empfehlung für die Verteidigung. Ausbau = bessere Quellen'},
   depot:   {name:'Lagerhaus',     w:2,h:2, hp:600,  power:0,   cost:{money:250, wood:60, stone:40}, time:6, req:[], sight:3, desc:'+1000 Lagerplatz für jeden Rohstoff'},
   power:   {name:'Kraftwerk',     w:2,h:2, hp:600,  power:100, cost:{money:250, stone:40}, time:6, req:[], noise:0.3, sight:4, desc:'+100 Strom'},
   mine:    {name:'Mine',          w:2,h:2, hp:650,  power:-20, cost:{money:300, wood:30, stone:20}, time:8, req:[], metal:1.5, needsOre:true, noise:0.35, sight:4, desc:'Metall: direkt an Erz bauen – baut das ganze Vorkommen ringsum ab'},
@@ -329,7 +333,7 @@ export const DRONE = {
 };
 // ---------- Räuber ----------
 export const BANDITS = {
-  camps: [[8,86],[50,100]],   // Lager am Rand jeder Stadt (Aldoria-Seite, wird für jede Macht gespiegelt)
+  camps: [[6,82],[58,92]],   // Lager am Rand jeder Stadt (Aldoria-Seite, wird für jede Macht gespiegelt)
   campsA: [[14,36]],          // in der Wildnis zwischen Aldoria und Kastrova
   campsB: [[58,136]],         // an den Flussgrenzen zwischen Nachbarn
   guard: 3,             // Räuber je Lager zu Beginn
@@ -347,11 +351,14 @@ export const BANDITS = {
 // ---------- KI ----------
 // incomeMul: Wirtschaftsbonus der KI, grace: Sekunden ohne Aggression, aggr: Angriffslust
 export const DIFFICULTY = {
-  leicht: {incomeMul:0.85, grace:300, think:1.5, aggr:0.7},
-  mittel: {incomeMul:1.0,  grace:200, think:1.0, aggr:1.0},
-  schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35},
+  // aiTech: Kostenfaktor der KI für Forschung, Universität und Fahrzeugwerk (die KI plant schlechter als ein Mensch)
+  leicht: {incomeMul:0.85, grace:300, think:1.5, aggr:0.7,  aiTech:0.8},
+  mittel: {incomeMul:1.0,  grace:200, think:1.0, aggr:1.0,  aiTech:0.6},
+  schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35, aiTech:0.45},
 };
-export const AI_MIX2 = ['tel','swarm','jet','amphib','para'];   // Spätzeit-Waffen der KI, sobald erforscht
+// KI gegen KI: frühestens nach minT Sekunden und mit höherer Angriffslust
+export const AI_WAR = {minT:1200, aggr:1.4, minDur:150, peaceCool:600, fund:0.3};   // fund: Anteil der Steuern, den die KI fürs nächste Schlüsselgebäude/Forschung zurücklegt   // minDur: so lange dauert ein Krieg mindestens, bevor Frieden angeboten wird
+export const AI_MIX2 = ['tel','swarm','jet','heavy','amphib','para'];   // Spätzeit-Waffen der KI, sobald erforscht
 export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','spaag','drone','apc','ifv','at','jammer','mlrs','reaper','drone','mbt'];
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
 // Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt, Veloria dazwischen.
@@ -370,31 +377,84 @@ export const TRIBUTE = {money:[300,800,2000], res:[100,250,500], every:60, cool:
 export const LOT = {food:100, wood:100, stone:80, metal:50, oil:100};
 // Forschungsbaum: Universität Stufe 1 = gebaut; alles Weitere wird in der Universität erforscht.
 // need = vorher erforscht, needB = Gebäude muss stehen, power = forscht nur ohne Stromengpass
+// branch = Zweig (wirt Wirtschaft, land Landkrieg, luft Luft & Raketen, wiss Wissenschaft)
+// excl = Entweder-oder-Gruppe: wer eins erforscht, kann die anderen derselben Gruppe nie mehr erforschen
+// win = Sieg (Wissenschaft: Abschluss gewinnt; Wirtschaft: danach Vermögen halten)
 export const RESEARCH = {
-  res2:   {name:'Forschung Stufe 2', icon:'🎓', level:2, cost:{money:1500, metal:150}, time:180, need:[], desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
-  res3:   {name:'Forschung Stufe 3', icon:'🎓', level:3, cost:{money:2400, metal:250, oil:150}, time:300, need:['res2'], desc:'Schaltet die Reaper-Drohne frei'},
-  fert:   {name:'Düngemittel', icon:'🌾', cost:{money:1200, metal:60}, time:150, need:['res2'], desc:'Alle Bauernhöfe bringen 50 % mehr Ertrag'},
-  glass:  {name:'Gewächshäuser', icon:'🥬', cost:{money:2000, metal:120, stone:200}, time:200, need:['fert','res3'], desc:'Gewächshaus: ernährt 250 Einwohner auf 2×2 Feldern ohne Äcker (braucht viel Strom)'},
-  urban:  {name:'Stadtplanung', icon:'🏙', cost:{money:1500, stone:200}, time:150, need:['res2'], desc:'Wohnblock: 150 Einwohner auf 2×2 Feldern'},
-  physics:{name:'Kernphysik', icon:'⚛', cost:{money:4000, metal:300}, time:300, need:['res3'], desc:'Kernkraftwerk: +600 Strom – zerstört verstrahlt es die Umgebung'},
-  computing:{name:'Informatik', icon:'💻', cost:{money:3000, metal:200}, time:240, need:['res3'], desc:'Rechenzentrum: beschleunigt die Forschung, braucht viel Strom'},
-  ai:     {name:'Künstliche Intelligenz', icon:'🧠', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos, +10 Felder Reichweite), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
-  biofuel:{name:'Biokraftstoff', icon:'🌽', cost:{money:1500, metal:80}, time:180, need:['fert'], desc:'Raffinerien machen aus überschüssiger Nahrung Öl, wenn kein Rohöl da ist (2 🌾 → 1 🛢)'},
-  deepdrill:{name:'Tiefbohrung', icon:'🛢', cost:{money:2500, metal:200}, time:240, need:['res3'], desc:'Bohrturm: fördert Öl aus tiefen Lagerstätten – auch wenn die Ölfelder erschöpft sind'},
-  amphibious:{name:'Amphibische Kriegführung', icon:'🌊', cost:{money:1500, metal:120}, time:150, need:['res2'], desc:'Amphibienpanzer: fahren durch Flüsse und umgehen Brücken und Grenzbefestigungen'},
-  airborne:{name:'Luftlandetruppen', icon:'🪂', cost:{money:2000, metal:100}, time:180, need:['aviation'], desc:'Fallschirmjäger: springen hinter den feindlichen Linien ab – Flugabwehr auf dem Weg ist gefährlich'},
-  airdef: {name:'Luftverteidigung', icon:'🛡', cost:{money:1800, metal:150}, time:180, need:['res2'], desc:'Flugabwehrraketen-Stellung: holt Flugzeuge und Drohnen vom Himmel, fängt Raketen und Gleitbomben mit Chance ab'},
-  rocketry:{name:'Raketentechnik', icon:'🚀', cost:{money:3000, metal:250, oil:100}, time:240, need:['res3'], desc:'Raketenträger mit ballistischen Kurzstreckenraketen (40 Felder weit)'},
-  aviation:{name:'Luftfahrt', icon:'✈', cost:{money:3500, metal:300, oil:150}, time:300, need:['res3'], needB:['factory'], desc:'Fliegerhorst und Jagdbomber (Freifallbomben – müssen das Ziel überfliegen)'},
-  glidebomb:{name:'Gleitbomben', icon:'🎯', cost:{money:2500, metal:200}, time:200, need:['aviation','computing'], desc:'Jagdbomber werfen aus 14 Feldern Entfernung – außerhalb der meisten Flugabwehr'},
-  swarm:  {name:'Drohnenschwärme', icon:'🐝', cost:{money:3000, metal:200}, time:240, need:['computing'], desc:'Drohnenschwarm: acht autonome Kamikazedrohnen in einer Einheit'},
-  bomb:   {name:'Atomwaffenprogramm', icon:'☢', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
+  res2:   {name:'Forschung Stufe 2', icon:'🎓', branch:'wiss', level:2, cost:{money:1500, metal:150}, time:180, need:[], desc:'Schaltet FPV-Kamikazedrohnen und Raketenwerfer frei'},
+  res3:   {name:'Forschung Stufe 3', icon:'🎓', branch:'wiss', level:3, cost:{money:2400, metal:250, oil:150}, time:300, need:['res2'], desc:'Schaltet die Reaper-Drohne frei'},
+  fert:   {name:'Düngemittel', icon:'🌾', branch:'wirt', cost:{money:1200, metal:60}, time:150, need:['res2'], desc:'Alle Bauernhöfe bringen 50 % mehr Ertrag'},
+  glass:  {name:'Gewächshäuser', icon:'🥬', branch:'wirt', cost:{money:2000, metal:120, stone:200}, time:200, need:['fert','res3'], desc:'Gewächshaus: ernährt 250 Einwohner auf 2×2 Feldern ohne Äcker (braucht viel Strom)'},
+  urban:  {name:'Stadtplanung', icon:'🏙', branch:'wirt', cost:{money:1500, stone:200}, time:150, need:['res2'], desc:'Wohnblock: 150 Einwohner auf 2×2 Feldern'},
+  biofuel:{name:'Biokraftstoff', icon:'🌽', branch:'wirt', cost:{money:1500, metal:80}, time:180, need:['fert'], desc:'Raffinerien machen aus überschüssiger Nahrung Öl, wenn kein Rohöl da ist (2 🌾 → 1 🛢)'},
+  deepdrill:{name:'Tiefbohrung', icon:'🛢', branch:'wirt', cost:{money:2500, metal:200}, time:240, need:['res3'], desc:'Bohrturm: fördert Öl aus tiefen Lagerstätten – auch wenn die Ölfelder erschöpft sind'},
+  cars:   {name:'Kfz-Industrie', icon:'🚗', branch:'wirt', excl:'gesellschaft', cost:{money:2000, metal:150, oil:80}, time:200, need:['res2'], desc:'Fahrzeuge kosten 20 % weniger und laufen 25 % schneller vom Band'},
+  philosophy:{name:'Philosophie', icon:'📜', branch:'wiss', excl:'gesellschaft', cost:{money:1800, stone:120}, time:200, need:['res2'], desc:'Aufgeklärte Bürger: Zufriedenheit +8 Punkte, Forschung 15 % schneller'},
+  worldtrade:{name:'Welthandelsabkommen', icon:'🌐', branch:'wirt', win:'wirt', cost:{money:6000, metal:300, oil:200}, time:420, need:['deepdrill','urban'], desc:'Wirtschaftssieg: Wer danach ein Vermögen von 40.000 $ (Kasse + Lager) zwei Minuten lang hält, beherrscht das Tal'},
+  amphibious:{name:'Amphibische Kriegführung', icon:'🌊', branch:'land', cost:{money:1500, metal:120}, time:150, need:['res2'], desc:'Amphibienpanzer: fahren durch Flüsse und umgehen Brücken und Grenzbefestigungen'},
+  heavyarmor:{name:'Schwere Panzer', icon:'🛡', branch:'land', excl:'kriegsart', cost:{money:3000, metal:300, oil:150}, time:240, need:['res3'], needB:['factory'], desc:'Schwerer Kampfpanzer: doppelt so viel Panzerung, schwere Kanone – langsam und teuer'},
+  conventional:{name:'Konventionelle Überlegenheit', icon:'🎖', branch:'land', excl:'doktrin', cost:{money:6000, metal:400, oil:200}, time:360, need:['res3','heavyarmor'], desc:'Statt Atomwaffen: alle Einheiten +15 % Schaden, Stellungen und Bunker nehmen 25 % weniger Schaden'},
+  airborne:{name:'Luftlandetruppen', icon:'🪂', branch:'luft', cost:{money:2000, metal:100}, time:180, need:['aviation'], desc:'Fallschirmjäger: springen hinter den feindlichen Linien ab – Flugabwehr auf dem Weg ist gefährlich'},
+  airdef: {name:'Luftverteidigung', icon:'🛡', branch:'luft', cost:{money:1800, metal:150}, time:180, need:['res2'], desc:'Flugabwehrraketen-Stellung: holt Flugzeuge und Drohnen vom Himmel, fängt Raketen und Gleitbomben mit Chance ab'},
+  missiledef:{name:'Raketenabwehr', icon:'🎯', branch:'luft', cost:{money:2500, metal:200}, time:200, need:['airdef','computing'], desc:'Flugabwehrraketen fangen ballistische Raketen und Gleitbomben viel öfter ab (+30 %)'},
+  rocketry:{name:'Raketentechnik', icon:'🚀', branch:'luft', cost:{money:3000, metal:250, oil:100}, time:240, need:['res3'], desc:'Raketenträger mit ballistischen Kurzstreckenraketen (40 Felder weit)'},
+  aviation:{name:'Luftfahrt', icon:'✈', branch:'luft', cost:{money:3500, metal:300, oil:150}, time:300, need:['res3'], needB:['factory'], desc:'Fliegerhorst und Jagdbomber (Freifallbomben – müssen das Ziel überfliegen)'},
+  glidebomb:{name:'Gleitbomben', icon:'🎯', branch:'luft', cost:{money:2500, metal:200}, time:200, need:['aviation','computing'], desc:'Jagdbomber werfen aus 14 Feldern Entfernung – außerhalb der meisten Flugabwehr'},
+  swarm:  {name:'Drohnenschwärme', icon:'🐝', branch:'luft', excl:'kriegsart', cost:{money:3000, metal:200}, time:240, need:['computing'], desc:'Drohnenschwarm: acht autonome Kamikazedrohnen in einer Einheit'},
+  physics:{name:'Kernphysik', icon:'⚛', branch:'wiss', cost:{money:4000, metal:300}, time:300, need:['res3'], desc:'Kernkraftwerk: +600 Strom – zerstört verstrahlt es die Umgebung'},
+  computing:{name:'Informatik', icon:'💻', branch:'wiss', cost:{money:3000, metal:200}, time:240, need:['res3'], desc:'Rechenzentrum: beschleunigt die Forschung, braucht viel Strom'},
+  counterintel:{name:'Spionageabwehr', icon:'🕶', branch:'wiss', cost:{money:1500, metal:60}, time:150, need:['res2'], needB:['intel'], desc:'Fremde Geheimdienste erfahren viel seltener, was ihr erforscht und baut'},
+  ai:     {name:'Künstliche Intelligenz', icon:'🧠', branch:'wiss', cost:{money:8000, metal:400}, time:600, need:['computing'], needB:['datacenter'], power:true, desc:'Autonome FPV-Drohnen (Störsender wirkungslos, +10 Felder Reichweite), alle Betriebe und Werke 15 % schneller – Voraussetzung fürs Atomprogramm'},
+  bomb:   {name:'Atomwaffenprogramm', icon:'☢', branch:'wiss', excl:'doktrin', cost:{money:12000, metal:800, oil:400}, time:600, need:['physics','ai'], power:true, desc:'Anreicherungsanlage und Raketensilo – die ultimative Abschreckung'},
+  fusion: {name:'Kernfusion', icon:'☀', branch:'wiss', win:'wiss', cost:{money:20000, metal:1200, oil:600}, time:900, need:['physics','ai'], needB:['datacenter'], power:true, desc:'Wissenschaftssieg: Wer die Kernfusion als Erster beherrscht, gewinnt das Spiel'},
 };
+// Forschungsbaum: Zweige, steigende Kosten (Breite kostet), Meisterschaft (Tiefe lohnt sich)
+export const RTREE = {
+  rise: 0.07,           // jede abgeschlossene Forschung (außer Stufen) verteuert alle weiteren um 7 %
+  master: 4,            // so viele Forschungen eines Zweigs (außer Stufen) = Meisterschaft
+  branches: {
+    wirt: {name:'Wirtschaft',       icon:'💰', bonus:'Steuern +10 %'},
+    land: {name:'Landkrieg',        icon:'🪖', bonus:'Kaserne und Fahrzeugwerk 20 % schneller'},
+    luft: {name:'Luft & Raketen',   icon:'✈', bonus:'Fliegerhorst und Drohnenwerkstatt 20 % schneller'},
+    wiss: {name:'Wissenschaft',     icon:'🔬', bonus:'Forschung 20 % schneller'},
+  },
+  excl: {gesellschaft:'Industrie oder Aufklärung', kriegsart:'Panzer oder Drohnen', doktrin:'Atomwaffen oder konventionelle Überlegenheit'},
+  cars: {cost:0.8, speed:1.25}, philosophy: {mood:0.08, research:1.15}, conventional: {dmg:1.15, fort:0.75}, missiledef: {intercept:0.3},
+  mastery: {wirt:{tax:1.1}, land:{speed:1.2}, luft:{speed:1.2}, wiss:{research:1.2}},
+};
+// Geheimdienst: Wahrscheinlichkeit, von einem Ereignis zu erfahren (nach Ausbaustufe des Nachrichtendienstes), Verzögerung
+export const INTEL = {
+  chance: [0, 0.55, 0.75, 0.92], embassy: 0.15, rumor: 0.2, counter: 0.35, delay: [6, 25],
+  armyAt: 2, researchAt: 3,           // ab Stufe 2 Truppenschätzung, ab Stufe 3 laufende Forschung im Lagebericht
+  log: 40,
+  // Bedrohungen: was es ist und wie man sich dagegen wappnet
+  threats: {
+    rocketry:  {txt:'weitreichende ballistische Raketen (40 Felder)', counter:'Flugabwehrraketen (Luftverteidigung, Raketenabwehr) bei Rathaus, Kraftwerk und Werken; wichtige Gebäude verteilen'},
+    aviation:  {txt:'Jagdbomber', counter:'Flugabwehrraketen-Stellungen, Flak und Flakpanzer'},
+    glidebomb: {txt:'Gleitbomben mit 14 Feldern Reichweite', counter:'Flugabwehrraketen mit großer Reichweite und Raketenabwehr – Flak allein reicht nicht'},
+    swarm:     {txt:'Drohnenschwärme', counter:'Störsender, Selbstschussanlagen und MK-Stellungen'},
+    heavyarmor:{txt:'schwere Kampfpanzer', counter:'Panzerabwehrtrupps, Panzerminen, Gräben und Artillerie (Raketenwerfer)'},
+    amphibious:{txt:'Amphibienpanzer – Flüsse schützen nicht mehr', counter:'Flussufer mit Stellungen und Minen sichern, Reserve hinter der Grenze'},
+    airborne:  {txt:'Fallschirmjäger', counter:'Flak und MK-Stellungen auch im Hinterland, eine schnelle Eingreifreserve'},
+    bomb:      {txt:'ein Atomwaffenprogramm', counter:'eigene Abschreckung, Flugabwehrraketen mit Raketenabwehr, Stadt nicht zu dicht bauen'},
+    conventional:{txt:'eine konventionelle Großoffensive (alle Truppen stärker)', counter:'mehr Stellungen, Bunker und Reserven'},
+    fusion:    {txt:'die Kernfusion – den Wissenschaftssieg', counter:'Universität und Rechenzentren angreifen, bevor die Forschung fertig ist'},
+    worldtrade:{txt:'das Welthandelsabkommen – den Wirtschaftssieg', counter:'Handel einschränken, Krieg führen oder Tribut fordern, bevor das Vermögen reicht'},
+    ai:        {txt:'Künstliche Intelligenz (autonome Drohnen)', counter:'Selbstschussanlagen und Flak – Störsender wirken gegen autonome Drohnen nicht mehr'},
+  },
+  units: {tel:'Raketenträger', jet:'Jagdbomber', swarm:'Drohnenschwärme', heavy:'schwere Kampfpanzer', amphib:'Amphibienpanzer', mlrs:'Raketenwerfer', reaper:'Reaper-Drohnen', nuke:'eine Atomrakete'},
+};
+// Alternative Siege
+export const VICTORY = {wealth:40000, hold:120, warnAt:0.75};
+
 // Biokraftstoff: Nahrung → Öl in der Raffinerie (nur über der Reserve)
 export const BIOFUEL = {ratio:2, rate:1.5, reserve:300};
 export const RESEARCH_SPEED = {datacenter:0.5, maxDatacenters:2, ai:0.15};
 // KI Kastrova: Reihenfolge der Forschung und Mindest-Einwohnerzahl je Schritt
-export const AI_RESEARCH = [['res2',140],['fert',200],['urban',220],['airdef',230],['amphibious',250],['res3',240],['biofuel',280],['deepdrill',300],['computing',320],['rocketry',340],['aviation',360],['swarm',380],['airborne',390],['glidebomb',400],['physics',340],['glass',360],['ai',420],['bomb',480]];
+export const AI_RESEARCH = {
+  1: [['res2',140],['fert',200],['urban',220],['airdef',230],['amphibious',250],['res3',240],['cars',260],['heavyarmor',280],['biofuel',280],['deepdrill',300],['computing',320],['rocketry',340],['aviation',360],['airborne',390],['glidebomb',400],['physics',340],['glass',360],['ai',420],['bomb',480],['missiledef',500],['fusion',700]],
+  4: [['res2',140],['fert',200],['urban',220],['philosophy',230],['airdef',240],['res3',240],['counterintel',260],['biofuel',280],['deepdrill',300],['computing',320],['swarm',340],['missiledef',360],['rocketry',380],['aviation',400],['glidebomb',420],['worldtrade',420],['physics',440],['glass',380],['ai',480],['conventional',520],['fusion',650]],
+};
 // KI und Atomwaffen: Abschreckung dämpft die Angriffslust, Einsatz nur in der Not
 export const AI_NUKE = {stock:1, reserve:1500, deterAggr:0.15, blackmail:0.5, ratio:0.6, cool:300};
 // ---------- Atomwaffe ----------

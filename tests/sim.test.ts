@@ -21,13 +21,15 @@ import { serialize, loadGame } from '../src/sim/save';
 import { hasEmbassy, proposeContract, sendDiplomats } from '../src/sim/trade';
 import { applyOrder } from '../src/sim/missions';
 import { orderAttack, orderEscort, orderLurk, orderMove, orderPatrol } from '../src/sim/orders';
-import { AIR, BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, STORAGE, T } from '../src/data/config';
+import { AIR, BANDITS, BUILDINGS, CONSTRUCTION, FEAT, MAP_H, MAP_W, NUKE, RESEARCH, STORAGE, T, VICTORY } from '../src/data/config';
 import { answerOffer } from '../src/sim/offers';
 import { canPlaceRoad, demolish, orderRoadTo, planRoadLine, startUpgrade, upgradeBlock } from '../src/sim/build';
 import { accessPoints, unprotected } from '../src/sim/fortify';
 import { canPlaceDef } from '../src/sim/production';
 import { idx } from '../src/core/util';
 import { on } from '../src/core/events';
+import { costOf } from '../src/sim/costs';
+import { armyEstimate, intelChance, knows, mastery, researchIntel } from '../src/sim/intel';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
 /** Baustelle nahe dem Rathaus setzen */
@@ -877,6 +879,61 @@ describe('Simulation', () => {
     run(1); expect(G.over).toBe(false); expect(G.beaten && G.beaten[1]).toBe(true);
     for (const b of civ(4)) destroy(b, null);
     run(1); expect(G.over).toBe(true);
+  });
+  it('Forschung: Entweder-oder, steigende Kosten, Meisterschaft', () => {
+    newGame('mittel'); noBandits();
+    const p = G.players[0]; p.res.money = 1e6; p.res.metal = 1e5; p.res.oil = 1e5; p.res.stone = 1e5;
+    placeBuilding(0, 'university', 30, 110, true); placeBuilding(0, 'factory', 34, 106, true);
+    p.done = {res2: true, res3: true}; p.tech = 3;
+    const c0 = costOf('rocketry', 0).money;
+    p.done.fert = true; p.done.urban = true;
+    expect(costOf('rocketry', 0).money).toBeGreaterThan(c0);            // Breite kostet
+    expect(costOf('res2', 0).money).toBe(RESEARCH.res2.cost.money);     // Stufen nicht
+    // Panzer oder Drohnen: wer schwere Panzer hat, bekommt keine Schwärme mehr
+    p.done.computing = true; p.done.heavyarmor = true;
+    expect(missingReq(0, 'swarm').join(' ')).toMatch(/ausgeschlossen/);
+    expect(enqueue(0, 'swarm')).toBe(false);
+    // Doktrin: konventionelle Überlegenheit sperrt das Atomprogramm
+    p.done.physics = true; p.done.ai = true; placeBuilding(0, 'datacenter', 30, 104, true);
+    expect(enqueue(0, 'conventional')).toBe(true);
+    expect(missingReq(0, 'bomb').join(' ')).toMatch(/ausgeschlossen/);
+    // Meisterschaft Wirtschaft ab 4 Forschungen
+    expect(mastery(p, 'wirt')).toBe(false);
+    p.done.biofuel = true; p.done.deepdrill = true;
+    expect(mastery(p, 'wirt')).toBe(true);
+    // Kfz-Industrie verbilligt Fahrzeuge
+    const t0 = costOf('mbt', 0).money; p.done.cars = true; expect(costOf('mbt', 0).money).toBeLessThan(t0);
+  });
+  it('Geheimdienst: meldet Forschung und Waffen des Gegners mit Gegenmaßnahme', () => {
+    newGame('mittel'); noBandits(); makeContact(0, 1); makeContact(1, 0);
+    const got: string[] = []; on('msg', (m: any) => got.push(String(m)));
+    const A = G.players[1]; A.res.money = 1e6; A.res.metal = 1e5; A.res.oil = 1e5;
+    const ku = findBuilding(1, 'hq'); placeBuilding(1, 'university', ku.tx - 4, ku.ty + 6, true); A.done = {res2: true, res3: true}; A.tech = 3;
+    // ohne Nachrichtendienst kaum Chance, mit Stufe III fast sicher
+    expect(intelChance(0, 1)).toBeLessThan(0.2);
+    const ib = placeBuilding(0, 'intel', 30, 112, true); ib.lvl = 3;
+    expect(intelChance(0, 1)).toBeGreaterThan(0.85);
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    expect(enqueue(1, 'rocketry')).toBe(true);
+    run(30);
+    vi.restoreAllMocks();
+    expect(knows(0, 1).research).toBe('rocketry');
+    expect(got.some(t => /Geheimdienst: .*forscht an weitreichende/.test(t) && /Empfehlung: Flugabwehrraketen/.test(t))).toBe(true);
+    expect(researchIntel(0, 1)).toBe('rocketry');                       // Stufe III: laufende Forschung im Lagebericht
+    expect(armyEstimate(0, 1)).toBeTruthy();
+    // Spionageabwehr senkt die Chance
+    A.done.counterintel = true; expect(intelChance(0, 1)).toBeLessThan(0.65);
+  });
+  it('Alternative Siege: Kernfusion und Welthandel', () => {
+    newGame('mittel'); noBandits();
+    const p = G.players[0]; p.done = {worldtrade: true}; p.res.money = VICTORY.wealth + 1000;
+    run(VICTORY.hold - 10); expect(G.over).toBe(false);
+    run(15); expect(G.over).toBe(true);
+    newGame('mittel'); noBandits();
+    const A = G.players[4]; A.res.money = 1e6; A.res.metal = 1e5; A.res.oil = 1e5;
+    const h = findBuilding(4, 'hq'); placeBuilding(4, 'university', h.tx - 4, h.ty - 4, true);
+    A.q.research.push({type: 'fusion', t: RESEARCH.fusion.time - 0.5, time: RESEARCH.fusion.time});
+    run(2); expect(G.over).toBe(true);                                 // Veloria gewinnt das Rennen
   });
   it('läuft 10 Spielminuten ohne Fehler (Endlos-Modus)', () => {
     newGame('mittel');

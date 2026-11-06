@@ -116,18 +116,18 @@ export function genMap(){
     const st=lvl(side,'stone');
     if(st>=1) lf(G.rock,15.5,56.5,st===2?1.6:1.3,st===2?1500:1100,0.85);
     if(st===2){ lf(G.rock,2.5,57.5,1.6,1500,0.85); lf(G.rock,19.5,51.5,1.4,1400,0.85); }
-    if(st>=1) gf(G.rock,36,100,1.9,1400,0.85);
-    else { gf(G.rock,50,92,1.5,900,0.8); lf(G.rock,3.5,60,1.0,500,0.9); }   // knapp: nur ein paar Brocken
+    if(st>=1) gf(G.rock,34,106,1.9,1400,0.85);
+    else { gf(G.rock,38,110,1.5,900,0.8); lf(G.rock,3.5,60,1.0,500,0.9); }   // knapp: nur ein paar Brocken
     // Öl: knapp = nichts in Stadtnähe, reich = reich + Zusatzfeld
     const o=lvl(side,'oil'), om=o===2?1.6:1;
     if(o>=1){ lf(G.oil,18.5,58.5,2.2,420*om,0.8); lf(G.oil,3.5,40.5,1.8,380*om,0.8); }
     if(o===2) lf(G.oil,9.5,61,1.5,500,0.85);
-    gf(G.oil,46,112,3.2,o===0?400:600,0.8); gf(G.oil,12,88,3,520,0.8);
+    gf(G.oil,44,118,3.2,o===0?400:600,0.8); gf(G.oil,8,102,3,520,0.8);
     // Erz (Metall): knapp = kein Erz in Stadtnähe, reich = größer + Zusatzfeld
     const m=lvl(side,'metal');
     if(m>=1) lf(G.ore,15.5,45.5,m===2?2.0:1.6,m===2?1300:900,0.9);
     if(m===2) lf(G.ore,2.5,46.5,1.4,900,0.9);
-    gf(G.ore,54,98,2.4,m===0?800:1200,0.9); gf(G.ore,28,84,2.2,1000,0.9);
+    gf(G.ore,42,104,2.4,m===0?800:1200,0.9); gf(G.ore,16,99,2.2,1000,0.9);
   }
   // ---- Umkämpftes: Wildnis links oben (Aldoria | Kastrova) und Flussgrenzen der Nachbarn ----
   blob(PAIR_A,14,46,5,toMeadow); field(PAIR_A,G.rock,8,22,2.4,1800,0.85); field(PAIR_A,G.ore,22,40,2.2,1300,0.9); field(PAIR_A,G.oil,40,60,2.8,700,0.8);

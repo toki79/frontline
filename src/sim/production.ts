@@ -1,7 +1,9 @@
 import { idx, inMap } from '../core/util';
-import { isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { INTEL, RTREE, isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
 import { canAfford, pay } from '../sim/costs';
 import { G } from '../sim/state';
+import { intelEvent, mastery, branchCount } from '../sim/intel';
+import { endGame } from '../sim/combat';
 import { anyWar, atWar, findBuilding, placeBuilding, rectDist, ringTiles, spawnUnit } from '../sim/world';
 import { canPlaceRoad, clearForest, findWorking, forestTilesNear, hasRockNear, planRoad } from '../sim/build';
 import { msg } from '../core/events';
@@ -25,9 +27,14 @@ export function missingReq(pid,type){
   if(d.emergency&&G.units.filter(u=>!u.dead&&u.owner===pid&&u.type===type).length>=EMERGENCY.maxVolunteers) miss.push(`höchstens ${EMERGENCY.maxVolunteers} Trupps`);
   if(d.research&&!hasTech(p,d.research)) miss.push(`Forschung „${RESEARCH[d.research].name}“`);
   if(RESEARCH[type]){ for(const n of (d.need||[])) if(!hasTech(p,n)) miss.push(RESEARCH[n].name);
+    const ex=exclBlock(p,type); if(ex) miss.push(`ausgeschlossen durch „${RESEARCH[ex].name}“`);
     for(const b of (d.needB||[])) if(!findBuilding(pid,b)) miss.push(BUILDINGS[b].name); }
   return miss;
 }
+/** Entweder-oder: welche schon erforschte oder laufende Forschung derselben Gruppe sperrt diese? */
+export function exclBlock(p,type){ const g=RESEARCH[type]&&RESEARCH[type].excl; if(!g) return null;
+  for(const k in RESEARCH) if(k!==type&&RESEARCH[k].excl===g&&(hasTech(p,k)||p.q.research.some(i=>i.type===k))) return k;
+  return null; }
 /** Notstand: Stadt kürzlich angegriffen oder Krieg */
 export const emergency = pid => isMajor(pid)&&anyWar(pid) || !!(G.players[pid].lastAttack&&G.t-G.players[pid].lastAttack.t<EMERGENCY.window);
 export const available=(pid,type)=>missingReq(pid,type).length===0;
@@ -37,7 +44,9 @@ export function enqueue(pid,type){
   if(qn==='research'&&(q.length||hasTech(p,type))) return false;
   if(qn==='silo'&&(q.length||(p.nukes||0)>=NUKE.maxStock)) return false;
   if(q.length>=(qn==='factory'?2:qn==='droneshop'?3:6)) return false;   // Fahrzeuge nur in kleinen Stückzahlen vorbestellen
-  pay(pid,type,1); q.push({type,t:0,time:DEF(type).time}); return true;
+  pay(pid,type,1); q.push({type,t:0,time:DEF(type).time});
+  if(qn==='research'&&isMajor(pid)) intelEvent(pid,'research',type);   // fremde Geheimdienste können davon erfahren
+  return true;
 }
 export function cancelItem(pid,type){
   const p=G.players[pid], q=p.q[queueName(type)]; if(!q) return false;
@@ -50,7 +59,7 @@ export function updateProduction(pid,dt){
     const q=p.q[qn]; if(!q||!q.length) continue;
     const producer=findWorking(pid, qn==='research'?'university':qn); if(!producer) continue;
     const it=q[0];
-    let ff=(UNITS[it.type]&&UNITS[it.type].emergency?1:f)*lvlMul(producer);   // ausgebaute Werke arbeiten schneller   // Bürgerwehr: Freiwillige brauchen kein Geld
+    let ff=(UNITS[it.type]&&UNITS[it.type].emergency?1:f)*lvlMul(producer)*branchSpeed(p,qn);   // ausgebaute Werke arbeiten schneller   // Bürgerwehr: Freiwillige brauchen kein Geld
     if(qn==='research'){ ff*=1+RESEARCH_SPEED.datacenter*Math.min(RESEARCH_SPEED.maxDatacenters,G.buildings.filter(b=>b.owner===pid&&b.type==='datacenter'&&!b.dead&&!b.site).length);   // Rechenzentren
       const R=RESEARCH[it.type]; if(R.power&&p.use>p.power) ff=0; it.stalled=ff===0?'⚡ Strommangel – steht still':''; }   // KI und Atomprogramm: nur mit genug Strom
     if(qn==='silo'){ if(!findWorking(pid,'enrich')) ff=0; it.stalled=ff===0?'Anreicherungsanlage arbeitet nicht':''; }
@@ -59,14 +68,25 @@ export function updateProduction(pid,dt){
       if(qn==='research'){ const R=RESEARCH[it.type]; q.shift(); p.done=p.done||{}; p.done[it.type]=true; if(R.level) p.tech=Math.max(p.tech,R.level);
         const what=R.level?`Stufe ${R.level}: ${TECH_UNLOCKS[R.level]}`:`${R.name}: ${R.desc}`;
         if(pid===0) msg(`${R.icon||'🎓'} Erforscht – ${what}.`,'#9fd88a');
-        else if(isMajor(pid)&&G.known[0][pid]&&(R.level||it.type==='bomb'||it.type==='ai'||it.type==='physics')) msg(it.type==='bomb'?`☢ Geheimdienst: ${p.short} betreibt ein Atomwaffenprogramm!`:`Geheimdienst: ${p.short} hat „${R.name}“ erforscht.`,it.type==='bomb'?'#ff8a7a':'#d6b45a'); }
+        if(isMajor(pid)) intelEvent(pid,'done',it.type);
+        if(R.branch&&!R.level&&branchCount(p,R.branch)===RTREE.master&&pid===0) msg(`🏅 Meisterschaft ${RTREE.branches[R.branch].name}: ${RTREE.branches[R.branch].bonus}.`,'#ffd36a');
+        if(R.win==='wiss'&&!G.over){ endGame(pid===0, pid===0?'Aldoria beherrscht die Kernfusion – Wissenschaftssieg!':`${p.short} beherrscht die Kernfusion – ihr habt das Rennen um den Wissenschaftssieg verloren.`); return; } }
       else if(UNITS[it.type].stored){ q.shift(); p.nukes=(p.nukes||0)+1;
         if(pid===0) msg('☢ Eine Atomrakete ist einsatzbereit. Schon ihr Besitz schreckt die anderen Mächte ab.','#ffd36a');
-        else if(G.known[0][pid]) msg(`☢☢ Geheimdienst: ${p.short} besitzt jetzt eine Atomrakete!`,'#ff8a7a'); }
-      else { const nu=spawnUnit(pid,it.type,producer); if(nu){ q.shift(); if(it.grp) joinGroup(nu,it); } else it.t=it.time; }   // Ersatz stößt zum Verband
+        else intelEvent(pid,'unit','nuke'); }
+      else { const nu=spawnUnit(pid,it.type,producer); if(nu){ q.shift(); if(it.grp) joinGroup(nu,it);   // Ersatz stößt zum Verband
+          if(isMajor(pid)&&INTEL.units[it.type]){ const n=G.units.filter(u=>!u.dead&&u.owner===pid&&u.type===it.type).length; if([1,3,6,10,15].includes(n)) intelEvent(pid,'unit',it.type,{n}); } }
+        else it.t=it.time; }
     }
   }
 }
+/** Tempo eines Werks durch Meisterschaft und Doktrin */
+function branchSpeed(p,qn){ let m=1;
+  if(qn==='research'){ if(mastery(p,'wiss')) m*=RTREE.mastery.wiss.research; if(hasTech(p,'philosophy')) m*=RTREE.philosophy.research; }
+  if((qn==='barracks'||qn==='factory')&&mastery(p,'land')) m*=RTREE.mastery.land.speed;
+  if((qn==='airbase'||qn==='droneshop')&&mastery(p,'luft')) m*=RTREE.mastery.luft.speed;
+  if(qn==='factory'&&hasTech(p,'cars')) m*=RTREE.cars.speed;
+  return m; }
 export function tileFree(i){return !(G.fallMap&&G.fallMap[i])&&(TERRAIN[G.terr[i]].build||G.terr[i]===T.FOREST)&&!(G.sapling&&G.sapling[i]>0)&&G.oil[i]<=0&&G.ore[i]<=0&&G.rock[i]<=0&&!G.road[i]&&!G.occ[i];}
 export function nearOwn(pid,tx,ty,w,h){
   for(const b of G.buildings){ if(b.dead||b.owner!==pid) continue;

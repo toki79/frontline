@@ -2,7 +2,7 @@ import { $$ } from './dom';
 import { fmt } from '../core/util';
 import { AIS, BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType } from '../data/config';
 import { drawBuildingShape, drawFeature, drawRoad, drawUnitShape } from '../render/draw';
-import { canAfford, lacking } from '../sim/costs';
+import { canAfford, costOf, lacking } from '../sim/costs';
 import { nextMilestone } from '../sim/economy';
 import { cancelItem, enqueue, missingReq, queueName } from '../sim/production';
 import { G } from '../sim/state';
@@ -22,10 +22,10 @@ export const ui: any={tab:'bau',btns:{},cat:{}};
 export const CATS = {
   bau: [['alle','Alle'],['wohnen','🏠 Wohnen',['house','block']],['versorgung','🌾 Nahrung & ⚡ Strom',['farm','greenhouse','power','npp']],
         ['rohstoffe','⛏ Rohstoffe',['lumber','forester','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
-        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär',['barracks','factory','droneshop','airbase']],
+        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär & Geheimdienst',['barracks','factory','droneshop','airbase','intel']],
         ['hightech','🎓 Wissen & Hightech',['university','datacenter','enrich','silo']]],
   truppen: [['alle','Alle'],['zivil','👷 Zivil',['worker','volunteer','diplomat','truck']],['inf','🪖 Infanterie',['inf','at','para']],
-        ['fahrz','🚜 Fahrzeuge',['apc','amphib','ifv','mbt','mlrs','tel','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','swarm','spy','reaper']],['luft','✈ Luftwaffe',['jet','para']]],
+        ['fahrz','🚜 Fahrzeuge',['apc','amphib','ifv','mbt','heavy','mlrs','tel','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','swarm','spy','reaper']],['luft','✈ Luftwaffe',['jet','para']]],
   vert: [['alle','Alle'],['pio','👷 Pioniere & Sperren',['pioneer','wall','wire','trench','atmine']],['stell','🎯 Stellungen',['sentry','turret','atpost','flak','sam','gbunker']]],
   forsch: [['alle','Alle'],['offen','Offen'],['fertig','✓ Erforscht']],
 };
@@ -100,6 +100,7 @@ export function updatePanel(){
     const qn=queueName(k), q=qn?p.q[qn]:[], miss=missingReq(0,k);
     const sites=BUILDINGS[k]?G.buildings.filter(x=>!x.dead&&x.site&&x.owner===0&&x.type===k).length:0;
     const n=q.filter(i=>i.type===k).length+sites, cur=q[0]&&q[0].type===k?q[0]:null;
+    if(RESEARCH[k]||(UNITS[k]&&UNITS[k].cls==='veh')){ const ch=costHtml(costOf(k,0)); if(b.cost!==ch){ b.cost=ch; const c=b.el.querySelector('.c'); if(c) c.innerHTML=ch; } }   // steigende Forschungskosten, Kfz-Rabatt
     b.el.classList.toggle('ready',G.placing===k);
     b.el.classList.toggle('locked',miss.length>0);
     b.el.classList.toggle('poor',!miss.length&&!canAfford(0,k)&&!n);

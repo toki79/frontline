@@ -43,8 +43,8 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     else { c.fillStyle='#4a4d42'; c.fillRect(-7,-4,9,8); c.strokeStyle='#1d1d1a'; c.lineWidth=1.3;
       c.beginPath(); c.moveTo(-3,0); c.lineTo(-3,-9); c.moveTo(-6,-7); c.lineTo(0,-7); c.moveTo(-5,-5); c.lineTo(-1,-5); c.stroke();   // Antennen
       const t=G?G.t:0; c.strokeStyle=`rgba(140,200,255,${0.25+0.25*Math.sin(t*6)})`; c.beginPath(); c.arc(-3,-9,4+((t*8)%6),0,7); c.stroke(); }
-  } else if(type==='ifv'||type==='mbt'){
-    const big=type==='mbt', L=big?24:20, Wd=big?16:13;
+  } else if(type==='ifv'||type==='mbt'||type==='heavy'){
+    const hv=type==='heavy', big=type!=='ifv', L=hv?30:big?24:20, Wd=hv?19:big?16:13;
     c.rotate(ang);
     c.fillStyle='rgba(0,0,0,.3)'; rr(c,-L/2+2,-Wd/2+2,L,Wd,3); c.fill();
     c.fillStyle='#2b2b26'; c.fillRect(-L/2,-Wd/2-1,L,3.2); c.fillRect(-L/2,Wd/2-2.2,L,3.2);
@@ -52,7 +52,9 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     c.fillStyle='rgba(255,255,255,.12)'; c.fillRect(-L/2+3,-Wd/2+3,L-8,2);
     c.rotate(tur-ang);
     c.fillStyle=dark;
-    if(big){ c.fillRect(3,-1.6,15,3.2); c.fillStyle=col; c.beginPath(); c.arc(0,0,6.5,0,7); c.fill(); c.strokeStyle=dark; c.stroke(); c.fillStyle=dark; c.beginPath(); c.arc(-1.5,-1.5,1.6,0,7); c.fill(); }
+    if(hv){ c.fillRect(4,-2.1,19,4.2); c.fillRect(21,-2.8,3,5.6); c.fillStyle=col; rr(c,-8,-7,15,14,3); c.fill(); c.strokeStyle=dark; c.stroke();   // schwerer Turm, Mündungsbremse
+      c.fillStyle='rgba(255,255,255,.14)'; c.fillRect(-6,-5.5,10,2); c.fillStyle=dark; c.beginPath(); c.arc(-3,-2,1.8,0,7); c.fill(); c.fillRect(-7,3,5,2.4); }
+    else if(big){ c.fillRect(3,-1.6,15,3.2); c.fillStyle=col; c.beginPath(); c.arc(0,0,6.5,0,7); c.fill(); c.strokeStyle=dark; c.stroke(); c.fillStyle=dark; c.beginPath(); c.arc(-1.5,-1.5,1.6,0,7); c.fill(); }
     else { c.fillRect(2,-0.9,11,1.8); c.fillStyle=col; rr(c,-4,-3.8,8,7.6,1.5); c.fill(); c.strokeStyle=dark; c.stroke(); }
   } else if(type==='spy'||type==='reaper'){
     const t=G?G.t:0, big=type==='reaper';
@@ -154,6 +156,14 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
       c.fillStyle=col; c.fillRect(14,4,10,6);
       box(W/2-8,H-10,16,8,'#444');
       break;
+    case 'intel': {   // Nachrichtendienst: unscheinbarer Bau, Antennen und Satellitenschüssel
+      roof(4,8,W-14,H-16,false);
+      c.fillStyle='#d8d8d0'; c.beginPath(); c.ellipse(W-11,H-14,7,5.5,-0.6,0,7); c.fill(); c.strokeStyle='#777'; c.stroke();
+      c.strokeStyle='#555'; c.beginPath(); c.moveTo(W-11,H-14); c.lineTo(W-6,H-20); c.stroke();
+      c.strokeStyle='#3a3a34'; c.lineWidth=1.4; c.beginPath(); c.moveTo(12,10); c.lineTo(12,1); c.moveTo(8,4); c.lineTo(16,4); c.moveTo(9,7); c.lineTo(15,7); c.stroke(); c.lineWidth=1;
+      c.fillStyle=(Math.floor(tt*1.5)%2)?'#ff5a4a':'#5a2a22'; c.fillRect(11,0,2,2);
+      c.fillStyle='#2a2e34'; c.fillRect(8,H-10,10,4);
+      break; }
     case 'depot': {   // Lagerhalle: Wellblechdach, Rolltor, Kisten
       c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(7,7,W-10,H-14);
       const rx=5, ry=5, rw=W-10, rh=H-16;

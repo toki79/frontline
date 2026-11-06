@@ -1,6 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { RTREE, hasTech, MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -74,6 +74,8 @@ export function applyDamage(t,dmg,type,src){
   if(t.kind==='unit'&&isMajor(t.owner)&&type!=='drone'&&homeTurf(t)) m*=0.7;          // Heimvorteil: vorbereitete Stellungen (nicht gegen Drohnen von oben)
   if(t.cage&&CAGE[type]) m*=CAGE[type];
   if(src&&src.cmb) m*=1+COMBINED.dmg;   // verbundene Waffen
+  if(src&&src.owner!==undefined&&hasTech(G.players[src.owner],'conventional')) m*=RTREE.conventional.dmg;   // konventionelle Überlegenheit
+  if(t.kind==='building'&&t.def.def&&hasTech(G.players[t.owner],'conventional')) m*=RTREE.conventional.fort;
   if(src&&src.kind==='building'&&src.def&&src.def.def) m*=FORTIFY.dmgOut;   // Stellungen: vorbereitete Schussfelder
   if(src&&src.dug) m*=FORTIFY.dugOut;   // eingegrabene Truppen schießen ruhiger
   if(t.kind==='building'&&t.def.def&&!FORTIFY.artillery.includes(type)) m*=FORTIFY.direct;   // Befestigung hält direktem Feuer stand

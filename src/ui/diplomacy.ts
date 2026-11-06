@@ -1,5 +1,6 @@
 import { fmt } from '../core/util';
-import { AIS, AI_CHAR, REGION, RES, TRADE, TRIBUTE, isAI } from '../data/config';
+import { AIS, AI_CHAR, INTEL, REGION, RES, RESEARCH, TRADE, TRIBUTE, hasTech, isAI } from '../data/config';
+import { armyEstimate, intelChance, intelLevel, knows, researchIntel } from '../sim/intel';
 import { demandTribute, evalTribute, landOffer, tributeOf, waiveTribute } from '../sim/tribute';
 import { rr } from '../render/draw';
 import { TRADES, aiQuotes, marketOpen, marketTrend, trade, tradeAI, tradeTerms } from '../sim/market';
@@ -89,12 +90,28 @@ function aiPartyHtml(pid){
         if(q.side==='buy') h+=B(pid,`ai_buy_${q.res}`,`Verkaufen: ${q.amt} ${ic} → $${q.price}${q.urgent?' 🔥':''}`,p.res[q.res]>=q.amt);
         else h+=B(pid,`ai_sell_${q.res}`,`Kaufen: ${q.amt} ${ic} für $${q.price}`,p.res.money>=q.price); }
       h+=`</div><div class="barl"><span>Preise richten sich nach Vorrat und Engpass von ${A.short}. 🔥 = dringend gesucht. Handel verbessert die Beziehung.</span></div>`; } }
+  h+=intelHtml(pid);
   h+=contractHtml(pid);
   h+=tributeHtml(pid);
   h+='<h4>Beziehung</h4><div class="row">';
   if(war){ h+=B(pid,'peace','Frieden anbieten',true)+B(pid,'peacet','Frieden + $400',p.res.money>=400); }
   else { h+=B(pid,'gift','Geschenk ($200)',p.res.money>=200)+B(pid,'food','Nahrung schenken (🌾100)',p.res.food>=100)+B(pid,'war','Krieg erklären',true,'#5a221c'); }
   return h+'</div></div>';
+}
+// ---------- Geheimdienst: Lagebericht ----------
+function intelHtml(pid){
+  const n=G.players[pid].short, l=intelLevel(0), ch=Math.round(intelChance(0,pid)*100), K=knows(0,pid);
+  let h=`<h4>🕵 Lagebericht</h4><div class="barl"><span>${l?`Nachrichtendienst Stufe ${l}`:'Kein Nachrichtendienst – nur Gerüchte'} · Quellenlage ${ch} %${G.embassy[0][pid]?' (mit Botschaft)':''}${hasTech(G.players[pid],'counterintel')&&l?' · Spionageabwehr erschwert die Arbeit':''}</span></div>`;
+  if(!l) h+=`<div class="barl"><span>Ein <b>Nachrichtendienst</b> (Gebäude → Militär & Geheimdienst) meldet, was ${n} erforscht, baut und plant – mit Empfehlung für eure Verteidigung. Stufe II schätzt die Truppen, Stufe III sieht die laufende Forschung.</span></div>`;
+  const tech=Object.keys(K.tech).filter(k=>RESEARCH[k]).map(k=>`${RESEARCH[k].icon} ${RESEARCH[k].name}`), units=Object.entries(K.units).map(([k,c])=>`${c}× ${INTEL.units[k]||k}`);
+  if(tech.length) h+=`<div class="barl"><span>Bekannte Technik: ${tech.join(', ')}</span></div>`;
+  if(units.length) h+=`<div class="barl"><span>Gesichtet: ${units.join(', ')}</span></div>`;
+  const rs=researchIntel(0,pid); if(rs&&RESEARCH[rs]) h+=`<div class="barl"><span>Forscht gerade: ${RESEARCH[rs].icon} ${RESEARCH[rs].name}${INTEL.threats[rs]?' ⚠':''}</span></div>`;
+  const est=armyEstimate(0,pid); if(est) h+=`<div class="barl"><span>Truppen (geschätzt): 🪖 ${est.inf} Infanterie · 🚙 ${est.veh} Fahrzeuge · 🛡 ${est.heavy} Panzer · ✈ ${est.air} Luft · 🚀 ${est.missile} Raketen/Artillerie</span></div>`;
+  if(K.plan&&G.t-K.plan.t<300) h+=`<div class="barl" style="color:#ffb38a"><span>⚠ Angriffspläne gemeldet${K.plan.target?` – Ziel vermutlich euer ${K.plan.target}`:''}</span></div>`;
+  const L=((G.intel&&G.intel.log)||[]).filter(r=>r.tgt===pid).slice(0,3);
+  for(const r of L) h+=`<div class="intelRep"><span class="dim">vor ${Math.max(1,Math.round((G.t-r.t)/60))} min</span> ${r.txt.replace(/^🕵 Geheimdienst: /,'')}${r.counter?`<br>➜ ${r.counter}`:''}</div>`;
+  return h;
 }
 // ---------- Tribut fordern ----------
 const tgs={}; export const tgOf=pid=>tgs[pid]||(tgs[pid]={kind:'money', lvl:1, rec:false});
