@@ -45,7 +45,7 @@ export function siteWorkers(b){ let n=0; for(const u of G.units) if(!u.dead&&u.j
 /** Abriss eines eigenen Gebäudes. Baustellen werden voll erstattet, fertige Gebäude teilweise. */
 export function demolish(pid,b){
   if(!b||b.dead||b.owner!==pid||b.type==='hq'||b.kind!=='building') return false;
-  const c=costOf(b.type), p=G.players[pid];
+  const c={...costOf(b.type)}, p=G.players[pid]; if(b.paid!=null) c.money=b.paid;   // nur zurückgeben, was wirklich bezahlt wurde (Not-Höfe)
   if(b.site&&b.pio){ for(const r in c) if(r!=='pop') p.res[r]+=c[r]; }   // Stellung im Bau: alles zurück
   else if(b.site){ p.res.money+=c.money||0; for(const m of MATS) p.res[m]+=Math.floor(((b.used&&b.used[m])||0)+((b.dlv&&b.dlv[m])||0)); }   // Baustelle: Geld und verbautes Material zurück
   else for(const r in c){ if(r==='pop') continue; p.res[r]+=Math.floor(c[r]*CONSTRUCTION.demolishRefund); }

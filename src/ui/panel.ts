@@ -101,7 +101,7 @@ export function updatePanel(){
     const qn=queueName(k), q=qn?p.q[qn]:[], miss=missingReq(0,k);
     const sites=BUILDINGS[k]?G.buildings.filter(x=>!x.dead&&x.site&&x.owner===0&&x.type===k).length:0;
     const n=q.filter(i=>i.type===k).length+sites, cur=q[0]&&q[0].type===k?q[0]:null;
-    if(RESEARCH[k]||(UNITS[k]&&UNITS[k].cls==='veh')){ const ch=costHtml(costOf(k,0)); if(b.cost!==ch){ b.cost=ch; const c=b.el.querySelector('.c'); if(c) c.innerHTML=ch; } }   // steigende Forschungskosten, Kfz-Rabatt
+    if(RESEARCH[k]||(UNITS[k]&&UNITS[k].cls==='veh')||k==='farm'){ const ch=costHtml(costOf(k,0)); if(b.cost!==ch){ b.cost=ch; const c=b.el.querySelector('.c'); if(c) c.innerHTML=ch; } }   // steigende Forschungskosten, Kfz-Rabatt
     b.el.classList.toggle('ready',G.placing===k);
     b.el.classList.toggle('locked',miss.length>0);
     b.el.classList.toggle('poor',!miss.length&&!canAfford(0,k)&&!n);

@@ -356,6 +356,15 @@ export const DIFFICULTY = {
   mittel: {incomeMul:1.0,  grace:200, think:1.0, aggr:1.0,  aiTech:0.6},
   schwer: {incomeMul:1.2,  grace:120, think:0.7, aggr:1.35, aiTech:0.45},
 };
+// Hungersnot-Hilfe: Frühwarnung, Notrationen aus dem Rathaus, kostenlose Not-Höfe, Hilfsangebot der Nachbarn
+export const FAMINE = {
+  warn: 180, warnEvery: 60,            // Warnung, wenn die Nahrung in weniger als warn Sekunden aufgebraucht ist
+  window: 180,                         // so lange nach dem letzten Hunger gilt der Notstand
+  rationMul: 4, rationT: 150, rationCool: 600,   // Rathaus gibt das Vierfache aus (0,5 -> 2 Nahrung/s), höchstens alle 10 min
+  freeFarms: 3,                        // so viele Höfe kosten im Notstand kein Geld (nur Holz)
+  aidAmt: 200, aidMarkup: 1.3, creditMarkup: 1.25, aidCool: 420, aidMinAtt: -30, aidReserve: 100,   // Hilfslieferung: Marktwert × Aufschlag, auf Kredit noch einmal teurer
+  debtShare: 0.4, debtTime: 900, debtAnger: 20,   // Kredit: 40 % der Steuern gehen an den Gläubiger, nach 15 min ist er verärgert
+};
 // LLM-Stratege (optional, siehe ui/llm.ts): Gültigkeit einer Entscheidung, Grenzen für Forderungen und Geschenke
 export const STRATEGIST = {ttl:180, interval:45, timeout:45, demand:{money:[100,1500], res:[50,400]}, gift:200};
 // KI gegen KI: frühestens nach minT Sekunden und mit höherer Angriffslust

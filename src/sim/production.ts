@@ -1,6 +1,6 @@
 import { idx, inMap } from '../core/util';
-import { INTEL, RTREE, isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
-import { canAfford, pay } from '../sim/costs';
+import { FAMINE, INTEL, RTREE, isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
+import { canAfford, costOf, famine, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { intelEvent, mastery, branchCount } from '../sim/intel';
 import { endGame } from '../sim/combat';
@@ -139,9 +139,10 @@ export function cancelDefPlan(pid,x,y){
 /** Baustelle beauftragen: Kosten werden sofort bezahlt, Bauarbeiter erledigen den Rest. */
 export function placeSite(pid,type,tx,ty){
   if(!BUILDINGS[type]||BUILDINGS[type].def||!canPlace(pid,type,tx,ty)||missingReq(pid,type).length||!canAfford(pid,type)) return null;
-  const p=G.players[pid]; p.res.money-=BUILDINGS[type].cost.money||0;   // Holz, Stein, Metall holen die Arbeiter erst beim Bauen
+  const p=G.players[pid], paid=costOf(type,pid).money||0; p.res.money-=paid;   // Holz, Stein, Metall holen die Arbeiter erst beim Bauen
+  if(type==='farm'&&!paid&&famine(p)){ p.freeFarms=(p.freeFarms||0)+1; if(pid===0) msg(`🌾 Not-Hof gesetzt – kostenlos (noch ${Math.max(0,FAMINE.freeFarms-p.freeFarms)} frei, solange die Hungersnot dauert).`,'#9fd88a'); }
   const d=BUILDINGS[type]; let n=0, w=0;   // Bauplatz im Wald: Bäume werden gerodet, ein Teil des Holzes kommt ins Lager
   for(let y=ty;y<ty+d.h;y++)for(let x=tx;x<tx+d.w;x++){ const i=idx(x,y); if(G.terr[i]===T.FOREST){ n++; w+=G.wood[i]*CONSTRUCTION.clearShare; clearForest(i); } }
   if(n){ p.res.wood+=Math.floor(w); if(pid===0) msg(`🌲 ${n} Waldfeld${n===1?'':'er'} für den Bauplatz gerodet (+${Math.floor(w)} 🪵).`,'#9fd88a'); G.qDirty=true; }
-  return placeBuilding(pid,type,tx,ty,false,true);
+  const nb=placeBuilding(pid,type,tx,ty,false,true); if(nb) nb.paid=paid; return nb;
 }

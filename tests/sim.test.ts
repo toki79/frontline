@@ -370,7 +370,7 @@ describe('Simulation', () => {
     newGame('mittel');
     const p = G.players[0];
     run(5); const h0 = p.happy;
-    p.res.food = 0; run(40);
+    p.rationCool = 1e9; p.res.food = 0; run(40);                      // ohne Notrationen
     expect(p.happy).toBeLessThan(h0 - 0.1);
     expect(p.rate.taxF).toBeLessThan(1);
   });
@@ -935,6 +935,35 @@ describe('Simulation', () => {
     const h = findBuilding(4, 'hq'); placeBuilding(4, 'university', h.tx - 4, h.ty - 4, true);
     A.q.research.push({type: 'fusion', t: RESEARCH.fusion.time - 0.5, time: RESEARCH.fusion.time});
     run(2); expect(G.over).toBe(true);                                 // Veloria gewinnt das Rennen
+  });
+  it('Hungersnot: Frühwarnung, Notrationen, kostenlose Not-Höfe ohne Abriss-Trick, Hilfsangebot auf Kredit', () => {
+    newGame('mittel'); noBandits();
+    const p = G.players[0], texts: string[] = []; on('msg', (t: string) => texts.push(t));
+    p.res.food = 30; p.pop = 200; p.cap = 260;                         // viele Esser, wenig Vorrat
+    run(2); expect(p.foodRate).toBeLessThan(0);
+    expect(texts.some(t => t.includes('Nahrung reicht noch'))).toBe(true);
+    expect(costOf('farm', 0).money).toBeGreaterThan(0);                // noch kein Notstand
+    p.res.food = 0; run(1);
+    expect(G.t).toBeLessThan(p.rationUntil);                           // Notrationen laufen
+    expect(texts.some(t => t.includes('Notrationen'))).toBe(true);
+    expect(costOf('farm', 0).money).toBe(0);                           // Not-Hof: kein Geld, nur Holz
+    expect(costOf('farm', 0).wood).toBeGreaterThan(0);
+    p.res.money = 0;
+    const f = siteNearHq('farm'); expect(f).toBeTruthy(); expect(p.freeFarms).toBe(1); expect(f.paid).toBe(0);
+    demolish(0, f); expect(p.res.money).toBe(0);                       // Abreißen bringt kein Geld
+    // Notrationen: das Rathaus gibt mehr Nahrung aus
+    const hqFood = () => { const save = p.rationUntil; p.rationUntil = 0; run(0.05); const a = p.rate.foodProd; p.rationUntil = G.t + 100; run(0.05); const b = p.rate.foodProd; p.rationUntil = save; return [a, b]; };
+    const [plain, ration] = hqFood(); expect(ration).toBeGreaterThan(plain + 1);
+    // Hilfsangebot: Veloria kennt uns, hat Nahrung, wir haben kein Geld -> Kredit
+    G.known[0][4] = true; G.players[4].res.food = 2000; p.res.food = 0; p.res.money = 0; G.aidCool = 0;
+    const seen: any[] = []; on('offer', (o: any) => seen.push({...o}));
+    for (let i = 0; i < 40 && !G.offer; i++) update(0.05);
+    expect(G.offer && G.offer.type).toBe('aid'); expect(G.offer.from).toBe(4); expect(G.offer.credit).toBe(true);
+    const price = G.offer.price; answerOffer(true);
+    expect(p.res.food).toBeGreaterThan(100); expect(p.debt.left).toBe(price);
+    p.res.food = 5000; p.pop = 300;
+    run(30); expect(p.debt ? p.debt.left : 0).toBeLessThan(price);       // Tilgung aus den Steuern
+    expect(seen.length).toBeGreaterThan(0);
   });
   it('LLM-Stratege: Lagebild ohne Allwissen, Entscheidungen werden geprüft und umgesetzt, veraltet = eingebaute KI', () => {
     newGame('mittel'); noBandits();

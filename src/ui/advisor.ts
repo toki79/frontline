@@ -1,6 +1,7 @@
 import { $$ } from './dom';
 import { fmt } from '../core/util';
-import { AIS, BUILDINGS, ECON, FIRE, FUN, REGION, RES, T } from '../data/config';
+import { AIS, BUILDINGS, ECON, FAMINE, FIRE, FUN, REGION, RES, T } from '../data/config';
+import { famine } from '../sim/costs';
 import { distTo } from '../sim/combat';
 import { aiQuotes, marketOpen, needLevel } from '../sim/market';
 import { G, regionText } from '../sim/state';
@@ -32,7 +33,9 @@ export function advise(){
   // Bedrohungen zuerst
   if(war){ let near=0; for(const u of G.units){ if(u.dead||u.owner===0||!hostile(0,u.owner)) continue; for(const b of G.buildings) if(!b.dead&&b.owner===0&&distTo(u,b)<6){near++;break;} }
     if(near) T.push({p:100,txt:`<b>${near} feindliche Einheiten in der Stadt!</b> Wähle deine Truppen (◎ Alle) und tippe den Gegner an.`,act:{label:'◎ Alle wählen',fn:()=>cmd('all')}}); }
-  if(p.res.food<=0) T.push({p:95,txt:'<b>Hungersnot!</b> Die Bevölkerung schrumpft. Baue einen Bauernhof oder kaufe Nahrung am Milizmarkt.',act:busy?{label:'🤝 Markt',fn:openDiplo}:B('farm')});
+  { const free=Math.max(0,FAMINE.freeFarms-(p.freeFarms||0)), farmSite=sites.some(b=>b.type==='farm');
+    if(p.res.food<=0||(famine(p)&&(p.foodRate<0||(!farmSite&&free))))
+    T.push({p:95,txt:`<b>Hungersnot!</b> Die Bevölkerung schrumpft.${free?` Im Notstand kostet ein Bauernhof <b>kein Geld</b>, nur Holz (noch ${free}).`:' Baue einen Bauernhof oder kaufe Nahrung am Milizmarkt.'}${G.t<(p.rationUntil||0)?' Das Rathaus gibt gerade Notrationen aus.':''}`,act:farmSite&&busy?{label:'🤝 Markt',fn:openDiplo}:B('farm')}); }
   const trainW={label:'Bauarbeiter ausbilden',fn:()=>{setTab('truppen');$('#panel').classList.remove('min');buildClick('worker');}};
   if(!workers) T.push({p:sites.length?92:58,txt:`<b>Keine Bauarbeiter!</b> Ohne sie entsteht kein Gebäude und keine Straße. Bilde am Rathaus neue aus (Reiter Truppen).`,act:trainW});
   else if(sites.length>workers&&G.t>30) T.push({p:36,txt:`<b>${sites.length} Baustellen, aber nur ${workers} Bauarbeiter.</b> Mehr Arbeiter bauen schneller (bis zu 4 je Baustelle).`,act:trainW});
@@ -72,7 +75,9 @@ export function advise(){
     if(full.length) T.push({p:37,txt:`<b>Lager voll:</b> ${full.map(r=>RES[r].icon+' '+RES[r].name).join(', ')} (${fmt(p.store)}). Was nicht hineinpasst, geht verloren. Ein Lagerhaus schafft Platz, ein Handelskontor macht Überschuss zu Geld.`,act:has('kontor')?B('depot'):B('kontor')}); }
   { const f=G.buildings.find(b=>!b.dead&&!b.site&&b.owner===0&&b.type==='farm'&&(b.fieldF??1)<0.6);
     if(f) T.push({p:39,txt:`<b>Bauernhof mit zu wenig Äckern</b> (Ertrag ${Math.round((f.fieldF??1)*100)} %). Ein Hof braucht freie Fläche um sich herum, am besten grüne Wiese – nicht zubauen.`,act:B('farm')}); }
-  if(p.foodRate<0&&p.res.food>0) T.push({p:p.res.food/-p.foodRate<90?85:p.res.food/-p.foodRate<240?45:22,txt:`<b>Nahrung sinkt</b> (${f1(p.foodRate)}/s) – in ca. ${Math.round(p.res.food/-p.foodRate)} s ist der Vorrat leer. Ein Bauernhof ernährt 125 Einwohner.`,act:B('farm')});
+  if(p.foodRate<0&&p.res.food>0){ const left=p.res.food/-p.foodRate;
+    T.push({p:left<FAMINE.warn?88:left<240?45:22,txt:`<b>Nahrung reicht noch ${left<90?Math.round(left)+' s':'ca. '+Math.round(left/60*2)/2+' min'}</b> (${f1(p.foodRate)}/s). Ohne Nahrung gibt es keine Steuern – baue jetzt einen Bauernhof, am besten auf grüner Wiese. Ein Hof ernährt 125 Einwohner.`,act:B('farm')}); }
+  if(p.debt) T.push({p:30,txt:`<b>Kredit bei ${G.players[p.debt.to].short}:</b> noch ${Math.round(p.debt.left)} $ offen, ${Math.round(FAMINE.debtShare*100)} % der Steuern gehen an den Gläubiger (Frist ${Math.max(0,Math.round((p.debt.until-G.t)/60))} min).`});
   if(p.use>p.power) T.push({p:80,txt:'<b>Strommangel:</b> Bauen, Wachstum und Verteidigung laufen nur halb so schnell.',act:B('power')});
   if(p.pop>=p.cap-3) T.push({p:70,txt:'<b>Wohnraum voll</b> – die Stadt wächst nicht mehr. Ein Wohnhaus bringt Platz für 50 Einwohner.',act:B('house')});
   if(p.growQ<0.8&&p.pop<p.cap-3) T.push({p:p.growQ<0.6?60:42,txt:`<b>Schlechte Wohnlage bremst das Wachstum</b> (Wohnqualität ${Math.round(p.growQ*100)} %): Lärm von Industrie oder enge Bebauung. Baue Wohnhäuser mit Freiraum drumherum, abseits von Kraftwerk, Mine, Raffinerie und Fahrzeugwerk.`,act:B('house')});

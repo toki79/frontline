@@ -1,9 +1,11 @@
-import { AIR, BUILDINGS, DEF, DRONES_PER_SHOP, ECON, RESEARCH, RTREE, UNITS, VEH_PER_FACTORY, hasTech, isAI } from '../data/config';
+import { AIR, BUILDINGS, DEF, DRONES_PER_SHOP, ECON, RESEARCH, RTREE, UNITS, VEH_PER_FACTORY, hasTech, isAI, FAMINE } from '../data/config';
 import { G } from '../sim/state';
 import { countBuildings } from '../sim/world';
 
 // ---------- Kosten ----------
 /** abgeschlossene Forschungen ohne die Universitätsstufen (für steigende Kosten und Meisterschaft) */
+/** Hungersnot-Notstand (Nahrung war in den letzten FAMINE.window Sekunden aufgebraucht) */
+export const famine=p=>!!p&&(p.res.food<=0||G.t-(p.famineT??-1e9)<FAMINE.window);
 export const doneCount=p=>Object.keys((p&&p.done)||{}).filter(k=>RESEARCH[k]&&!RESEARCH[k].level).length;
 const scale=(c,m)=>{ const o={}; for(const k in c) o[k]=k==='pop'?c[k]:Math.round(c[k]*m/10)*10; return o; };
 /** Kosten – mit pid: Forschung wird mit jeder erforschten Technik teurer, Kfz-Industrie verbilligt Fahrzeuge */
@@ -12,6 +14,7 @@ export function costOf(t,pid?){ const c=DEF(t).cost||{}; if(pid===undefined) ret
   if(RESEARCH[t]){ const n=RESEARCH[t].level?0:doneCount(p), m=(1+RTREE.rise*n)*ai; return m!==1?scale(c,m):c; }
   if(ai!==1&&(t==='university'||t==='factory')) return scale(c,ai);
   if(UNITS[t]&&UNITS[t].cls==='veh'&&hasTech(p,'cars')) return scale(c,RTREE.cars.cost);
+  if(t==='farm'&&famine(p)&&(p.freeFarms||0)<FAMINE.freeFarms) return {...c, money:0};   // Not-Hof: die Bürger packen selbst an
   return c; }
 export function lacking(pid,type){
   const p=G.players[pid], c0=costOf(type,pid), out=[];
