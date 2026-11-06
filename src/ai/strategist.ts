@@ -7,6 +7,7 @@ import { G } from '../sim/state';
 import { addAtt, atWar, attOf, countBuildings } from '../sim/world';
 import { aiDemand, aiOfferPeace } from './kastrova';
 import { setWar } from '../sim/world';
+import { bound, jointAgainst, pactWith } from '../sim/pacts';
 
 /* =====================================================================
    LLM-Stratege (optional): Lagebild für ein Sprachmodell und Umsetzung
@@ -56,6 +57,7 @@ export function strategistPrompt(pid, persona=''){
     L.push(`- ${slug(o)} (${P.name}): ${atWar(pid,o)?'KRIEG':'Frieden'}, ${fmt(P.pop)} Einwohner, deine Haltung ${Math.round(attOf(pid,o))}, wir sind ${rat>=1?`${rat.toFixed(1)}× stärker`:`${(1/Math.max(0.05,rat)).toFixed(1)}× schwächer`}`+
       (est?`, Truppen geschätzt: ${est.inf} Inf., ${est.veh} Fahrz., ${est.heavy} Panzer, ${est.air} Luft, ${est.missile} Raketen`:'')+(threats.length?`, bekannt: ${threats.join(', ')}`:'')+(K.plan&&G.t-K.plan.t<300?', plant einen Angriff auf dich!':'')+'.'); }
   L.push(`- miliz (Grenzmiliz, Markt in der Talmitte): ${G.militiaAlly===pid?'mit dir verbündet':G.militiaAlly>=0?`verbündet mit ${slug(G.militiaAlly)}`:'neutral'}, dein Ansehen ${Math.round(G.attitude[pid]||0)}.`);
+  { const pc=pactWith(pid); if(pc) L.push(`Abmachung mit Aldoria (gilt noch ${Math.max(1,Math.round((pc.until-G.t)/60))} min): ${pc.kind==='joint'?`gemeinsam gegen ${slug(pc.target)} – kein Krieg gegen Aldoria, kein Frieden mit ${slug(pc.target)}`:'Nichtangriffspakt – kein Krieg und keine Forderungen gegen Aldoria'}. Abmachungen werden gehalten.`); }
   if(ai.need) L.push(`Engpass: ${RES[ai.need].name}.`);
   if(ai.llm&&ai.llm.reason) L.push(`Deine letzte Entscheidung: ${ai.llm.reason}`);
   const keys=others.map(slug);
@@ -89,6 +91,8 @@ export function applyDecision(pid, d, opt:{ttl?:number, model?:string}={}){
   const met=o=>G.known[pid][o]&&G.known[o][pid];
   for(const o of others){ const a=d[slug(o)]; if(!ACTIONS.includes(a)||a==='nichts'||!G.buildings.some(b=>!b.dead&&b.owner===o)) continue;
     const war=atWar(pid,o), n=G.players[o].short;
+    if(bound(pid,o)&&(a==='krieg_erklaeren'||a==='fordern')){ done.push(`${a==='fordern'?'Forderung':'Krieg'} an ${n} verworfen (Abmachung)`); continue; }
+    if(a==='frieden_anbieten'&&jointAgainst(pid,o)){ done.push(`Frieden mit ${n} verworfen (Bündnis mit Aldoria)`); continue; }
     if(a==='krieg_erklaeren'){
       const gate=o===0?G.diff.grace:AI_WAR.minT*0.5;
       if(!war&&met(o)&&G.t>gate&&G.t>ai.cool){ setWar(pid,o,true,pid); ai.cool=G.t+60; ai.nextRaid=0; done.push(`Krieg gegen ${n}`); } else done.push(`Krieg gegen ${n} (noch) nicht möglich`); }

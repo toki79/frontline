@@ -1,5 +1,6 @@
 import { on } from '../core/events';
-import { FAMINE, RES } from '../data/config';
+import { AI_CHAR, FAMINE, PACT, RES } from '../data/config';
+import { dealText, pactList } from '../sim/pacts';
 import { fmt } from '../core/util';
 import { G } from '../sim/state';
 import { $ } from './dom';
@@ -23,6 +24,12 @@ export function showOfferDialog(o){
     $('#offerText').innerHTML=`${who} „${why}. Liefert uns <b>${o.amt} ${RES[o.res].name}</b> ${RES[o.res].icon} – oder wir holen es uns selbst.“<br><br><span style="color:var(--dim);font-size:13px">Ihr habt ${fmt(P.res[o.res])} ${RES[o.res].icon}. Ablehnen bedeutet Krieg.</span>`;
     $('#offerYes').textContent=`Liefern (−${o.res==='money'?'$':''}${o.amt}${o.res==='money'?'':' '+RES[o.res].icon})`; $('#offerYes').disabled=P.res[o.res]<o.amt;
     $('#offerNo').textContent='Ablehnen';
+  } else if(o.type==='pact'){
+    const d=o.deal, X=G.players[d.target], say=(AI_CHAR[o.from??1].say.pactAsk||'').replace('{ziel}',X.short);
+    $('#offerTitle').textContent='Geheimes Angebot aus '+A.short;
+    $('#offerText').innerHTML=`${who} ${say}<br><br><b>${dealText(o.from,d)}</b><br><br><span class="warnl">Einschlagen heißt: Aldoria erklärt ${X.short} sofort den Krieg. ${Math.round(PACT.jointDur/60)} min lang kein Separatfrieden mit ${X.short} – sonst ist ${A.short} schwer verärgert.</span>`;
+    $('#offerYes').textContent='🤝 Einschlagen'+(d.money<0?` (+${-d.money} $)`:''); $('#offerYes').disabled=false;
+    $('#offerNo').textContent='Ablehnen';
   } else if(o.type==='aid'){
     $('#offerTitle').textContent='Hilfsangebot aus '+A.short;
     const say=(o.from??1)===4?'„Euer Volk hungert, hört man. Veloria kann liefern – Geschäft ist Geschäft.“':'„Hungernde Nachbarn sind unruhige Nachbarn. Kastrova hilft – nicht umsonst.“';
@@ -33,7 +40,8 @@ export function showOfferDialog(o){
     $('#offerNo').textContent='Ablehnen';
   } else {
     $('#offerTitle').textContent='Friedensangebot';
-    $('#offerText').innerHTML=`${who} „Wir haben genug Blut vergossen. ${A.short} bietet Frieden an. Nehmt Ihr an?“`;
+    const sw=pactList().find(q=>q.kind==='joint'&&q.join&&q.target===(o.from??1));
+    $('#offerText').innerHTML=`${who} „Wir haben genug Blut vergossen. ${A.short} bietet Frieden an. Nehmt Ihr an?“`+(sw?`<br><br><span class="warnl">⚠ Ihr habt ${G.players[sw.f].short} zugesagt, gegen ${A.short} zu kämpfen. Frieden wäre Wortbruch.</span>`:'');
     $('#offerYes').textContent='Frieden schließen'; $('#offerYes').disabled=false;
     $('#offerNo').textContent='Weiterkämpfen';
   }

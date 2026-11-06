@@ -38,7 +38,7 @@ const cc=(c:Cfg)=>c.cloud[c.provider]||(c.cloud[c.provider]={key:'', model:'', u
 /** aktuelles Modell und Herkunft (für Anzeige) */
 export function activeModel(c:Cfg){ if(c.mode==='ollama') return c.model; if(c.mode==='cloud') return cc(c).model; return ''; }
 export function sourceName(c:Cfg){ return c.mode==='ollama'?`Ollama ${c.url.replace(/^https?:\/\//,'').replace(/:11434\/?$/,'')}`:c.mode==='cloud'?PROVIDERS[c.provider].name:'eingebaut'; }
-const ready=(c:Cfg)=>c.mode==='ollama'?!!c.model:c.mode==='cloud'?!!(cc(c).model&&(cc(c).key||c.provider==='custom')&&cloudUrl(c)):false;
+export const ready=(c:Cfg)=>c.mode==='ollama'?!!c.model:c.mode==='cloud'?!!(cc(c).model&&(cc(c).key||c.provider==='custom')&&cloudUrl(c)):false;
 const cloudUrl=(c:Cfg)=>(c.provider==='custom'?(cc(c).url||''):PROVIDERS[c.provider].url).replace(/\/+$/,'');
 /** Laufzeit-Zustand je Macht (wird nicht gespeichert) */
 export const llmState: Record<number, any> = {};
@@ -48,7 +48,7 @@ const base=u=>u.replace(/\/+$/,'');
 /** Warum eine Adresse vom Browser vermutlich blockiert wird (https-Seite → http-Rechner im Netz) */
 export function mixedContent(url){ return location.protocol==='https:'&&/^http:\/\//i.test(url)&&!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url); }
 const originHint=()=>/^(null|file:)/.test(location.origin)?'*':location.origin;
-function hint(e,c:Cfg){
+export function hint(e,c:Cfg){
   const url=c.mode==='ollama'?c.url:cloudUrl(c);
   if(mixedContent(url)) return 'Der Browser blockiert unverschlüsselte Adressen (http) anderer Rechner von dieser https-Seite – nutze https (z. B. Tailscale Serve) oder localhost.';
   if(e&&e.name==='AbortError') return `Zeitlimit (${c.timeout} s) überschritten – das Modell denkt zu lange, ist überlastet oder lädt noch. Zeitlimit erhöhen (z. B. 60 s) oder ein schnelleres Modell wählen${c.mode==='cloud'&&c.provider==='gemini'?' (Flash-Lite)':''}.`;
@@ -62,7 +62,7 @@ async function req(url, init, timeout){
     return await r.json(); } finally{ clearTimeout(t); }
 }
 /** ein Auftrag an das gewählte Modell – liefert den Antworttext */
-async function complete(c:Cfg, system:string, user:string, schema:any, timeout:number){
+export async function complete(c:Cfg, system:string, user:string, schema:any, timeout:number){
   if(c.mode==='ollama'){
     const j=await req(base(c.url)+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:c.model, stream:false, think:false, format:schema, options:{temperature:c.temp},
       messages:[{role:'system',content:system},{role:'user',content:user}]})},timeout);
@@ -176,7 +176,7 @@ export function renderLLM(){
 /** Kopfzeile einer Macht im Fenster auffrischen */
 function head(box,pid){ const c=llmCfg.ais[pid], hb=box.querySelector('h3 .llmB') as HTMLElement; if(hb){ const B=badge(pid); hb.className='llmB '+B.cls; hb.textContent=`${B.t} ${ready(c)?activeModel(c)+' · '+sourceName(c):'eingebaut'}`; } }
 export function openLLM(){ if(G&&!G.over) G.paused=true; renderLLM(); $('#llm').classList.remove('hidden'); }
-function closeLLM(){ $('#llm').classList.add('hidden'); if(G&&$('#start').classList.contains('hidden')) G.paused=!!G.offer; }
+function closeLLM(){ $('#llm').classList.add('hidden'); if(G&&$('#start').classList.contains('hidden')) G.paused=!!G.offer||!$('#diplo').classList.contains('hidden')||!$('#chat').classList.contains('hidden'); document.dispatchEvent(new Event('llmclosed')); }
 const resetState=pid=>{ const S=llmState[pid]; S.fails=0; S.err=''; if(S.status==='offline'||S.status==='aus') S.status='bereit'; if(G) S.nextT=G.t+2; };
 export function init(){
   $('#bLLM').addEventListener('click',openLLM);

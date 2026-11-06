@@ -290,10 +290,12 @@ export const isAI = (p:number) => p===1||p===4;
 export const AI_CHAR = {
   1: {key:'militar', label:'Militärmacht', aggr:1.1, army:1.2, trade:0.7, gifts:1.0, defense:1.0, peace:0,   say:{
       war:'„Ihr habt es so gewollt. Kastrova holt sich, was es braucht.“', talk:'„Der Krieg kostet beide Seiten. Wir könnten reden – zu unseren Bedingungen.“', lose:'„… Vielleicht war dieser Krieg ein Fehler.“',
-      lead:'„Ihr wachst zu schnell. Das beobachten wir mit großer Sorge.“', need:'„Unsere Vorräte sind knapp. Ein guter Nachbar würde helfen.“', friend:'„Ein verlässlicher Nachbar. So soll es bleiben.“', base:'„Kastrova wünscht Frieden – solange er uns nützt.“'}},
+      lead:'„Ihr wachst zu schnell. Das beobachten wir mit großer Sorge.“', need:'„Unsere Vorräte sind knapp. Ein guter Nachbar würde helfen.“', friend:'„Ein verlässlicher Nachbar. So soll es bleiben.“', base:'„Kastrova wünscht Frieden – solange er uns nützt.“',
+      pactYes:'„Abgemacht. Kastrova hält sein Wort – erwartet dasselbe von Euch.“', pactNo:'„Nein. Kastrova lässt sich nicht vor einen fremden Karren spannen.“', pactPrice:'„Für {preis} $ ließe sich darüber reden.“', pactPay:'„Kastrova legt {preis} $ obendrauf, wenn Eure Truppen mitmarschieren.“', pactAsk:'„{ziel} wird zu mächtig. Gemeinsam zerschlagen wir sie – seid Ihr dabei?“', intelYes:'„Unsere Späher waren fleißig. Hier ist, was wir wissen.“'}},
   4: {key:'handel',  label:'Handelsmacht', aggr:0.7, army:0.9, trade:1.4, gifts:1.4, defense:1.4, peace:0.6, say:{
       war:'„Krieg ist schlecht fürs Geschäft – aber wir können ihn uns leisten.“', talk:'„Jeder Tag Krieg kostet. Lasst uns rechnen statt schießen.“', lose:'„Genug. Veloria will Frieden – nennt Euren Preis.“',
-      lead:'„Euer Wachstum beunruhigt den Rat. Wir rüsten nur zur Vorsicht.“', need:'„Die Lager sind leer. Wer liefert, wird gut bezahlt.“', friend:'„Ein Handelspartner, wie wir ihn uns wünschen.“', base:'„Veloria handelt mit jedem, der zahlt.“'}},
+      lead:'„Euer Wachstum beunruhigt den Rat. Wir rüsten nur zur Vorsicht.“', need:'„Die Lager sind leer. Wer liefert, wird gut bezahlt.“', friend:'„Ein Handelspartner, wie wir ihn uns wünschen.“', base:'„Veloria handelt mit jedem, der zahlt.“',
+      pactYes:'„Ein Geschäft unter Partnern. Der Vertrag gilt.“', pactNo:'„Das rechnet sich für Veloria nicht. Abgelehnt.“', pactPrice:'„Krieg ist teuer. {preis} $, und wir sind im Geschäft.“', pactPay:'„Veloria zahlt Euch {preis} $, wenn Ihr mit angreift – ein faires Angebot.“', pactAsk:'„{ziel} bedroht unseren Handel. Ein Bündnis würde sich für beide lohnen.“', intelYes:'„Informationen sind auch eine Ware. Bitte sehr.“'}},
 };
 // ---------- Einsätze ----------
 export const MISSION = {
@@ -366,6 +368,18 @@ export const FAMINE = {
   debtShare: 0.4, debtTime: 900, debtAnger: 20,   // Kredit: 40 % der Steuern gehen an den Gläubiger, nach 15 min ist er verärgert
 };
 // LLM-Stratege (optional, siehe ui/llm.ts): Gültigkeit einer Entscheidung, Grenzen für Forderungen und Geschenke
+// Geheimabsprachen mit den KI-Mächten: Bündnis gegen die dritte Macht, Nichtangriffspakt, Lagebericht
+export const PACT = {
+  jointDur: 600, napDur: 900,               // Laufzeit in Sekunden
+  thrJoint: 30, thrNap: 25,                 // so viel „Wille“ braucht die KI ohne Bezahlung
+  unit: {militar: 20, handel: 12},          // $ je fehlendem Willenspunkt (die Handelsmacht lässt sich leichter kaufen)
+  maxGap: 90, maxPay: 800,                  // darüber: nie; so viel zahlt eine KI höchstens selbst
+  intelPrice: {militar: 400, handel: 250},
+  breakAtt: 40, breakOther: 10, peaceBreakAtt: 35, brokenW: 25,   // Wortbruch kostet Vertrauen – bei allen
+  doneAtt: 8, winAtt: 15, signAtt: 5,
+  askAtt: 30, askFirst: 900, askCool: 900,  // KI schlägt selbst ein Bündnis vor
+  chatUp: 6, chatWin: 600, chatHist: 10,    // Verhandlung per Sprachmodell: höchstens +6 Haltung je 10 min durch schöne Worte
+};
 export const STRATEGIST = {ttl:180, interval:45, timeout:45, demand:{money:[100,1500], res:[50,400]}, gift:200};
 // KI gegen KI: frühestens nach minT Sekunden und mit höherer Angriffslust
 export const AI_WAR = {minT:1200, aggr:1.4, minDur:150, peaceCool:600, fund:0.3};   // fund: Anteil der Steuern, den die KI fürs nächste Schlüsselgebäude/Forschung zurücklegt   // minDur: so lange dauert ein Krieg mindestens, bevor Frieden angeboten wird

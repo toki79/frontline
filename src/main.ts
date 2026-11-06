@@ -21,6 +21,7 @@ import { init as initForces } from './ui/forces';
 import { init as initDev } from './ui/devui';
 import { init as initTree } from './ui/tree';
 import { init as initLLM, llmTick } from './ui/llm';
+import { init as initChat } from './ui/chat';
 import { autosave } from './ui/saves';
 
 let last = performance.now();
@@ -48,7 +49,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-initForces(); initDev(); initTree(); initLLM(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
+initForces(); initDev(); initTree(); initLLM(); initChat(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
 resize();
 requestAnimationFrame(frame);
 

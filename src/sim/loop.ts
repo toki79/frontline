@@ -8,6 +8,7 @@ import { updateTrade } from '../sim/trade';
 import { updateNukes } from '../sim/nuke';
 import { updateTribute } from '../sim/tribute';
 import { famineAid } from '../sim/offers';
+import { updatePacts } from '../sim/pacts';
 import { updateDev } from '../sim/devplan';
 import { updateCity } from '../sim/city';
 import { updateGroups } from '../sim/groups';
@@ -29,7 +30,7 @@ export function update(dt){
   G.t+=dt;
   for(const p of G.players){recalcPower(p.id); updateProduction(p.id,dt); if(isMajor(p.id)) updateEconomy(p.id,dt); if(G.over) return;}
   aiThinkAll(dt);
-  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute(); famineAid(); updateIntel(); updateVictory(); if(G.over) return;}
+  G.milThinkT-=dt; if(G.milThinkT<=0){G.milThinkT=1; militiaThink(); banditThink(); updateTrade(); updateTribute(); famineAid(); updatePacts(); updateIntel(); updateVictory(); if(G.over) return;}
   if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}
   for(const k in G.market) G.market[k]=Math.max(0,G.market[k]-MARKET_RECOVER*dt);

@@ -22,7 +22,7 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
               done:{}, nukes:0, q:{hq:[], kontor:[], silo:[], airbase:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
     rel:FACTIONS.map((_,a)=>FACTIONS.map((_,b)=>a===b?'-':a===3||b===3?'feind':'neutral')),
     wars:{}, offer:null,
-    contracts:[], embassy:FACTIONS.map(()=>FACTIONS.map(()=>false)),
+    contracts:[], pacts:[], pactBreaks:0, chat:{}, embassy:FACTIONS.map(()=>FACTIONS.map(()=>false)),
     known:FACTIONS.map((_,a)=>FACTIONS.map((_,b)=>a===b||a===2||a===3||b===3)),   // Erstkontakt: wer kennt wen? (Miliz und Räuber kennen alle)
     militiaAlly:-1, militiaWar:FACTIONS.map(()=>false), attitude:FACTIONS.map(()=>0), mercCooldown:0, market:{sellOil:0,buyFood:0,buyMetal:0},
     milSpawnT:20, milRaidT:40, aiHintShown:false,

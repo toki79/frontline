@@ -10,6 +10,9 @@ import { cancelContract, evalContract, hasEmbassy, proposeContract } from '../si
 import { $ } from '../ui/dom';
 import { costHtml, f1 } from '../ui/format';
 import { msg } from '../core/events';
+import { dealText, pactList, pactWith } from '../sim/pacts';
+import { openChat } from '../ui/chat';
+import { llmCfg, ready } from '../ui/llm';
 
 /* =====================================================================
    Diplomatie (Spieler)
@@ -90,12 +93,19 @@ function aiPartyHtml(pid){
         if(q.side==='buy') h+=B(pid,`ai_buy_${q.res}`,`Verkaufen: ${q.amt} ${ic} → $${q.price}${q.urgent?' 🔥':''}`,p.res[q.res]>=q.amt);
         else h+=B(pid,`ai_sell_${q.res}`,`Kaufen: ${q.amt} ${ic} für $${q.price}`,p.res.money>=q.price); }
       h+=`</div><div class="barl"><span>Preise richten sich nach Vorrat und Engpass von ${A.short}. 🔥 = dringend gesucht. Handel verbessert die Beziehung.</span></div>`; } }
+  { const pc=pactWith(pid), sworn=pactList().find(q=>q.kind==='joint'&&q.join&&q.target===pid);
+    h+=`<h4>🤝 Geheimabsprachen</h4>`;
+    if(pc) h+=`<div class="barl" style="color:#9fd88a"><span>Abmachung: ${dealText(pid,pc)} – noch ${Math.max(1,Math.round((pc.until-G.t)/60))} min.</span></div>`;
+    if(sworn) h+=`<div class="barl" style="color:#ffb38a"><span>Ihr habt ${G.players[sworn.f].short} zugesagt, gegen ${A.short} zu kämpfen – Frieden mit ${A.short} wäre Wortbruch.</span></div>`;
+    h+=`<div class="row">${B(pid,'chat',`💬 Verhandeln mit ${lead(pid)}${ready(llmCfg.ais[pid])?' (frei)':''}`,true,'#2a3a52')}</div>`;
+    if(!pc&&!war) h+=`<div class="barl"><span>Bündnis gegen die dritte Macht, Nichtangriffspakt oder Lagebericht aushandeln.</span></div>`; }
   h+=intelHtml(pid);
   h+=contractHtml(pid);
   h+=tributeHtml(pid);
   h+='<h4>Beziehung</h4><div class="row">';
-  if(war){ h+=B(pid,'peace','Frieden anbieten',true)+B(pid,'peacet','Frieden + $400',p.res.money>=400); }
-  else { h+=B(pid,'gift','Geschenk ($200)',p.res.money>=200)+B(pid,'food','Nahrung schenken (🌾100)',p.res.food>=100)+B(pid,'war','Krieg erklären',true,'#5a221c'); }
+  const brk=pactList().some(q=>q.kind==='joint'&&q.join&&q.target===pid)?' (Wortbruch!)':'';
+  if(war){ h+=B(pid,'peace','Frieden anbieten'+brk,true)+B(pid,'peacet','Frieden + $400'+brk,p.res.money>=400); }
+  else { h+=B(pid,'gift','Geschenk ($200)',p.res.money>=200)+B(pid,'food','Nahrung schenken (🌾100)',p.res.food>=100)+B(pid,'war',pactWith(pid)?'Krieg erklären (bricht die Abmachung!)':'Krieg erklären',true,'#5a221c'); }
   return h+'</div></div>';
 }
 // ---------- Geheimdienst: Lagebericht ----------
@@ -171,6 +181,7 @@ function aiAction(pid,a){
     if(k==='kind') tg.kind=v; else if(k==='lvl') tg.lvl=Number(v); else if(k==='rec') tg.rec=v==='1'; return ''; }
   if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); return 'Vertrag gekündigt.'; }
   switch(a){
+    case 'chat': openChat(pid); return '';
     case 'gift': p.res.money-=200; addAtt(pid,0,12*AI_CHAR[pid].gifts); return `${L}: „${A.short} nimmt Eure Aufmerksamkeit zur Kenntnis.“`;
     case 'food': p.res.food-=100; A.res.food+=100; addAtt(pid,0,ai.need==='food'?20:8); return ai.need==='food'?`${L}: „Das kommt zur rechten Zeit. Wir vergessen das nicht.“`:`${L}: „Danke. Unsere Speicher sind allerdings gut gefüllt.“`;
     case 'war': setWar(0,pid,true,0); addAtt(pid,0,-60); return `${L}: „Dann wird ${A.short} antworten.“`;

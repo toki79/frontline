@@ -221,3 +221,20 @@ body.held #pauseTag{display:block}
 #llm .seg{background:#1a1f14;border:1px solid #3a4430;color:#d8d8c8;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
 #llm .seg.on{background:#4a3f7a;border-color:#8a7ad0;color:#fff}
 #llm .seg.copy{margin-left:auto;font-weight:500;opacity:.85}
+
+/* Verhandeln */
+#chat .card{max-width:640px}
+#chatLog{background:#12160d;border:1px solid #333b28;border-radius:9px;padding:8px;height:min(320px,38vh);overflow:auto;display:flex;flex-direction:column;gap:6px}
+#chatLog .cm{font-size:14px;line-height:1.4;padding:6px 10px;border-radius:9px;max-width:88%}
+#chatLog .me{align-self:flex-end;background:#2a3a52;color:#e2e8f2}
+#chatLog .them{align-self:flex-start;background:#262b1c;color:#e4e0cc}
+#chatLog .sys{align-self:center;color:var(--dim);font-size:12.5px;background:none;text-align:center}
+#chatLog .typing{opacity:.7;font-style:italic}
+#chatLog .deal{margin-top:6px;border:1px solid #6a7a3a;border-radius:8px;padding:6px 8px;background:#1b2212;font-size:13px}
+#chatLog .deal.ja{border-color:#4a8a4a;color:#9fd88a}#chatLog .deal.nein{border-color:#6a3a2a;color:#c99}
+#chatLog .deal .row{margin:6px 0 2px}#chatLog .deal button.no{background:#4a2a22;border-color:#8a4a3a}
+.chatrow input{flex:1;min-width:0;padding:9px 10px;font-size:14px;background:#12160d;color:#eee;border:1px solid #3a4430;border-radius:8px}
+#chat .chath{margin:12px 0 0;font-size:13px;color:var(--dim)}
+#chatDeal button.go{background:#4a5a2a;border-color:#7d8f4a;font-weight:700}
+button.link{background:none;border:none;color:var(--acc);padding:0;text-decoration:underline;cursor:pointer;font:inherit}
+#offer .warnl{color:#ffb38a;font-size:13px}

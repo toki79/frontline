@@ -4,6 +4,7 @@ import { deterrent } from '../sim/nuke';
 import { G } from '../sim/state';
 import { addAtt, anyWar, atWar, findBuilding, recalcPower, setWar } from '../sim/world';
 import { msg } from '../core/events';
+import { bound } from '../sim/pacts';
 import { fxAdd } from '../sim/units';
 
 /* =====================================================================
@@ -55,7 +56,7 @@ export function demandTribute(t,kind,amt,recurring){
   G.tribCool[t]=G.t+T.cool;
   const e=evalTribute(t,kind,amt,recurring);
   if(!e.ok){ addAtt(t,0,-T.angry);
-    if(!atWar(0,t)&&e.fear<0.3&&r>1.3&&Math.random()<0.5){ setWar(t,0,true,t); ai.nextRaid=0; G.tribLast[t]={ok:false,txt:`Abgelehnt – und ${A.short} hat euch den Krieg erklärt! (Haltung −${T.angry})`}; msg(`👑 Tributforderung abgelehnt – ${A.short} erklärt den Krieg!`,'#ff8a7a'); return 'krieg'; }   // Drohung ohne Macht dahinter
+    if(!atWar(0,t)&&!bound(0,t)&&e.fear<0.3&&r>1.3&&Math.random()<0.5){ setWar(t,0,true,t); ai.nextRaid=0; G.tribLast[t]={ok:false,txt:`Abgelehnt – und ${A.short} hat euch den Krieg erklärt! (Haltung −${T.angry})`}; msg(`👑 Tributforderung abgelehnt – ${A.short} erklärt den Krieg!`,'#ff8a7a'); return 'krieg'; }   // Drohung ohne Macht dahinter
     G.tribLast[t]={ok:false,txt:'Abgelehnt: '+e.reasons.join(', ')+` (Haltung −${T.angry}).`}; msg(`👑 ${A.short} lehnt eure Tributforderung ab.`,'#ffb38a');
     return 'nein'; }
   addAtt(t,0,-T.grudge); (ai.humBy=ai.humBy||{})[0]=G.t;

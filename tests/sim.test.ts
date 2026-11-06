@@ -31,6 +31,9 @@ import { idx } from '../src/core/util';
 import { on } from '../src/core/events';
 import { costOf } from '../src/sim/costs';
 import { armyEstimate, intelChance, knows, mastery, researchIntel } from '../src/sim/intel';
+import { conclude, judge, pactTerms, pactWith, bound, updatePacts } from '../src/sim/pacts';
+import { envoyPrompt, readEnvoy, applyMood } from '../src/ai/envoy';
+import { aiOfferPeace } from '../src/ai/kastrova';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
 /** Baustelle nahe dem Rathaus setzen */
@@ -964,6 +967,47 @@ describe('Simulation', () => {
     p.res.food = 5000; p.pop = 300;
     run(30); expect(p.debt ? p.debt.left : 0).toBeLessThan(price);       // Tilgung aus den Steuern
     expect(seen.length).toBeGreaterThan(0);
+  });
+  it('Geheimabsprachen: Bündnis gegen die dritte Macht, Preis, Wortbruch, Nichtangriffspakt', () => {
+    newGame('mittel'); noBandits();
+    for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true;
+    G.t = 1500; const P = G.players[0];
+    G.ais[4].att[0] = -10; G.ais[4].att[1] = 0;
+    const d = {kind: 'joint' as const, target: 1, join: true, money: 0};
+    const t = pactTerms(4, d); expect(t.need).not.toBeNull(); expect(t.need).toBeGreaterThan(0);   // misstrauisch: will Geld
+    expect(judge(4, d).ok).toBe(false); expect(conclude(4, d).ok).toBe(false);
+    P.res.money = 5000; const r = conclude(4, {...d, money: t.need}); expect(r.ok).toBe(true);
+    expect(atWar(4, 1)).toBe(true); expect(atWar(0, 1)).toBe(true); expect(pactWith(4)).toBeTruthy();
+    expect(bound(4, 0)).toBe(true);
+    aiOfferPeace(1, 4); expect(atWar(4, 1)).toBe(true);                  // Veloria hält zu Aldoria
+    const att0 = G.ais[4].att[0];
+    setWar(0, 1, false, 0); updatePacts();                               // Separatfrieden = Wortbruch
+    expect(pactWith(4)).toBeFalsy(); expect(G.pactBreaks).toBe(1); expect(G.ais[4].att[0]).toBeLessThan(att0 - 20);
+    // Nichtangriffspakt: Kastrova (Stratege) darf nicht angreifen
+    newGame('mittel'); noBandits(); for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true; G.t = 1500;
+    G.ais[1].att[0] = 60;
+    const n = conclude(1, {kind: 'nap', money: 0}); expect(n.ok).toBe(true);
+    applyDecision(1, {schwerpunkt: 'ruestung', forschung: 'keine', aldoria: 'krieg_erklaeren', veloria: 'nichts', begruendung: 'x'});
+    expect(atWar(1, 0)).toBe(false);
+    for (let i = 0; i < 60; i++) { G.ais[1].cool = 0; aiThink(1); } expect(atWar(1, 0)).toBe(false);
+    setWar(0, 1, true, 0); updatePacts(); expect(G.pactBreaks).toBe(1); expect(pactWith(1)).toBeFalsy();   // wir brechen ihn
+    // Lagebericht gegen Geld
+    newGame('mittel'); for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true;
+    G.players[0].res.money = 2000; const it = pactTerms(4, {kind: 'intel', target: 1, money: 0});
+    const ir: any = conclude(4, {kind: 'intel', target: 1, money: it.need}); expect(ir.ok).toBe(true); expect(ir.report).toContain('Kastrova');
+  });
+  it('Geheimabsprachen: KI schlägt selbst ein Bündnis vor; Gesandten-Auftrag fürs Sprachmodell', () => {
+    newGame('mittel'); noBandits(); for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true;
+    G.t = 1500; G.ais[4].att[0] = 70; G.ais[4].att[1] = -40; setWar(4, 1, true, 4); G.ais[4].rat = {0: 1, 1: 1.2};
+    updatePacts(); expect(G.offer && G.offer.type).toBe('pact'); expect(G.offer.deal.target).toBe(1);
+    answerOffer(true); expect(pactWith(4)).toBeTruthy(); expect(atWar(0, 1)).toBe(true);
+    const pr = envoyPrompt(1, 'Lasst uns gemeinsam Veloria angreifen!', 'stolz');
+    expect(pr.system).toContain('Marschall Varek'); expect(pr.user).toContain('Verhandlungsspielraum'); expect(pr.user).toContain('Lasst uns');
+    const o = readEnvoy(1, {antwort: 'Niemals!', vorschlag: {art: 'gemeinsam', ziel: 'veloria', aldoria_kaempft_mit: true, geld: 333}, haltung: 9});
+    expect(o.deal.target).toBe(4); expect(o.deal.money).toBe(350); expect(o.mood).toBe(5);
+    G.ais[1].att[0] = 0; let up = 0; for (let i = 0; i < 5; i++) up += applyMood(1, 5); expect(up).toBe(6);   // schöne Worte nur begrenzt
+    expect(readEnvoy(1, {foo: 1})).toBeNull();
+    const s = serialize(); loadGame(s); expect(pactWith(4)).toBeTruthy();
   });
   it('LLM-Stratege: Lagebild ohne Allwissen, Entscheidungen werden geprüft und umgesetzt, veraltet = eingebaute KI', () => {
     newGame('mittel'); noBandits();

@@ -14,6 +14,7 @@ import { focusArmy, focusDefense, llmActive } from './strategist';
 import { exclBlock } from '../sim/production';
 import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, findBuilding, hostile, housingQuality, nameFor0, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
+import { bound, jointAgainst } from '../sim/pacts';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
 import { makeGroup } from '../sim/groups';
@@ -51,7 +52,7 @@ function pickFoe(pid,ai){
   if(G.t<ai.foeT&&others.includes(ai.foe)) return ai.foe;
   ai.foeT=G.t+60;
   const p=G.players[pid];
-  const score=o=>(G.known[pid][o]?2:0)+G.players[o].pop/Math.max(30,p.pop)-attOf(pid,o)/40-near(o)/80+(o===ai.foe?0.3:0);
+  const score=o=>(bound(pid,o)?-6:0)+(G.known[pid][o]?2:0)+G.players[o].pop/Math.max(30,p.pop)-attOf(pid,o)/40-near(o)/80+(o===ai.foe?0.3:0);
   return others.sort((a,b)=>score(b)-score(a))[0];
 }
 export function aiThink(pid=1){
@@ -214,7 +215,7 @@ export function aiThink(pid=1){
   if(!warF){
     ai.mode='frieden'; if(ai.warSince) delete ai.warSince[F];
     let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(pid)&&!deterrent(F)?AI_NUKE.blackmail:0)+(G.t-((ai.humBy||{})[F]??-1e9)<TRIBUTE.revenge?0.4:0))*D.aggr*C.aggr - Math.max(0,attOf(pid,F))/60 - (G.t-((ai.tradedBy||{})[F]??-999)<90?0.4:0);
-    if(war) aggr=0;   // kein Zweifrontenkrieg
+    if(war||bound(pid,F)) aggr=0;   // kein Zweifrontenkrieg, Abmachungen werden gehalten
     const deterred=deterrent(F);   // Atomrakete des Rivalen: keine Forderungen, kein Krieg
     if(deterred){ aggr*=AI_NUKE.deterAggr; if(F===0&&!ai.deterMsg&&met){ ai.deterMsg=true; msg(`☢ Geheimdienst: ${p.short} fürchtet eure Atomrakete. Forderungen und Kriegsdrohungen bleiben aus.`,'#9fd88a'); } } else ai.deterMsg=false;
     const busyOffer=F===0&&G.offer;
@@ -230,7 +231,7 @@ export function aiThink(pid=1){
       } else { ai.cool=G.t+60; setWar(pid,F,true,pid); ai.nextRaid=0; }
     }
     // Schutzgeld: Stärke ausnutzen, wenn der Rivale reich und schwach ist
-    else if(!LLM&&!deterred&&met&&!war&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
+    else if(!LLM&&!deterred&&met&&!war&&!bound(pid,F)&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
       ai.cool=G.t+220; aiDemand(pid,F,'money',Math.min(600,Math.floor(P.res.money*0.3/50)*50));
     }
     if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&!u.task&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x+(Math.random()-.5)*4,rally.y+(Math.random()-.5)*4);
@@ -251,7 +252,8 @@ export function aiThink(pid=1){
     // Frieden anbieten, wenn das Ziel erreicht oder der Krieg aussichtslos ist (Handelsmächte früher)
     (ai.warSince=ai.warSince||{}); if(ai.warSince[F]===undefined) ai.warSince[F]=G.t;
     const tired=G.t-ai.lastCombat>40-C.peace*20&&G.t-ai.warSince[F]>AI_WAR.minDur;
-    if(!llmActive(ai)&&!raiders.length&&!urgent&&tired&&G.t>ai.peaceCool&&!(F===0&&G.offer)&&((!need&&ai.lootSince>150*(1-C.peace*0.6))||ratio<0.7+C.peace*0.4||(deterrent(F)&&!deterrent(pid)))){
+    const sworn=jointAgainst(pid,F)&&ratio>=0.5;   // Bündnis mit Aldoria: kein Separatfrieden, solange es nicht verzweifelt steht
+    if(!sworn&&!llmActive(ai)&&!raiders.length&&!urgent&&tired&&G.t>ai.peaceCool&&!(F===0&&G.offer)&&((!need&&ai.lootSince>150*(1-C.peace*0.6))||ratio<0.7+C.peace*0.4||(deterrent(F)&&!deterrent(pid)))){
       ai.peaceCool=G.t+120; aiOfferPeace(pid,F);
     }
   }
@@ -277,6 +279,7 @@ export function aiDemand(pid,to,res,amt){
 export function aiOfferPeace(pid,to){
   if(to===0){ showOffer({type:'peace',from:pid}); return; }
   const B=G.ais[to]; if(!B) return;
+  if(jointAgainst(to,pid)&&(B.rat?.[pid]??1)>=0.5) return;   // an Aldoria gebunden
   if((B.rat?.[pid]??1)<1.3||AI_CHAR[to].peace>0.5||G.t-B.lastCombat>60) setWar(pid,to,false,pid);
 }
 /** Handel unter den KI-Mächten: Überschuss gegen Engpass, verbessert die Beziehung */
