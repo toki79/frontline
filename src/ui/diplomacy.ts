@@ -11,6 +11,7 @@ import { $ } from '../ui/dom';
 import { costHtml, f1 } from '../ui/format';
 import { msg } from '../core/events';
 import { dealText, pactList, pactWith } from '../sim/pacts';
+import { aiChar, personaKnown, personaText } from '../ai/persona';
 import { openChat } from '../ui/chat';
 import { llmCfg, ready } from '../ui/llm';
 
@@ -118,6 +119,7 @@ function intelHtml(pid){
   if(units.length) h+=`<div class="barl"><span>Gesichtet: ${units.join(', ')}</span></div>`;
   const rs=researchIntel(0,pid); if(rs&&RESEARCH[rs]) h+=`<div class="barl"><span>Forscht gerade: ${RESEARCH[rs].icon} ${RESEARCH[rs].name}${INTEL.threats[rs]?' ⚠':''}</span></div>`;
   const est=armyEstimate(0,pid); if(est) h+=`<div class="barl"><span>Truppen (geschätzt): 🪖 ${est.inf} Infanterie · 🚙 ${est.veh} Fahrzeuge · 🛡 ${est.heavy} Panzer · ✈ ${est.air} Luft · 🚀 ${est.missile} Raketen/Artillerie</span></div>`;
+  { const pk=personaKnown(pid); h+=`<div class="barl"><span>🎭 ${pk.opening||pk.traits.length?personaText(pid,pk):'Strategie und Charakter: unbekannt – der Nachrichtendienst findet es mit der Zeit heraus.'}</span></div>`; }
   if(K.plan&&G.t-K.plan.t<300) h+=`<div class="barl" style="color:#ffb38a"><span>⚠ Angriffspläne gemeldet${K.plan.target?` – Ziel vermutlich euer ${K.plan.target}`:''}</span></div>`;
   const L=((G.intel&&G.intel.log)||[]).filter(r=>r.tgt===pid).slice(0,3);
   for(const r of L) h+=`<div class="intelRep"><span class="dim">vor ${Math.max(1,Math.round((G.t-r.t)/60))} min</span> ${r.txt.replace(/^🕵 Geheimdienst: /,'')}${r.counter?`<br>➜ ${r.counter}`:''}</div>`;
@@ -182,7 +184,7 @@ function aiAction(pid,a){
   if(a.startsWith('cx_')){ const c=G.contracts.find(c=>c.id===Number(a.slice(3))); if(c) cancelContract(c,0); return 'Vertrag gekündigt.'; }
   switch(a){
     case 'chat': openChat(pid); return '';
-    case 'gift': p.res.money-=200; addAtt(pid,0,12*AI_CHAR[pid].gifts); return `${L}: „${A.short} nimmt Eure Aufmerksamkeit zur Kenntnis.“`;
+    case 'gift': p.res.money-=200; addAtt(pid,0,12*aiChar(pid).gifts); return `${L}: „${A.short} nimmt Eure Aufmerksamkeit zur Kenntnis.“`;
     case 'food': p.res.food-=100; A.res.food+=100; addAtt(pid,0,ai.need==='food'?20:8); return ai.need==='food'?`${L}: „Das kommt zur rechten Zeit. Wir vergessen das nicht.“`:`${L}: „Danke. Unsere Speicher sind allerdings gut gefüllt.“`;
     case 'war': setWar(0,pid,true,0); addAtt(pid,0,-60); return `${L}: „Dann wird ${A.short} antworten.“`;
     case 'peace': case 'peacet': {

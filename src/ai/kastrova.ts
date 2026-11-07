@@ -15,6 +15,7 @@ import { exclBlock } from '../sim/production';
 import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, detected, findBuilding, hostile, spotted, housingQuality, nameFor0, nearestPassable, rectDist, ringTiles, setWar, updateRel } from '../sim/world';
 import { msg } from '../core/events';
 import { bound, jointAgainst } from '../sim/pacts';
+import { aiChar, hasTrait } from '../ai/persona';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
 import { makeGroup } from '../sim/groups';
@@ -52,11 +53,12 @@ function pickFoe(pid,ai){
   if(G.t<ai.foeT&&others.includes(ai.foe)) return ai.foe;
   ai.foeT=G.t+60;
   const p=G.players[pid];
-  const score=o=>(bound(pid,o)?-6:0)+(G.known[pid][o]?2:0)+G.players[o].pop/Math.max(30,p.pop)-attOf(pid,o)/40-near(o)/80+(o===ai.foe?0.3:0);
+  const Cx=aiChar(pid), rushNow=G.t<Cx.driveUntil&&G.t<AI_WAR.minT;   // Ansturm: zuerst gegen Aldoria (KI-Kriege erst später)
+  const score=o=>(bound(pid,o)?-6:0)+(rushNow&&o===0?3:0)+(G.known[pid][o]?2:0)+G.players[o].pop/Math.max(30,p.pop)-attOf(pid,o)/40-near(o)/80+(o===ai.foe?0.3:0);
   return others.sort((a,b)=>score(b)-score(a))[0];
 }
 export function aiThink(pid=1){
-  const p=G.players[pid], ai=G.ais[pid], D=G.diff, C=AI_CHAR[pid];
+  const p=G.players[pid], ai=G.ais[pid], D=G.diff, C=aiChar(pid);
   const myB=G.buildings.filter(b=>!b.dead&&b.owner===pid); if(!myB.length) return;
   const myU=G.units.filter(u=>!u.dead&&u.owner===pid);
   const army=myU.filter(u=>u.def.weapon&&!u.patrol&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'), trucks=myU.filter(u=>u.def.harvester);
@@ -92,8 +94,8 @@ export function aiThink(pid=1){
   // --- Sparen: für das nächste Schlüsselgebäude oder die nächste Forschung Geld zurücklegen ---
   const hasB=t=>G.buildings.some(b=>!b.dead&&b.owner===pid&&b.type===t);
   const nextRes=aiNextResearch(p);
-  const uniFirst=C.key==='handel'||G.profile[pid].scarce.includes('metal');   // Handelsmacht (oder Metallmangel): erst Universität, dann Fahrzeugwerk
-  const wantF=!hasB('factory')&&p.pop>90&&hasB('barracks'), wantU=!hasB('university')&&p.pop>100&&hasB('power')&&(uniFirst||hasB('factory'));
+  const uniFirst=C.key==='handel'||C.tech>1.3||G.profile[pid].scarce.includes('metal');   // Handelsmacht (oder Metallmangel): erst Universität, dann Fahrzeugwerk
+  const wantF=!hasB('factory')&&p.pop>90&&hasB('barracks'), wantU=!hasB('university')&&p.pop>100/Math.min(1.4,C.tech)&&hasB('power')&&(uniFirst||hasB('factory'));
   const resGoal=nextRes&&!p.q.research.length?nextRes:null;
   const goal=uniFirst?(wantU?'university':resGoal&&!hasTech(p,'res2')?resGoal:wantF?'factory':resGoal):(wantF?'factory':wantU?'university':resGoal);
   const saveFor=goal?(costOf(goal,pid).money||0)+(RESEARCH[goal]?100:40):0;
@@ -139,7 +141,7 @@ export function aiThink(pid=1){
     if(!open&&p.res.stone>=80) for(const b of myB.filter(b=>!b.site&&hauls(b)&&(b.eff??1)<0.8).sort((a,c)=>a.eff-c.eff)){ if(orderRoadTo(pid,b)>0) break; } }
   if(!saving||G.t>(ai.defT||0)){ ai.defT=G.t+20; aiDefense(pid); }
   // --- Forschung ---
-  if(nextRes&&!p.q.research.length&&available(pid,nextRes)&&canAfford(pid,nextRes)&&p.res.money>(costOf(nextRes,pid).money||0)+(RESEARCH[nextRes].level?100:300)) enqueue(pid,nextRes);
+  if(nextRes&&!p.q.research.length&&available(pid,nextRes)&&canAfford(pid,nextRes)&&p.res.money>(costOf(nextRes,pid).money||0)+(RESEARCH[nextRes].level?100:300)/C.tech) enqueue(pid,nextRes);
   // --- Atomrakete ---
   if(findBuilding(pid,'silo')&&!p.q.silo.length&&(p.nukes||0)<AI_NUKE.stock&&canAfford(pid,'nuke')&&p.res.money>UNITS.nuke.cost.money+AI_NUKE.reserve) enqueue(pid,'nuke');
   aiNukeStrike(pid,F,ratio,urgent);
@@ -229,7 +231,7 @@ export function aiThink(pid=1){
   // --- Absicht ---
   if(!warF){
     ai.mode='frieden'; if(ai.warSince) delete ai.warSince[F];
-    let aggr=((need&&patience?1:0)+(lead?0.9:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(pid)&&!deterrent(F)?AI_NUKE.blackmail:0)+(G.t-((ai.humBy||{})[F]??-1e9)<TRIBUTE.revenge?0.4:0))*D.aggr*C.aggr - Math.max(0,attOf(pid,F))/60 - (G.t-((ai.tradedBy||{})[F]??-999)<90?0.4:0);
+    let aggr=((need&&patience?1:0)+(lead?0.9+C.leadDrive:0)+(G.t<C.driveUntil&&(F===0||G.t>AI_WAR.minT)?C.drive:0)+(urgent?1:0)+(ratio>2.5?0.5:0)+(deterrent(pid)&&!deterrent(F)?AI_NUKE.blackmail:0)+(G.t-((ai.humBy||{})[F]??-1e9)<TRIBUTE.revenge?0.4:0))*D.aggr*C.aggr - Math.max(0,attOf(pid,F))/60 - (G.t-((ai.tradedBy||{})[F]??-999)<90?0.4:0);
     if(war||bound(pid,F)) aggr=0;   // kein Zweifrontenkrieg, Abmachungen werden gehalten
     const deterred=deterrent(F);   // Atomrakete des Rivalen: keine Forderungen, kein Krieg
     if(deterred){ aggr*=AI_NUKE.deterAggr; if(F===0&&!ai.deterMsg&&met){ ai.deterMsg=true; msg(`☢ Geheimdienst: ${p.short} fürchtet eure Atomrakete. Forderungen und Kriegsdrohungen bleiben aus.`,'#9fd88a'); } } else ai.deterMsg=false;
@@ -237,16 +239,16 @@ export function aiThink(pid=1){
     const need0=F!==0?AI_WAR.aggr:1;
     if(met&&aggr>=need0*0.75&&G.t>(ai.planT||0)&&!deterred&&!war){ ai.planT=G.t+(F===0?150:400); const tg=raidTarget(pid,F,findBuilding(pid,'hq')||rally,need,lead,0);
       intelEvent(pid,'plan','war',{on:F, target:tg?tg.def.name.replace(/\u00AD/g,''):null, army:armyText(army), counter:'Verteidigung an den Zugängen verstärken, Reserve bereithalten'}); }   // Kriegspläne sickern durch
-    const aiFoe=F!==0, gate=aiFoe?AI_WAR.minT:D.grace;   // KI gegen KI: später und nur bei klarem Anlass (need0)
+    const aiFoe=F!==0, gate=aiFoe?AI_WAR.minT:D.grace*C.grace;   // KI gegen KI: später und nur bei klarem Anlass (need0)
     const LLM=llmActive(ai);   // ein LLM-Stratege entscheidet über Krieg, Forderungen und Frieden selbst
-    if(!LLM && met && G.t>gate && aggr>=need0 && G.t>ai.cool && !busyOffer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
+    if(!LLM && met && !deterred && G.t>gate && aggr>=need0 && G.t>ai.cool && !busyOffer && ((army.length>=4&&ratio>=1.15)||(urgent&&army.length>=6&&ratio>=0.7))){
       if(need&&!urgent&&P.res[need]>=150&&Math.random()<0.7){
         const amt=need==='food'?150:need==='metal'?100:120;
         ai.cool=G.t+150; aiDemand(pid,F,need,amt);
       } else { ai.cool=G.t+60; setWar(pid,F,true,pid); ai.nextRaid=0; }
     }
     // Schutzgeld: Stärke ausnutzen, wenn der Rivale reich und schwach ist
-    else if(!LLM&&!deterred&&met&&!war&&!bound(pid,F)&&G.t>D.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
+    else if(!LLM&&!deterred&&met&&!war&&!bound(pid,F)&&G.t>D.grace*C.grace&&!need&&ratio>2.2*(2-D.aggr)/C.aggr&&P.res.money>1200&&army.length>=5&&G.t>ai.cool&&!busyOffer&&attOf(pid,F)<40){
       ai.cool=G.t+220; aiDemand(pid,F,'money',Math.min(600,Math.floor(P.res.money*0.3/50)*50));
     }
     if(!threat) for(const u of army) if(u.mode==='idle'&&!u.target&&!u.task&&dist(u.x,u.y,rally.x,rally.y)>5) orderMove([u],rally.x+(Math.random()-.5)*4,rally.y+(Math.random()-.5)*4);
@@ -267,7 +269,7 @@ export function aiThink(pid=1){
     // Frieden anbieten, wenn das Ziel erreicht oder der Krieg aussichtslos ist (Handelsmächte früher)
     (ai.warSince=ai.warSince||{}); if(ai.warSince[F]===undefined) ai.warSince[F]=G.t;
     const tired=G.t-ai.lastCombat>40-C.peace*20&&G.t-ai.warSince[F]>AI_WAR.minDur;
-    const sworn=jointAgainst(pid,F)&&ratio>=0.5;   // Bündnis mit Aldoria: kein Separatfrieden, solange es nicht verzweifelt steht
+    const sworn=jointAgainst(pid,F)&&ratio>=(hasTrait(pid,'treu')?0.25:0.5);   // Bündnis mit Aldoria: kein Separatfrieden, solange es nicht verzweifelt steht
     if(!sworn&&!llmActive(ai)&&!raiders.length&&!urgent&&tired&&G.t>ai.peaceCool&&!(F===0&&G.offer)&&((!need&&ai.lootSince>150*(1-C.peace*0.6))||ratio<0.7+C.peace*0.4||(deterrent(F)&&!deterrent(pid)))){
       ai.peaceCool=G.t+120; aiOfferPeace(pid,F);
     }
@@ -286,7 +288,7 @@ export function aiThink(pid=1){
 export function aiDemand(pid,to,res,amt){
   if(to===0){ showOffer({type:'demand',from:pid,res,amt}); return; }
   const T=G.players[to], B=G.ais[to], r=B?.rat?.[pid]??1;
-  if(T.res[res]>=amt&&(r<0.9||AI_CHAR[to].peace>0.5&&r<1.3)){ T.res[res]-=amt; G.players[pid].res[res]+=amt; addAtt(to,pid,-15);
+  if(T.res[res]>=amt&&(r<0.9||aiChar(to).peace>0.5&&r<1.3)){ T.res[res]-=amt; G.players[pid].res[res]+=amt; addAtt(to,pid,-15);
     if(G.known[0][pid]||G.known[0][to]) msg(`📰 ${nameFor0(to)} beugt sich ${nameFor0(pid)} und liefert ${amt} ${res==='money'?'$':RES[res].icon}.`,'#d6b45a'); }
   else { addAtt(to,pid,-15); setWar(pid,to,true,pid); G.ais[pid].nextRaid=0; }
 }
@@ -294,12 +296,12 @@ export function aiDemand(pid,to,res,amt){
 export function aiOfferPeace(pid,to){
   if(to===0){ showOffer({type:'peace',from:pid}); return; }
   const B=G.ais[to]; if(!B) return;
-  if(jointAgainst(to,pid)&&(B.rat?.[pid]??1)>=0.5) return;   // an Aldoria gebunden
-  if((B.rat?.[pid]??1)<1.3||AI_CHAR[to].peace>0.5||G.t-B.lastCombat>60) setWar(pid,to,false,pid);
+  if(jointAgainst(to,pid)&&(B.rat?.[pid]??1)>=(hasTrait(to,'treu')?0.25:0.5)) return;   // an Aldoria gebunden
+  if((B.rat?.[pid]??1)<1.3||aiChar(to).peace>0.5||G.t-B.lastCombat>60) setWar(pid,to,false,pid);
 }
 /** Handel unter den KI-Mächten: Überschuss gegen Engpass, verbessert die Beziehung */
 function aiTradeAI(pid){
-  const ai=G.ais[pid]; ai.aiTradeT=(ai.aiTradeT||0)-G.diff.think; if(ai.aiTradeT>0) return; ai.aiTradeT=45/AI_CHAR[pid].trade;
+  const ai=G.ais[pid]; ai.aiTradeT=(ai.aiTradeT||0)-G.diff.think; if(ai.aiTradeT>0) return; ai.aiTradeT=45/aiChar(pid).trade;
   for(const o of AIS){ if(o===pid||atWar(pid,o)||!G.known[pid][o]||!G.known[o][pid]||!alive(o)||G.ais[o].saving) continue;
     const q=aiQuotes(o).find(q=>q.side==='buy'&&G.players[pid].res[q.res]>=q.amt*2&&!G.profile[pid].scarce.includes(q.res));
     if(q&&G.players[o].res.money>=q.price){ const A=G.players[pid], B=G.players[o]; A.res[q.res]-=q.amt; B.res[q.res]+=q.amt; B.res.money-=q.price; A.res.money+=q.price;
@@ -307,7 +309,7 @@ function aiTradeAI(pid){
 }
 // KI-Verteidigung: Stellungen an der Front, eine Graben-/Drahtlinie, Flugabwehr gegen Drohnen
 export function aiDefense(pid){
-  const p=G.players[pid], ai=G.ais[pid], C=AI_CHAR[pid], F=ai.foe??0, hq=findBuilding(pid,'hq'); if(!hq||!findBuilding(pid,'barracks')) return;
+  const p=G.players[pid], ai=G.ais[pid], C=aiChar(pid), F=ai.foe??0, hq=findBuilding(pid,'hq'); if(!hq||!findBuilding(pid,'barracks')) return;
   // Pioniere bauen die Stellungen – ohne sie bleibt alles Plan
   const pio=G.units.filter(u=>!u.dead&&u.owner===pid&&u.def.pioneer).length, wantPio=ai.saving?1:1+(anyWar(pid)||ai.lead?1:0)+(G.t>900?1:0);
   if(pio<wantPio&&!p.q.barracks.some(i=>i.type==='pioneer')&&canAfford(pid,'pioneer')&&p.res.money>300) enqueue(pid,'pioneer');

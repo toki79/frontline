@@ -222,6 +222,12 @@ body.held #pauseTag{display:block}
 #llm .seg.on{background:#4a3f7a;border-color:#8a7ad0;color:#fff}
 #llm .seg.copy{margin-left:auto;font-weight:500;opacity:.85}
 
+/* Ereignisse */
+#evPill{color:#e8d48a;font-size:12.5px;gap:10px}#evPill span{white-space:nowrap}
+/* Kartenwahl */
+#mapRow button{flex:1 1 30%;min-width:0;font-size:13px;padding:7px 4px}
+.mapseed{align-items:center;gap:8px}.mapseed span{flex:1;font-size:12.5px;color:var(--dim)}
+.mapseed input{width:150px;padding:7px 8px;font-size:13px;background:#12160d;color:#eee;border:1px solid #3a4430;border-radius:8px}
 /* Verhandeln */
 #chat .card{max-width:640px}
 #chatLog{background:#12160d;border:1px solid #333b28;border-radius:9px;padding:8px;height:min(320px,38vh);overflow:auto;display:flex;flex-direction:column;gap:6px}

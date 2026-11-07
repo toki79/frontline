@@ -1,5 +1,5 @@
 import { on } from '../core/events';
-import { AI_CHAR, FAMINE, PACT, RES } from '../data/config';
+import { AI_CHAR, FAMINE, PACT, RES, UNITS } from '../data/config';
 import { dealText, pactList } from '../sim/pacts';
 import { fmt } from '../core/util';
 import { G } from '../sim/state';
@@ -23,6 +23,12 @@ export function showOfferDialog(o){
     const why={food:'Unser Volk hungert',metal:'Unsere Industrie braucht Metall',oil:'Uns geht der Treibstoff aus',wood:'Uns fehlt Bauholz',stone:'Uns fehlt Stein für unsere Festungen',money:'Eure Stadt ist reich, unsere Armee ist stark. Zahlt für Euren Schutz'}[o.res]||'Wir brauchen Nachschub';
     $('#offerText').innerHTML=`${who} „${why}. Liefert uns <b>${o.amt} ${RES[o.res].name}</b> ${RES[o.res].icon} – oder wir holen es uns selbst.“<br><br><span style="color:var(--dim);font-size:13px">Ihr habt ${fmt(P.res[o.res])} ${RES[o.res].icon}. Ablehnen bedeutet Krieg.</span>`;
     $('#offerYes').textContent=`Liefern (−${o.res==='money'?'$':''}${o.amt}${o.res==='money'?'':' '+RES[o.res].icon})`; $('#offerYes').disabled=P.res[o.res]<o.amt;
+    $('#offerNo').textContent='Ablehnen';
+  } else if(o.type==='merc'){
+    const n=o.units.map(t=>UNITS[t]?.name.replace(/\u00AD|­/g,'')).reduce((a,k)=>(a[k]=(a[k]||0)+1,a),{});
+    $('#offerTitle').textContent='🗡 Söldner bieten ihre Dienste an';
+    $('#offerText').innerHTML=`<b>Hauptmann der Söldner:</b> „Wir kämpfen für den, der zahlt. ${o.price} $, und wir stehen an eurem Rathaus.“<br><br>Trupp: ${Object.entries(n).map(([k,c])=>`${c}× ${k}`).join(', ')}<br><br><span class="warnl">Lehnt ihr ab, ziehen sie weiter – vielleicht zu euren Nachbarn.</span>`;
+    $('#offerYes').textContent=`Anwerben (−${o.price} $)`; $('#offerYes').disabled=P.res.money<o.price;
     $('#offerNo').textContent='Ablehnen';
   } else if(o.type==='pact'){
     const d=o.deal, X=G.players[d.target], say=(AI_CHAR[o.from??1].say.pactAsk||'').replace('{ziel}',X.short);

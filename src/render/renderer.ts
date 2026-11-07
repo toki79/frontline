@@ -9,6 +9,7 @@ import { accessPoints } from '../sim/fortify';
 import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
+import { evOn } from '../sim/happen';
 import { fpvRange, fxAdd, rangeOf } from '../sim/units';
 import { housingQuality, knownBuilding, tileVis, visibleUnit } from '../sim/world';
 import { ctx, cv, mctx, mini } from '../ui/dom';
@@ -57,6 +58,15 @@ function drawFog(c){
     g.putImageData(im,0,0); }
   c.save(); c.imageSmoothingEnabled=true; c.drawImage(fogCv,0,0,MAP_W,MAP_H,0,0,MAP_W*TILE,MAP_H*TILE); c.restore();
 }
+/** Winter: kalter Schleier und Schneeflocken über dem sichtbaren Ausschnitt */
+function winter(c){
+  const z=cam.zoom*dpr, x0=cam.x, y0=cam.y, w=cv.width/z, h=cv.height/z;
+  c.fillStyle='rgba(225,236,250,.13)'; c.fillRect(x0,y0,w,h);
+  c.fillStyle='rgba(255,255,255,.75)'; const t=performance.now()/1000;
+  for(let i=0;i<120;i++){ const sx=(hashf(i*7.1)*w+Math.sin(t*0.7+i)*18+t*14)%w, sy=(hashf(i*3.3)*h+t*(30+hashf(i)*30))%h;
+    c.beginPath(); c.arc(x0+sx,y0+sy,(1+hashf(i*1.7)*1.6)/cam.zoom,0,7); c.fill(); }
+}
+const hashf=(n:number)=>{ const s=Math.sin(n*127.1)*43758.5453; return s-Math.floor(s); };
 export function render(){
   const c=ctx; c.setTransform(1,0,0,1,0,0); c.fillStyle='#14170f'; c.fillRect(0,0,cv.width,cv.height);
   if(!G) return;
@@ -188,7 +198,10 @@ export function render(){
     else if(e.k==='marker'){c.strokeStyle=e.col;c.globalAlpha=1-k;c.lineWidth=2;c.beginPath();c.arc(e.x*TILE,e.y*TILE,12*(1-k)+3,0,7);c.stroke();c.globalAlpha=1;}
     else if(e.k==='loot'){c.globalAlpha=Math.min(1,(1-k)*2);c.font='bold 13px sans-serif';const tw=c.measureText(e.txt).width;c.fillStyle='#000c';c.fillRect(e.x*TILE-tw/2-4,e.y*TILE-30-k*20,tw+8,17);c.fillStyle=e.col;c.fillText(e.txt,e.x*TILE-tw/2,e.y*TILE-17-k*20);c.globalAlpha=1;}
   }
+  if(G.evFound&&G.t-G.evFound.t<40){ const k=((G.t-G.evFound.t)%2)/2;   // neues Vorkommen: pulsierender Ring
+    c.strokeStyle=`rgba(232,212,138,${1-k})`; c.lineWidth=3; c.beginPath(); c.arc(G.evFound.x*TILE,G.evFound.y*TILE,TILE*(1.5+k*2.5),0,7); c.stroke(); }
   if(G.fog) drawFog(c);
+  if(evOn('winter')) winter(c);
   for(const e of G.fx){ if(e.age<0||e.k!=='nuke') continue; const k=e.age/e.life, R=e.r*TILE;   // Atompilz: sichtbar auch im Nebel
     if(k<0.12){ c.fillStyle=`rgba(255,255,240,${1-k/0.12})`; c.beginPath(); c.arc(e.x*TILE,e.y*TILE,R*1.6*(k/0.12+0.2),0,7); c.fill(); }
     const g=c.createRadialGradient(e.x*TILE,e.y*TILE,0,e.x*TILE,e.y*TILE,R*(0.3+k*0.9)); g.addColorStop(0,`rgba(255,240,170,${(1-k)*0.95})`); g.addColorStop(0.5,`rgba(255,120,30,${(1-k)*0.8})`); g.addColorStop(1,'rgba(90,40,20,0)');

@@ -3,6 +3,7 @@ import { BANDITS, RES } from '../data/config';
 import { distTo } from '../sim/combat';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
+import { evOn } from '../sim/happen';
 import { nearestPassable, spawnUnit } from '../sim/world';
 import { fxAdd } from '../sim/units';
 import { msg } from '../core/events';
@@ -24,8 +25,8 @@ export function banditThink(){
     const mine=all.filter(u=>u.camp===c.id);
     if(!c.init){ c.init=true; c.raidT=rnd(BANDITS.firstRaid); c.spawnT=BANDITS.spawn;
       for(let i=0;i<BANDITS.guard;i++){ const u=spawnUnit(3,'bandit',c); if(u){ u.camp=c.id; mine.push(u); } } }
-    const cap=Math.min(BANDITS.max,BANDITS.guard+Math.floor(G.t/400));
-    c.spawnT-=1;
+    const king=evOn('banditen')?(c.kingBonus||0):0, cap=Math.min(BANDITS.max,BANDITS.guard+Math.floor(G.t/400))+king;
+    c.spawnT-=king?3:1;   // Banditenkönig: mehr Räuber, schneller Nachschub
     if(mine.length<cap&&c.spawnT<=0){ c.spawnT=BANDITS.spawn; const u=spawnUnit(3,'bandit',c); if(u){ u.camp=c.id; mine.push(u); } }
     // Eindringlinge im eigenen Gebiet angreifen
     let intr=null, bd=1e9;

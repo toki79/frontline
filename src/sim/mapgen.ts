@@ -1,5 +1,5 @@
 import { dist, hash, idx, inMap, makeNoise } from '../core/util';
-import { BANDITS, CONSTRUCTION, MAJORS, MAP_H, MAP_W, T } from '../data/config';
+import { BANDITS, CONSTRUCTION, MAJORS, MAPTYPES, MAP_H, MAP_W, T } from '../data/config';
 import { G } from '../sim/state';
 import { placeBuilding, recalcPower, spawnAt } from '../sim/world';
 
@@ -43,24 +43,28 @@ function canon(x,y):[number,number]{
   if(x>=h&&y<h) return [y,x];
   return y>=x?[x,y]:[y,x];
 }
+/** gleiche Verschiebung für alle Spiegelungen eines Feldes: je Schlüssel einmal gewürfelt */
+let JIT: Map<string,[number,number,number]>;
+const jit=(k:string,amp:number):[number,number,number]=>{ let v=JIT.get(k); if(!v){ v=[(G.rng()*2-1)*amp,(G.rng()*2-1)*amp,0.85+G.rng()*0.3]; JIT.set(k,v); } return v; };
 export function genMap(){
-  const R=G.rng, terr=G.terr, CX=W/2, CY=H/2;
+  const R=G.rng, terr=G.terr, CX=W/2, CY=H/2, MT=MAPTYPES[G.mapType]||MAPTYPES.tal; JIT=new Map();
   const nF=makeNoise(R,8), nF2=makeNoise(R,3), nM=makeNoise(R,6);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const [a,b]=canon(x,y), f=nF(a,b)*0.72+nF2(a,b)*0.28, m=nM(a,b);
-    terr[idx(x,y)] = f>0.62 ? T.FOREST : m>0.73 ? T.MUD : T.GRASS;
+    terr[idx(x,y)] = f>MT.forest ? T.FOREST : m>MT.mud ? T.MUD : T.GRASS;
   }
   const put=(tfs:TF[],x,y,fn:(i:number)=>void)=>{ for(const tf of tfs){ const [a,b]=tf(x,y); if(inMap(a,b)) fn(idx(a,b)); } };
   // Ortschaften (Ruinen) in der Wildnis und an den Grenzen
   const town=(tfs,cx,cy)=>{ for(let i=0;i<18;i++){ const x=cx+Math.floor(R()*7)-3, y=cy+Math.floor(R()*5)-2; put(tfs,x,y,i=>terr[i]=T.TOWN); } };
-  town(PAIR_A,10,30); town(PAIR_A,36,48); town(PAIR_B,50,118); town(HOME,8,80);
+  const tj=(k,tfs,x,y,a=4)=>{ const [dx,dy]=jit(k,a); town(tfs,x+Math.round(dx),y+Math.round(dy)); };
+  tj('t1',PAIR_A,10,30); tj('t2',PAIR_A,36,48); tj('t3',PAIR_B,50,118); tj('t4',HOME,8,80,3);
   // ---- Flüsse ----
   const ph=R()*6, ph2=R()*6;
   // a) vom unteren Rand zur Insel (Grenze Aldoria | Veloria) – symmetrisch zur Mittelsenkrechten; b) gespiegelt vom rechten Rand
-  for(let y=Math.floor(CY+ISLAND.r);y<H;y++){ const t=(y-CY)/(H-CY), w=1.25+Math.abs(Math.sin(y*0.16+ph))*1.6*t;
+  for(let y=Math.floor(CY+ISLAND.r);y<H;y++){ const t=(y-CY)/(H-CY), w=(1.25+Math.abs(Math.sin(y*0.16+ph))*1.6*t)*MT.riverW;
     for(let x=Math.floor(CX-w-1);x<=CX+w;x++) if(Math.abs(x+0.5-CX)<w){ put([ID,TR],x,y,i=>terr[i]=T.WATER); } }
   // c) aus der linken oberen Ecke zur Insel (Grenze Aldoria | Kastrova) – symmetrisch zur Diagonale
-  for(let y=0;y<CY;y++)for(let x=0;x<CX;x++){ const along=(x+y)/2, w=1.05+Math.abs(Math.sin(along*0.13+ph2))*0.9;
+  for(let y=0;y<CY;y++)for(let x=0;x<CX;x++){ const along=(x+y)/2, w=(1.05+Math.abs(Math.sin(along*0.13+ph2))*0.9)*MT.riverW;
     if(Math.abs(x-y)/Math.SQRT2<w&&along<CX-ISLAND.r) terr[idx(x,y)]=T.WATER; }
   // Insel der Miliz mit Wassergraben
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -74,10 +78,12 @@ export function genMap(){
     const s=k/Math.SQRT2; const x=Math.floor(CX-s)+(o>0?1:0), y=Math.floor(CY+s)-(o<0?1:0);
     if(inMap(x,y)) put(HOME,x,y,bridge); }
   // über Fluss a/b: zwei Übergänge (nahe der Insel und nahe dem Rand)
-  for(const yb of [Math.round(CY+ISLAND.moat+12+R()*6), Math.round(H-16-R()*6)])
+  const fa=[Math.round(CY+ISLAND.moat+12+R()*6), Math.round(H-16-R()*6)], fc=[Math.round(20+R()*6), Math.round(44+R()*6)];
+  if(MT.fords>2){ fa.push(Math.round((fa[0]+fa[1])/2+R()*4-2)); fc.push(Math.round(8+R()*4)); }
+  for(const yb of fa)
     for(let y=yb;y<=yb+1;y++)for(let x=Math.floor(CX-5);x<=CX+5;x++) put([ID,TR],x,y,bridge);
   // über Fluss c: zwei Übergänge quer zur Diagonale
-  for(const b of [Math.round(20+R()*6), Math.round(44+R()*6)])
+  for(const b of fc)
     for(let x=b-5;x<=b+5;x++)for(let y=b-5;y<=b+5;y++) if(Math.abs((x+y)-2*b)<=1) bridge(idx(x,y));
   // rund um Brücken: keine Wälder/Sümpfe
   for(let y=0;y<H;y++)for(let x=0;x<W;x++) if(terr[idx(x,y)]===T.BRIDGE){
@@ -88,21 +94,24 @@ export function genMap(){
     if(dist(x+0.5,y+0.5,Lx(9.5),Ly(51.5))<12.5) put(HOME,x,y,i=>{ if(terr[i]!==T.WATER&&terr[i]!==T.BRIDGE) terr[i]=T.GRASS; });
   }
   // Rohstoff-Felder: (cx,cy) auf der Aldoria-Seite, für jede Spiegelung in tfs
-  const field=(tfs:TF[],layer,cx,cy,r,rich,dens)=>{
+  const field=(tfs:TF[],layer,cx,cy,r,rich,dens,key='',amp=1.5)=>{
+    if(key){ const [dx,dy,m]=jit(key,amp); cx+=dx; cy+=dy; rich*=m; }
+    if(layer===G.oil) rich*=MT.oilRich;
     for(let y=Math.floor(cy-r);y<=cy+r;y++)for(let x=Math.floor(cx-r);x<=cx+r;x++){
       if(!inMap(x,y)||dist(x+0.5,y+0.5,cx,cy)>r) continue;
       if(R()<dens) put(tfs,x,y,i=>{ const t=terr[i]; if(t!==T.WATER&&t!==T.BRIDGE&&t!==T.TOWN){ terr[i]=T.GRASS; const [a,b]=[i%W,(i/W)|0]; layer[i]=rich*(0.7+0.3*hash(a,b)); } });
     }
   };
-  const blob=(tfs:TF[],cx,cy,r,fn)=>{ for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
+  const blob=(tfs:TF[],cx,cy,r,fn,key='',amp=1.5)=>{ if(key){ const [dx,dy]=jit(key,amp); cx+=dx; cy+=dy; } if(fn===toMeadow) r*=Math.sqrt(MT.meadow);
+    for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
       if(!inMap(x,y)||dist(x+0.5,y+0.5,cx,cy)>r*(0.8+0.35*hash(x*3,y*5))) continue; put(tfs,x,y,fn); } };
-  const toForest=i=>{ const t=terr[i]; if(t===T.GRASS||t===T.MUD||t===T.MEADOW) terr[i]=T.FOREST; };
-  const toMeadow=i=>{ if(terr[i]===T.GRASS) terr[i]=T.MEADOW; };
+  function toForest(i){ const t=terr[i]; if(t===T.GRASS||t===T.MUD||t===T.MEADOW) terr[i]=T.FOREST; }
+  function toMeadow(i){ if(terr[i]===T.GRASS) terr[i]=T.MEADOW; }
   // ---- Rohstoffe je Stadt ungleich verteilt: reich (2) / normal (1) / knapp (0) ----
   const lvl=(side,r)=>G.profile[side].rich.includes(r)?2:G.profile[side].scarce.includes(r)?0:1;
   for(const side of MAJORS){ const S=[SIDE_TF[side]];
-    const lb=(x,y,r,fn)=>blob(S,Lx(x),Ly(y),r,fn), lf=(layer,x,y,r,rich,dens)=>field(S,layer,Lx(x),Ly(y),r,rich,dens);
-    const gf=(layer,x,y,r,rich,dens)=>field(S,layer,x,y,r,rich,dens);
+    const lb=(x,y,r,fn)=>blob(S,Lx(x),Ly(y),r,fn,`b${x},${y}`,1.2), lf=(layer,x,y,r,rich,dens)=>field(S,layer,Lx(x),Ly(y),r,rich,dens,`f${x},${y}`,1.2);
+    const gf=(layer,x,y,r,rich,dens)=>field(S,layer,x,y,r,rich,dens,`g${x},${y}`,3);
     // Holz: knapp = Wald rund um die Stadt gerodet; reich = zusätzliche Wälder am Stadtrand
     const w=lvl(side,'wood');
     if(w===0){ lb(9.5,51.5,23,i=>{ if(terr[i]===T.FOREST) terr[i]=T.GRASS; }); lb(17,60,1.8,toForest); }   // knapp: nur ein Wäldchen
@@ -130,10 +139,27 @@ export function genMap(){
     gf(G.ore,42,104,2.4,m===0?800:1200,0.9); gf(G.ore,16,99,2.2,1000,0.9);
   }
   // ---- Umkämpftes: Wildnis links oben (Aldoria | Kastrova) und Flussgrenzen der Nachbarn ----
-  blob(PAIR_A,14,46,5,toMeadow); field(PAIR_A,G.rock,8,22,2.4,1800,0.85); field(PAIR_A,G.ore,22,40,2.2,1300,0.9); field(PAIR_A,G.oil,40,60,2.8,700,0.8);
-  blob(PAIR_B,58,124,4.5,toMeadow); field(PAIR_B,G.rock,62,138,2.0,1700,0.85); field(PAIR_B,G.ore,60,108,2.0,1200,0.9); field(PAIR_B,G.oil,50,138,2.4,650,0.8);
+  blob(PAIR_A,14,46,5,toMeadow,'mA',4); field(PAIR_A,G.rock,8,22,2.4,1800,0.85,'rA',4); field(PAIR_A,G.ore,22,40,2.2,1300,0.9,'oA',4); field(PAIR_A,G.oil,40,60,2.8,700,0.8,'lA',4);
+  blob(PAIR_B,58,124,4.5,toMeadow,'mB',3); field(PAIR_B,G.rock,62,138,2.0,1700,0.85,'rB',2); field(PAIR_B,G.ore,60,108,2.0,1200,0.9,'oB',3); field(PAIR_B,G.oil,50,138,2.4,650,0.8,'lB',2);
+  // Kartentyp: zusätzliche umkämpfte Vorkommen (Wildnis A und Flussgrenzen B abwechselnd)
+  const spotsA=[[28,24],[6,40],[32,36]], spotsB=[[46,98],[66,128],[40,132]];
+  for(let k=0;k<MT.extraRock;k++){ const [x,y]=(k%2?spotsB:spotsA)[k>>1]; field(k%2?PAIR_B:PAIR_A,G.rock,x,y,1.8,1500,0.85,'xr'+k,3); }
+  for(let k=0;k<MT.extraOre;k++){ const [x,y]=(k%2?spotsA:spotsB)[(k>>1)+1]; field(k%2?PAIR_A:PAIR_B,G.ore,x,y,1.8,1100,0.9,'xo'+k,3); }
+  for(let k=0;k<MT.extraOil;k++){ const [x,y]=(k%2?spotsB:spotsA)[2-(k>>1)]; field(k%2?PAIR_B:PAIR_A,G.oil,x,y,2.4,650,0.8,'xl'+k,3); }
+  // Seenplatte: Seen in der Wildnis – nur wenn danach alle Städte und die Insel noch erreichbar sind
+  if(MT.lakes){ const lake=[], wet=i=>{ const t=terr[i]; if(t!==T.WATER&&t!==T.BRIDGE&&t!==T.TOWN&&!G.oil[i]&&!G.ore[i]&&!G.rock[i]){ lake.push([i,t]); terr[i]=T.WATER; } };
+    blob(PAIR_A,24,22,4.2,wet,'L1',3); blob(PAIR_A,34,58,3.4,wet,'L2',2); blob(PAIR_B,40,120,3.6,wet,'L3',2); blob(HOME,30,88,3.0,wet,'L4',2);
+    if(!connected()) for(const [i,t] of lake) terr[i]=t; }
   for(let i=0;i<G.rock.length;i++) if(G.rock[i]>0){ G.oil[i]=0; G.ore[i]=0; }
   for(let i=0;i<terr.length;i++) G.wood[i]=terr[i]===T.FOREST?CONSTRUCTION.forestWood:0;
+}
+/** Bodenweg von Aldoria zu den anderen Städten und zur Insel? (Brücken zählen) */
+export function connected(){
+  const seen=new Uint8Array(W*H), q=[idx(HQ0.x+1,HQ0.y+1)]; seen[q[0]]=1;
+  while(q.length){ const i=q.pop(), x=i%W, y=(i/W)|0;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const a=x+dx,b=y+dy; if(!inMap(a,b)) continue; const j=idx(a,b); if(seen[j]||G.terr[j]===T.WATER) continue; seen[j]=1; q.push(j); } }
+  const ok=(x,y)=>seen[idx(Math.floor(x),Math.floor(y))]===1;
+  return MAJORS.every(pid=>{ const [a,b]=SIDE_TF[pid](HQ0.x+1,HQ0.y+1); return ok(a,b); })&&ok(W/2,H/2);
 }
 /** freier 2×2-Platz für ein Räuberlager nahe (cx,cy) */
 function campSpot(cx,cy){
@@ -158,8 +184,8 @@ export function setupStart(){
   G.players[3].res={money:0,food:0,wood:0,stone:0,metal:0,oil:0};
   [[-2,2],[3,-1],[-1,-2],[2,3],[-2,-1],[3,2]].forEach(([dx,dy])=>spawnAt(2,'militia',bx+1+dx+0.5,by+1+dy+0.5));
   // Räuberlager in abgelegenen Gebieten (für alle Mächte gleich)
-  const camps=(list,tfs)=>{ for(const [x,y] of list) for(const tf of tfs){ const [cx,cy]=tf(x,y), s=campSpot(cx,cy);
-    if(s){ const b=placeBuilding(3,'camp',s.x,s.y,true); b.home={x:b.x,y:b.y}; } } };
+  const camps=(list,tfs)=>{ for(const [x0,y0] of list){ const [dx,dy]=jit(`c${x0},${y0}`,3), x=Math.round(x0+dx), y=Math.round(y0+dy); for(const tf of tfs){ const [cx,cy]=tf(x,y), s=campSpot(cx,cy);
+    if(s){ const b=placeBuilding(3,'camp',s.x,s.y,true); b.home={x:b.x,y:b.y}; } } } };
   camps(BANDITS.camps,HOME); camps(BANDITS.campsA,PAIR_A); camps(BANDITS.campsB,PAIR_B);
   for(const p of G.players) recalcPower(p.id);
 }

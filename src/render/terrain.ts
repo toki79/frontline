@@ -24,6 +24,16 @@ for(let t=0;t<TERRAIN.length;t++) BASE[t]=TERRAIN[t].col.map(hex);
 BASE[T.FOREST]=[hex('#3d5a2b'),hex('#3a5629')];   // Waldboden
 BASE[T.WATER]=[hex('#2f566a')]; BASE[T.BRIDGE]=[hex('#2f566a')];
 BASE[T.TOWN]=[hex('#7d7a66'),hex('#787461')];
+/** Farbstich je Kartentyp für Steppe, Wiese und Sumpf (Wüste: Sand und Dünen) */
+const TINT: Record<string, Record<number, number[]>> = {
+  wueste:   {[T.GRASS]:[1.32,1.08,0.78], [T.MEADOW]:[1.12,1.02,0.82], [T.MUD]:[1.55,1.3,0.95]},
+  hochland: {[T.GRASS]:[0.97,0.96,1.04], [T.MUD]:[0.92,0.96,1.05]},
+  wald:     {[T.GRASS]:[0.9,1.02,0.9]},
+};
+const ONE=[1,1,1], desert=()=>!!G&&G.mapType==='wueste';
+const tintOf=(t:number)=>(TINT[G&&G.mapType]||{})[t];
+/** Grundfarbe eines Feldes als CSS-Farbe (Minikarte) */
+function colOf(t:number){ const c=hex(t===T.BRIDGE?'#a08a64':TERRAIN[t].col[0]), k=tintOf(t); return k?`rgb(${Math.min(255,c[0]*k[0])|0},${Math.min(255,c[1]*k[1])|0},${Math.min(255,c[2]*k[2])|0})`:t===T.BRIDGE?'#a08a64':TERRAIN[t].col[0]; }
 /** weiches Rauschen für großflächige Helligkeit (deterministisch, ohne Zufallsgenerator) */
 function vnoise(x: number, y: number){
   const xi=Math.floor(x), yi=Math.floor(y), fx=x-xi, fy=y-yi, s=(t:number)=>t*t*(3-2*t);
@@ -49,7 +59,7 @@ function renderChunk(cx: number, cy: number, s: number){
   // 1) Boden: (CH+2)² Farbpunkte, geglättet hochskaliert -> weiche Übergänge
   const lo=document.createElement('canvas'); lo.width=lo.height=CH+2; const lg=lo.getContext('2d'), im=lg.createImageData(CH+2,CH+2);
   for(let j=0;j<CH+2;j++)for(let i=0;i<CH+2;i++){ const x=x0+i-1, y=y0+j-1, t=terrAt(x,y), cols=BASE[t], c=cols[Math.floor(hash(x,y)*cols.length)%cols.length];
-    const L=isWet(t)?1:light(x,y), k=(j*(CH+2)+i)*4; im.data[k]=c[0]*L; im.data[k+1]=c[1]*L; im.data[k+2]=c[2]*L; im.data[k+3]=255; }
+    const L=isWet(t)?1:light(x,y), k=(j*(CH+2)+i)*4, tn=tintOf(t)||ONE; im.data[k]=Math.min(255,c[0]*L*tn[0]); im.data[k+1]=Math.min(255,c[1]*L*tn[1]); im.data[k+2]=Math.min(255,c[2]*L*tn[2]); im.data[k+3]=255; }
   lg.putImageData(im,0,0);
   g.imageSmoothingEnabled=true; (g as any).imageSmoothingQuality='high';
   g.drawImage(lo,0,0,CH+2,CH+2,-TILE*s,-TILE*s,(CH+2)*TILE*s,(CH+2)*TILE*s);
@@ -70,11 +80,14 @@ function ground(g: CanvasRenderingContext2D, x: number, y: number){
   if(t===T.GRASS||t===T.MEADOW){
     const n=t===T.MEADOW?7:5; g.lineWidth=1.1; g.lineCap='round';
     for(let i=0;i<n;i++){ const hx=hash(x*7+i,y*3)*30+1, hy=hash(y*5+i,x*11)*28+3, l=2.5+hash(x+i,y*7)*3, lean=(hash(x*3,y+i)-0.5)*2.4;
-      g.strokeStyle=t===T.MEADOW?(i%3===0?'#7fb352':i%3===1?'#4b7a2d':'#6a9c40'):(i%2?'#86955a':'#5c6a38');
+      g.strokeStyle=t===T.MEADOW?(i%3===0?'#7fb352':i%3===1?'#4b7a2d':'#6a9c40'):desert()?(i%2?'#a89a62':'#8a7a48'):(i%2?'#86955a':'#5c6a38');
       g.beginPath(); g.moveTo(px+hx,py+hy); g.lineTo(px+hx+lean,py+hy-l); g.moveTo(px+hx+1.6,py+hy); g.lineTo(px+hx+1.6+lean*0.6,py+hy-l*0.75); g.stroke(); }
     if(t===T.MEADOW) for(let i=0;i<3;i++){ const hx=hash(x*13+i,y*7), hy=hash(y*17+i,x*3), k=hash(x+i,y*3);
       g.fillStyle=k<0.4?'#f2e27a':k<0.75?'#f6f2ea':'#c9a3e6'; g.beginPath(); g.arc(px+3+hx*26,py+3+hy*26,1.4,0,7); g.fill(); }
     else if(h<0.18){ g.fillStyle='rgba(60,55,40,.35)'; g.beginPath(); g.ellipse(px+8+h*80,py+20,2.2,1.5,0,0,7); g.fill(); g.fillStyle='#a49a80'; g.beginPath(); g.ellipse(px+7.6+h*80,py+19.4,2,1.3,0,0,7); g.fill(); }   // Kiesel
+  } else if(t===T.MUD&&desert()){   // Düne: helle Kämme, Schatten
+    for(let i=0;i<2;i++){ const oy=8+i*12+hash(x*3+i,y)*6; g.strokeStyle='rgba(255,236,190,.35)'; g.lineWidth=1.4; g.beginPath(); g.moveTo(px+2,py+oy); g.quadraticCurveTo(px+16,py+oy-4-hash(y,x+i)*4,px+30,py+oy+1); g.stroke();
+      g.strokeStyle='rgba(120,90,50,.28)'; g.beginPath(); g.moveTo(px+3,py+oy+2.5); g.quadraticCurveTo(px+16,py+oy-1.5,px+29,py+oy+3.5); g.stroke(); }
   } else if(t===T.MUD){
     for(let i=0;i<3;i++){ const hx=hash(x*9+i,y), hy=hash(y*3+i,x*2), rx=5+hx*4, ry=3+hy*2;
       g.fillStyle='rgba(55,42,24,.55)'; g.beginPath(); g.ellipse(px+6+hx*20,py+6+hy*20,rx,ry,hx*3,0,7); g.fill();
@@ -174,14 +187,14 @@ export function renderTerrain(){
   cache=new Map(); dirty=new Set(); bytes=0; bridges=null;
   G.terrCanvas={chunks:true};   // Merker: Gelände ist vorbereitet (wird nicht gespeichert)
   const m=document.createElement('canvas'); m.width=MAP_W; m.height=MAP_H; const mg=m.getContext('2d');
-  for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){const t=G.terr[idx(x,y)]; mg.fillStyle=t===T.BRIDGE?'#a08a64':TERRAIN[t].col[0]; mg.fillRect(x,y,1,1);}
+  for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){const t=G.terr[idx(x,y)]; mg.fillStyle=colOf(t); mg.fillRect(x,y,1,1);}
   G.miniBg=m;
 }
 /** Einzelnes Feld geändert (z. B. abgeholzter Wald → Steppe): betroffene Kacheln neu zeichnen */
 export function repaintTile(i: number){
   const x=i%MAP_W, y=(i/MAP_W)|0;
   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ const cx=Math.floor((x+dx)/CH), cy=Math.floor((y+dy)/CH); if(cx>=0&&cy>=0&&cx<CW&&cy<CHH) dirty.add(cy*CW+cx); }
-  if(G.miniBg){ const mg=G.miniBg.getContext('2d'); mg.fillStyle=TERRAIN[G.terr[i]].col[0]; mg.fillRect(x,y,1,1); }
+  if(G.miniBg){ const mg=G.miniBg.getContext('2d'); mg.fillStyle=colOf(G.terr[i]); mg.fillRect(x,y,1,1); }
 }
 function evict(){
   if(bytes<=BUDGET) return;

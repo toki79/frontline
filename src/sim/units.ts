@@ -3,6 +3,7 @@ import { RTREE, isMajor, mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W,
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
+import { evMul } from '../sim/happen';
 import { detected, hostile, nearestPassable, passable, tileCost, visOf } from '../sim/world';
 import { msg } from '../core/events';
 import { updateRider } from '../sim/transport';
@@ -101,6 +102,7 @@ export function updateUnit(u,dt){
       const ti=idx(clamp(Math.floor(u.x),0,MAP_W-1),clamp(Math.floor(u.y),0,MAP_H-1));
       const c=tileCost(ti,mcls(u)); let spd=(u.pace&&(u.mode==='move'||u.mode==='amove')?Math.min(d.speed,u.pace):d.speed)/(c===Infinity?1:c)*(u.cage?CAGE.speed:1);   // Verband: im Tempo der Langsamsten
       if(d.upkeep&&G.players[u.owner].fuelShort) spd*=0.5;                        // Treibstoffmangel
+      if(d.cls!=='air') spd*=evMul('speed');                                       // Winter
       if(d.cls==='veh'&&G.feat[ti]===FEAT.WIRE) G.feat[ti]=0;                      // Fahrzeuge walzen Draht platt
       if(d.cls==='veh'&&G.feat[ti]===FEAT.MINE){ checkMine(u,ti); if(u.dead) return; }
       const step=spd*dt;

@@ -1,6 +1,7 @@
 import { clamp } from '../core/util';
 import { BASEVAL, LOT, REGION } from '../data/config';
 import { G, isRich, isScarce } from '../sim/state';
+import { evMarket } from '../sim/happen';
 import { siteLacks } from '../sim/build';
 import { addAtt, atWar, attOf, countBuildings, findBuilding } from '../sim/world';
 
@@ -18,7 +19,7 @@ export const TRADES = {
 };
 export const MARKET_RECOVER = 1/30;   // Sättigung sinkt um 1 Stufe pro 30 s
 export function marketOpen(pid){return !!findBuilding(2,'bunker')&&!G.militiaWar[pid]&&!!G.known[pid][2];}
-export function priceFactor(key){ const t=TRADES[key], s=G.market[key]||0; return t.sell?Math.max(t.min,1-t.step*s):1+t.step*s; }
+export function priceFactor(key){ const t=TRADES[key], s=G.market[key]||0; return (t.sell?Math.max(t.min,1-t.step*s):1+t.step*s)*evMarket(key); }
 export function tradeTerms(pid,key): {give: Record<string,number>, get: Record<string,number>}{
   const t=TRADES[key], f=priceFactor(key), friend=G.attitude[pid]>=30?1.15:1, give={}, get={};
   for(const k in t.give) give[k]=t.sell?t.give[k]:Math.round(t.give[k]*f/friend);

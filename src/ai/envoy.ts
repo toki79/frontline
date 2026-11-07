@@ -2,6 +2,7 @@ import { AI_CHAR, PACT } from '../data/config';
 import { G } from '../sim/state';
 import { atWar, attOf } from '../sim/world';
 import { addAtt } from '../sim/world';
+import { personaText } from '../ai/persona';
 import { Deal, dealText, pactTargets, pactTerms, pactWith, whyText } from '../sim/pacts';
 
 /* =====================================================================
@@ -32,6 +33,7 @@ function room(f,d:Deal){
 /** Auftrag an das Modell: Rolle, Lage, Spielraum, Gesprächsverlauf, neue Nachricht */
 export function envoyPrompt(f, text:string, persona=''){
   const A=G.players[f], C=AI_CHAR[f], ai=G.ais[f], targets=pactTargets(f), L=[];
+  { const pt=personaText(f); if(pt) L.push(`Deine Persönlichkeit (verrate sie nicht direkt, spiele sie aus): ${pt}.`); }
   L.push(`Spielzeit ${Math.floor(G.t/60)} min. Deine Haltung gegenüber Aldoria: ${Math.round(attOf(f,0))} (−100 Feind … 100 Freund). ${atWar(f,0)?'Ihr seid im KRIEG mit Aldoria.':'Frieden mit Aldoria.'}`);
   const r0=(ai.rat&&ai.rat[0])??1; L.push(`Stärke: du bist ${r0>=1?`${r0.toFixed(1)}× stärker`:`${(1/Math.max(0.05,r0)).toFixed(1)}× schwächer`} als Aldoria.${ai.leads&&ai.leads[0]?' Aldoria wächst dir über den Kopf.':''}`);
   for(const X of targets){ const r=(ai.rat&&ai.rat[X])??1; L.push(`${G.players[X].short}: ${atWar(f,X)?'du bist im KRIEG mit ihnen':'Frieden'}, deine Haltung ${Math.round(attOf(f,X))}, du bist ${r>=1?`${r.toFixed(1)}× stärker`:`${(1/Math.max(0.05,r)).toFixed(1)}× schwächer`}${atWar(0,X)?', Aldoria führt Krieg gegen sie':''}.`); }

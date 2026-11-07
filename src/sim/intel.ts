@@ -1,6 +1,8 @@
 import { msg } from '../core/events';
 import { INTEL, MAJORS, RESEARCH, RTREE, UNITS, hasTech, lvlOf } from '../data/config';
 import { G } from '../sim/state';
+import { PERSONA } from '../data/config';
+import { revealPersona } from '../ai/persona';
 
 /* =====================================================================
    Geheimdienst: wer weiß was über wen?
@@ -36,7 +38,12 @@ export function intelEvent(tgt, kind, key, extra?){
 }
 /** fällige Meldungen ausliefern (einmal je Sekunde aus der Hauptschleife) */
 export function updateIntel(){
-  const S=st(), due=S.pending.filter(r=>G.t>=r.at); if(!due.length) return;
+  const S=st();
+  // Persönlichkeit der KI: der Dienst findet nach und nach heraus, worauf sie hinarbeitet
+  if(G.t>=(S.personaT??PERSONA.revealEvery)){ S.personaT=G.t+PERSONA.revealEvery;
+    for(const pid of MAJORS){ if(pid===0||!G.ais||!G.ais[pid]||!G.known[0][pid]) continue;
+      if(Math.random()<intelChance(0,pid)*0.8){ const t=revealPersona(pid); if(t){ const [txt,counter]=t.split('|'); S.pending.push({obs:0, tgt:pid, kind:'persona', key:'', at:G.t+3, extra:{txt,counter}}); } } } }
+  const due=S.pending.filter(r=>G.t>=r.at); if(!due.length) return;
   S.pending=S.pending.filter(r=>G.t<r.at);
   for(const r of due){ const K=knows(r.obs,r.tgt);
     if(r.kind==='research') K.research=r.key;
@@ -57,6 +64,7 @@ function report(r){
   else if(r.kind==='plan'){ const e=r.extra||{};
     if(e.on===0){ txt=`🕵 Geheimdienst: ${n} bereitet einen Angriff auf uns vor${e.target?` – Ziel vermutlich: ${e.target}`:''}${e.army?` (${e.army})`:''}.`; warn=true; counter=e.counter||'Truppen dorthin verlegen, Zugänge sichern'; }
     else { txt=`🕵 Geheimdienst: ${n} bereitet einen Angriff auf ${G.known[0][e.on]?G.players[e.on].short:'eine fremde Macht'} vor.`; } }
+  else if(r.kind==='persona'){ txt=`🕵 Geheimdienst: ${(r.extra||{}).txt}`; counter=(r.extra||{}).counter||''; warn=!!counter; }
   else if(r.kind==='victory'){ txt=`🕵 Geheimdienst: ${n} ${r.extra&&r.extra.txt}`; warn=true; counter=r.extra&&r.extra.counter||''; }
   if(!txt) return;
   msg(txt+(warn&&counter?` Empfehlung: ${counter}.`:''), warn?'#ffb38a':'#d6b45a');

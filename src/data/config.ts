@@ -368,6 +368,39 @@ export const FAMINE = {
   debtShare: 0.4, debtTime: 900, debtAnger: 20,   // Kredit: 40 % der Steuern gehen an den Gläubiger, nach 15 min ist er verärgert
 };
 // LLM-Stratege (optional, siehe ui/llm.ts): Gültigkeit einer Entscheidung, Grenzen für Forderungen und Geschenke
+// ---------- KI-Persönlichkeit: jede Partie zieht jede KI eine Eröffnung und ein bis zwei Charakterzüge ----------
+// mods multiplizieren die Grundwerte aus AI_CHAR (peace wird addiert); grace: Schonfrist vor dem ersten Angriff (Faktor)
+export const OPENINGS = {
+  rush:    {name:'Ansturm',    desc:'früh viele Truppen und frühe Angriffe',        counter:'Früh Kaserne, Stellungen und Truppen – Zugänge zur Stadt sichern', mods:{aggr:1.45, army:1.35, defense:0.8, tech:0.7}, grace:0.55, drive:1.1, driveUntil:1500, w:{militar:3, handel:1}},
+  boom:    {name:'Aufschwung', desc:'erst Wirtschaft und Wachstum, die Armee später', counter:'Früh Druck machen oder Tribut fordern, bevor ihre Wirtschaft brummt', mods:{aggr:0.75, army:0.7, trade:1.25, tech:1.1}, grace:1.3, w:{militar:1, handel:3}},
+  igel:    {name:'Igel',       desc:'Festungen, Flugabwehr und Minen statt Angriffe', counter:'Nicht frontal anrennen – Artillerie, Raketen und Luftwaffe, oder einfach schneller wachsen', mods:{aggr:0.65, army:1.0, defense:1.8, tech:1.0}, grace:1.4, w:{militar:2, handel:2}},
+  technik: {name:'Technik',    desc:'Universität früh, forscht schnell auf Hochtechnologie', counter:'Forschung mit dem Nachrichtendienst überwachen, früh angreifen, bevor die Technik greift', mods:{aggr:0.85, army:0.85, defense:1.0, tech:1.7}, grace:1.1, w:{militar:2, handel:2}},
+};
+export const TRAITS = {
+  verraeter:   {name:'verräterisch', desc:'bricht Abmachungen, sobald es sich lohnt – nimmt sie dafür gern an', mods:{}, pactMul:0.8},
+  treu:        {name:'treu',         desc:'hält Bündnisse auch, wenn es schlecht steht', mods:{peace:-0.1}, pactMul:1.1},
+  nachtragend: {name:'nachtragend',  desc:'vergisst Kränkungen nicht (Ärger wirkt stärker)', mods:{}, grudge:1.6},
+  vorsichtig:  {name:'vorsichtig',   desc:'greift ungern an, schließt schneller Frieden', mods:{aggr:0.8, peace:0.3, defense:1.2}},
+  gierig:      {name:'gierig',       desc:'will für alles mehr Geld, Geschenke beeindrucken wenig', mods:{trade:1.25, gifts:0.7}, pactMul:1.3},
+  ehrgeizig:   {name:'ehrgeizig',    desc:'duldet niemanden über sich, rüstet stärker', mods:{aggr:1.15, army:1.1}, leadDrive:0.5},
+};
+export const PERSONA = {betrayChance:1/150, betrayRatio:1.6, betrayAfter:120, revealEvery:60};
+// ---------- Ereignisse: treffen alle Mächte gleich, die KI muss genauso reagieren ----------
+export const EVENTS = {
+  first: 420, gap: [360, 600],          // erstes Ereignis nach 7 min, dann alle 6–10 min
+  list: {
+    duerre:   {name:'Dürre',              icon:'☀', dur:240, w:3, food:0.6,  txt:'Eine Dürre trocknet die Felder aus – die Höfe bringen nur 60 %.', tip:'Nahrung kaufen oder Vorräte schonen'},
+    ernte:    {name:'Rekordernte',        icon:'🌾', dur:180, w:2, food:1.35, txt:'Ideales Wetter: Die Höfe bringen 35 % mehr.', tip:'Überschuss verkaufen oder Wachstum nutzen'},
+    winter:   {name:'Wintereinbruch',     icon:'❄', dur:240, w:3, food:0.75, speed:0.85, mood:-0.05, txt:'Schnee und Frost: Felder bringen weniger, Truppen am Boden kommen langsamer voran.', tip:'Angriffe verschieben, Nahrung sichern'},
+    fund:     {name:'Neue Vorkommen',     icon:'⛏', dur:0,   w:3, txt:'Prospektoren melden neue Vorkommen im Tal – für jede Stadt gleich weit entfernt.', tip:'Schnell sichern, bevor die Nachbarn kommen'},
+    fluecht:  {name:'Flüchtlinge',        icon:'🧳', dur:0,   w:2, pop:14, txt:'Flüchtlinge aus dem Gebirge suchen eine neue Heimat – wer Wohnraum frei hat, nimmt sie auf.', tip:'Freie Wohnhäuser zahlen sich aus'},
+    banditen: {name:'Banditenkönig',      icon:'🏴', dur:300, w:2, extra:3, txt:'Ein Banditenkönig vereint die Räuberlager – mehr Räuber, häufigere Überfälle.', tip:'Lager ausheben, Außenposten bewachen'},
+    oel:      {name:'Ölpreis-Hoch',       icon:'🛢', dur:300, w:2, market:{sellOil:2.0}, txt:'Öl ist knapp im ganzen Land – am Milizmarkt bringt es doppelt so viel.', tip:'Öl verkaufen'},
+    metall:   {name:'Metallkrise',        icon:'⚙', dur:300, w:2, market:{buyMetal:1.6}, txt:'Metall wird knapp – am Markt kostet es 60 % mehr.', tip:'Eigene Minen nutzen, Fahrzeuge später bauen'},
+    fest:     {name:'Landesfest',         icon:'🎉', dur:180, w:2, mood:0.12, txt:'Im ganzen Tal wird gefeiert – die Stimmung steigt.', tip:'Gute Zeit für Steuern und Wachstum'},
+    soeldner: {name:'Söldner',            icon:'🗡', dur:0,   w:2, price:750, units:['inf','inf','at','ifv'], txt:'Ein Söldnertrupp zieht durchs Tal und sucht einen Herrn.', tip:''},
+  },
+};
 // Geheimabsprachen mit den KI-Mächten: Bündnis gegen die dritte Macht, Nichtangriffspakt, Lagebericht
 export const PACT = {
   jointDur: 600, napDur: 900,               // Laufzeit in Sekunden
@@ -385,6 +418,16 @@ export const STRATEGIST = {ttl:180, interval:45, timeout:45, demand:{money:[100,
 export const AI_WAR = {minT:1200, aggr:1.4, minDur:150, peaceCool:600, fund:0.3};   // fund: Anteil der Steuern, den die KI fürs nächste Schlüsselgebäude/Forschung zurücklegt   // minDur: so lange dauert ein Krieg mindestens, bevor Frieden angeboten wird
 export const AI_MIX2 = ['tel','swarm','jet','heavy','amphib','para'];   // Spätzeit-Waffen der KI, sobald erforscht
 export const AI_MIX = ['inf','inf','ifv','at','drone','inf','mbt','spaag','drone','apc','ifv','at','jammer','mlrs','reaper','drone','mbt'];
+// ---------- Kartentypen (jede Karte bleibt fair: die drei Startecken sind gespiegelt) ----------
+// forest/mud: Schwellen des Rauschens (kleiner = mehr Wald/Sumpf); meadow: Größe der Wiesen; riverW: Flussbreite;
+// fords: Brücken je Fluss; lakes: Seen in der Wildnis; extra*: zusätzliche umkämpfte Vorkommen; oilRich: Ergiebigkeit der Ölfelder
+export const MAPTYPES = {
+  tal:      {name:'Flusstal',   icon:'🏞', desc:'Ausgewogen: Wälder, Wiesen, drei Flüsse.',            forest:0.62, mud:0.73, meadow:1.0, riverW:1.0, fords:2, lakes:0, extraRock:0, extraOre:0, extraOil:0, oilRich:1.0, weight:3},
+  hochland: {name:'Hochland',   icon:'⛰', desc:'Viel Fels und Moor, wenig Wiese, schmale Flüsse mit mehr Furten.', forest:0.66, mud:0.6, meadow:0.6, riverW:0.75, fords:3, lakes:0, extraRock:2, extraOre:1, extraOil:0, oilRich:0.9, weight:2},
+  wueste:   {name:'Ölwüste',    icon:'🏜', desc:'Kaum Wald, karge Wiesen, aber reiche Ölfelder – Nahrung wird knapp.', forest:0.8, mud:0.64, meadow:0.5, riverW:1.3, fords:2, lakes:0, extraRock:0, extraOre:0, extraOil:2, oilRich:1.6, weight:2},
+  seen:     {name:'Seenplatte', icon:'💧', desc:'Seen versperren Wege – wenige Engpässe entscheiden.', forest:0.6, mud:0.76, meadow:1.1, riverW:1.0, fords:2, lakes:1, extraRock:0, extraOre:1, extraOil:0, oilRich:1.0, weight:2},
+  wald:     {name:'Waldland',   icon:'🌲', desc:'Dichter Wald: viel Holz, enge Sicht, wenig freie Fläche.', forest:0.5, mud:0.78, meadow:0.8, riverW:1.0, fords:2, lakes:0, extraRock:0, extraOre:0, extraOil:0, oilRich:1.0, weight:2},
+};
 // ---------- Regionen: jede Stadt hat einen Engpass und einen Überschuss (pro Spiel zufällig, gegenseitig ergänzend) ----------
 // Jede Stadt ist bei zwei Rohstoffen reich und bei zwei knapp; Kastrova genau umgekehrt, Veloria dazwischen.
 export const REGION = {

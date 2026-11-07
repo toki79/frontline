@@ -23,6 +23,7 @@
   <div class="pb" data-tip="pop"><span class="nm">👥 Aldoria</span><b id="popMe">0</b><i><em id="popMeBar" style="background:#4f86d6"></em></i><span id="power" data-tip="power">⚡ 0/0</span><span id="happy" data-tip="happy">😊</span></div>
   <div class="pb" data-tip="popAi1"><span class="nm">👥 ???</span><b id="popAi1">0</b><i><em id="popAi1Bar" style="background:#cc4a3c"></em></i><span class="stance" id="stance1" data-tip="stance1"></span><span class="llmB" id="llmB1" data-tip="llm1"></span></div>
   <div class="pb" data-tip="popAi4"><span class="nm">👥 ???</span><b id="popAi4">0</b><i><em id="popAi4Bar" style="background:#3fae7a"></em></i><span class="stance" id="stance4" data-tip="stance4"></span><span class="llmB" id="llmB4" data-tip="llm4"></span></div>
+  <div class="pb" id="evPill" hidden></div>
 </div>
 <div id="log"></div>
 <canvas id="mini" width="124" height="124"></canvas>
@@ -65,6 +66,9 @@
   <p class="intro"><b>Ziel:</b> Baue die größere, reichere Stadt – vom Dorf bis zur Weltstadt. Das Spiel läuft endlos weiter; es endet nur, wenn eine Seite militärisch besiegt ist (oder im Wettlauf-Modus bei <b id="goalTxt">500</b> Einwohnern). Einwohner wachsen von selbst, wenn Wohnraum, Nahrung und Strom reichen. Jeder Soldat wird aus der Bevölkerung rekrutiert.</p>
   <div class="sub" style="margin-top:12px">Schwierigkeit</div>
   <div class="row" id="diffRow"><button data-d="leicht">Leicht</button><button data-d="mittel" class="on">Mittel</button><button data-d="schwer">Schwer</button></div>
+  <div class="sub" style="margin-top:12px">Karte</div>
+  <div class="row" id="mapRow"></div>
+  <div class="row mapseed"><span id="mapDesc" class="dim"></span><input id="optSeed" inputmode="numeric" maxlength="6" placeholder="Kartennr. (leer = neu)" title="Gleiche Nummer und gleicher Kartentyp = gleiche Karte"></div>
   <label class="chk"><input type="checkbox" class="optTips" checked> 💡 Spieltipps anzeigen (Berater meldet Engpässe)</label>
   <label class="chk"><input type="checkbox" id="optRace"> 🏁 Wettlauf: Wer zuerst 500 Einwohner hat, gewinnt (sonst endlos)</label>
   <label class="chk"><input type="checkbox" id="optFog" checked> 🌫 Nebel des Krieges (nur erkundete Gebiete sichtbar)</label>
@@ -77,6 +81,7 @@
     <b>Bauen:</b> Gebäude antippen und auf die Karte setzen – deine <b>Bauarbeiter</b> (gelber Helm) laufen hin und bauen vor Ort. Mehr Arbeiter = schneller. Geld zahlst du beim Setzen, Holz, Stein und Metall <b>tragen die Arbeiter</b> aus Rathaus oder Lagerhaus zur Baustelle – weite Wege bremsen, fehlt Material, wartet die Baustelle. Holzfäller (am Wald) liefert 🪵 Holz, Steinbruch (an hellen Felsen) 🪨 Stein. Betriebe liefern zum Rathaus oder Lagerhaus: je weiter der Weg, desto weniger kommt an – <b>Straßen</b> verkürzen ihn. Lass Platz: Höfe brauchen Äcker (am besten grüne Wiese), Häuser Freiraum, und Feuer springt über.<br>
     <b>Räuber</b> hausen in abgelegenen Lagern und überfallen unbegleitete Arbeiter, Laster und Außenposten – Soldaten wählen, <b>🛡 Begleiten</b>, Schützling antippen. Ein ausgehobenes Lager bringt Beute.<br>
     <b>Zufriedenheit 😊:</b> Hunger, Stromausfall, leere Kasse, schlechte Wohnlage, Angriffe und Räuber in Stadtnähe verärgern die Einwohner – weniger Steuern, langsameres Wachstum, unter 35 % wandern sie ab.<br>
+    <b>Jede Partie anders:</b> Kartentyp und Kartennummer bestimmen das Tal (gleiche Nummer = gleiche Karte). Kastrova und Veloria wählen jedes Mal eine andere Strategie (Ansturm, Aufschwung, Igel, Technik) und haben eigene Charakterzüge – der Nachrichtendienst deckt sie auf. Alle paar Minuten passiert etwas im Tal: Dürre, Winter, neue Vorkommen, Flüchtlinge, Banditenkönig, Preisschocks, Söldner.<br>
     <b>Unbekanntes Tal:</b> Wer außer euch hier lebt, wisst ihr zu Beginn nicht. Diplomatie und Handel gibt es erst nach dem Erstkontakt – schickt Späher oder Drohnen aus.<br>
     <b>Verteidigung</b> bauen <b>Pioniere</b> (Kaserne): Mauern, Gräben, Stacheldraht, <b>Panzerminen</b> und Stellungen werden geplant und vor Ort errichtet.<br>
     <b>Drohnen:</b> FPV schweben an ihrem Posten, mit 🎯 Lauern stürzen sie sich auf Feinde. Spionage- und Reaper-Drohnen fliegen mit 🛰 Aufklären selbstständig über das Tal; sie sind getarnt, nur das Radar der Flugabwehr entdeckt sie. Raketenwerfer treffen auf 22 Felder – aber nur aufgeklärte Ziele.<br>

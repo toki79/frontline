@@ -28,7 +28,8 @@ export function updateRel(){
 }
 export const hostile=(a,b)=>a!==b&&G.rel[a][b]==='feind';
 /** Haltung einer KI-Macht gegenüber einer anderen Macht ändern (−100 … 100) */
-export function addAtt(ai,o,d){ const A=G.ais&&G.ais[ai]; if(!A) return; A.att[o]=Math.max(-100,Math.min(100,(A.att[o]||0)+d)); }
+export function addAtt(ai,o,d){ const A=G.ais&&G.ais[ai]; if(!A) return; if(d<0&&A.persona&&A.persona.traits.includes('nachtragend')) d*=1.6;   // nachtragend: Ärger wirkt stärker
+  A.att[o]=Math.max(-100,Math.min(100,(A.att[o]||0)+d)); }
 export const attOf=(ai,o)=>(G.ais&&G.ais[ai]&&G.ais[ai].att[o])||0;
 /** Krieg erklären oder Frieden schließen (a, b: Großmächte; by: wer es tut) */
 export function setWar(a,b,on,by?){

@@ -6,6 +6,7 @@ import { canAfford, costOf, lacking } from '../sim/costs';
 import { nextMilestone } from '../sim/economy';
 import { cancelItem, enqueue, missingReq, queueName } from '../sim/production';
 import { G } from '../sim/state';
+import { evActive } from '../sim/happen';
 import { atWar } from '../sim/world';
 import { $ } from '../ui/dom';
 import { costHtml } from '../ui/format';
@@ -124,6 +125,8 @@ export function updatePanel(){
   $('#rOil').textContent=fmt(p.res.oil);
   const pw=$('#power'); pw.textContent=`⚡ ${p.use}/${p.power}`; pw.classList.toggle('low',p.use>p.power);
   $('#popMe').textContent=`${Math.floor(p.pop)}/${p.cap}`;
+  { const ev=evActive(), el=$('#evPill') as HTMLElement; el.hidden=!ev.length;
+    if(ev.length){ const h=ev.map(e=>`<span title="${e.txt}">${e.icon} ${e.name} ${Math.floor(e.left/60)}:${String(Math.floor(e.left%60)).padStart(2,'0')}</span>`).join(''); if(el.innerHTML!==h) el.innerHTML=h; } }
   { const h=p.happy??0.8, el=$('#happy'); el.textContent=`${h>=0.75?'😊':h>=0.5?'😐':h>=0.35?'😟':'😠'} ${Math.round(h*100)} %`; el.classList.toggle('low',h<0.5); }
   const goalMe=G.mode==='race'?ECON.target:nextMilestone(p.pop);
   $('#popMeBar').style.width=Math.min(100,p.pop/goalMe*100)+'%';

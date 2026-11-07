@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { newGame, G } from '../src/sim/state';
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
-import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar } from '../src/sim/world';
+import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar, addAtt as addAttT } from '../src/sim/world';
 import { enqueue, missingReq } from '../src/sim/production';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
@@ -34,6 +34,11 @@ import { armyEstimate, intelChance, knows, mastery, researchIntel } from '../src
 import { conclude, judge, pactTerms, pactWith, bound, updatePacts } from '../src/sim/pacts';
 import { envoyPrompt, readEnvoy, applyMood } from '../src/ai/envoy';
 import { aiOfferPeace } from '../src/ai/kastrova';
+import { connected, SIDE_TF } from '../src/sim/mapgen';
+import { aiChar, revealPersona, personaKnown } from '../src/ai/persona';
+import { fire, evMul, evOn, evMarket } from '../src/sim/happen';
+import { priceFactor } from '../src/sim/market';
+import { MAPTYPES } from '../src/data/config';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
 /** Baustelle nahe dem Rathaus setzen */
@@ -864,7 +869,7 @@ describe('Simulation', () => {
     expect([hq[2].tx, hq[2].ty]).toEqual([MAP_W - 3 - hq[0].tx, hq[0].ty]);
     // Gelände der Heimatgebiete gespiegelt gleich
     let same = 0, n = 0; for (let y = 100; y < 140; y++) for (let x = 2; x < 40; x++) { n++; if (G.terr[idx(x, y)] === G.terr[idx(MAP_W - 1 - x, y)] && G.terr[idx(x, y)] === G.terr[idx(y, x)]) same++; }
-    expect(same / n).toBeGreaterThan(0.6);   // Ressourcenprofile unterscheiden sich, das Gelände kaum
+    expect(same / n).toBeGreaterThan(0.5);   // Ressourcenprofile unterscheiden sich (im Waldland stärker), das Gelände kaum
     const bk = findBuilding(2, 'bunker');
     for (const [a, b] of [[hq[0], hq[1]], [hq[0], hq[2]], [hq[1], hq[2]], [hq[0], bk], [hq[1], bk], [hq[2], bk]])
       expect(findPath(a.tx + 1, a.ty + 4, b.tx + 1, b.ty + 4, 'veh'), 'Weg fehlt').toBeTruthy();
@@ -1001,6 +1006,53 @@ describe('Simulation', () => {
     expect(G.ais[1].airSeenT).toBeGreaterThan(0);
     G.ais[1].defT = 0; aiThink(1);
     expect(G.buildings.some(b => !b.dead && b.owner === 1 && (b.type === 'flak' || b.type === 'sam'))).toBe(true);   // Flugabwehr geplant
+  });
+  it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
+    newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();
+    newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); expect(G.terr.every((v, i) => v === a[i])).toBe(true); expect(G.ore.every((v, i) => v === ore[i])).toBe(true);
+    newGame('mittel', true, 'endless', {seed: 31338, map: 'seen'}); expect(G.terr.some((v, i) => v !== a[i])).toBe(true);
+    newGame('mittel', true, 'endless', {seed: 4711}); const t0 = G.mapType; newGame('mittel', true, 'endless', {seed: 4711}); expect(G.mapType).toBe(t0);
+    for (const mt of Object.keys(MAPTYPES)) for (const seed of [5, 77, 901]) {
+      newGame('mittel', true, 'endless', {seed, map: mt}); expect(connected()).toBe(true);
+      // Fairness: Rohstoff-Felder im Umkreis jeder Stadt etwa gleich
+      const near = (layer, pid) => { const hq = findBuilding(pid, 'hq'); let n = 0; for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) if (layer[idx(x, y)] > 0 && Math.hypot(x - hq.x, y - hq.y) < 45) n++; return n; };
+      for (const layer of [G.ore, G.oil, G.rock]) { const c = [0, 1, 4].map(pid => near(layer, pid)), avg = (c[0] + c[1] + c[2]) / 3;
+        for (const v of c) expect(Math.abs(v - avg)).toBeLessThanOrEqual(Math.max(12, avg * 0.6)); }
+    }
+  });
+  it('KI-Persönlichkeit: Eröffnung und Charakter verändern Entscheidungen; Geheimdienst deckt sie auf; Verräter brechen Pakte', () => {
+    newGame('mittel'); noBandits();
+    G.ais[1].persona = {opening: 'rush', traits: ['ehrgeizig']}; G.ais[4].persona = {opening: 'igel', traits: ['nachtragend']};
+    expect(aiChar(1).aggr).toBeGreaterThan(aiChar(4).aggr * 1.5); expect(aiChar(4).defense).toBeGreaterThan(aiChar(1).defense * 1.5);
+    expect(aiChar(1).grace).toBeLessThan(1); expect(aiChar(1).drive).toBeGreaterThan(0);
+    G.ais[4].att[0] = 0; addAttT(4, 0, -10); expect(G.ais[4].att[0]).toBe(-16);   // nachtragend
+    expect(personaKnown(1).opening).toBe(false);
+    const r = revealPersona(1); expect(r).toContain('Ansturm'); expect(personaKnown(1).opening).toBe(true);
+    expect(revealPersona(1)).toContain('ehrgeizig');
+    // Verräter: Nichtangriffspakt, deutlich überlegen -> bricht ihn irgendwann
+    newGame('mittel'); noBandits(); for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true; G.t = 1500;
+    G.ais[1].persona = {opening: 'boom', traits: ['verraeter']}; G.ais[1].att[0] = 60;
+    expect(conclude(1, {kind: 'nap', money: 0}).ok).toBe(true);
+    G.ais[1].rat = {0: 3, 4: 1}; G.t += 200; pactWith(1).t0 = 0;
+    for (let i = 0; i < 3000 && !atWar(1, 0); i++) { G.ais[1].rat = {0: 3, 4: 1}; updatePacts(); }
+    expect(atWar(1, 0)).toBe(true); expect(personaKnown(1).traits).toContain('verraeter');
+  });
+  it('Ereignisse: Dürre, Winter, Funde, Ölpreis, Flüchtlinge, Söldner', () => {
+    newGame('mittel'); noBandits(); const p = G.players[0];
+    expect(evMul('food')).toBe(1);
+    fire('duerre'); expect(evOn('duerre')).toBe(true); expect(evMul('food')).toBeCloseTo(0.6);
+    run(250); expect(evOn('duerre')).toBe(false);
+    fire('winter'); expect(evMul('speed')).toBeLessThan(1);
+    const before = priceFactor('sellOil'); fire('oel'); expect(priceFactor('sellOil')).toBeCloseTo(before * 2); expect(evMarket('buyFood')).toBe(1);
+    const cnt = () => { let n = 0; for (let i = 0; i < G.ore.length; i++) if (G.ore[i] > 0 || G.oil[i] > 0 || G.rock[i] > 0) n++; return n; };
+    const n0 = cnt(); expect(fire('fund')).toBe(true); expect(cnt()).toBeGreaterThan(n0 + 15);
+    p.cap = p.pop + 50; const pop0 = p.pop; fire('fluecht'); expect(p.pop).toBeGreaterThan(pop0 + 10);
+    // Söldner: abgelehnt -> reiche KI wirbt sie an
+    G.players[1].res.money = 5000; const k0 = G.units.filter(u => !u.dead && u.owner === 1).length;
+    fire('soeldner'); expect(G.offer && G.offer.type).toBe('merc'); answerOffer(false);
+    expect(G.units.filter(u => !u.dead && u.owner === 1).length).toBe(k0 + 4);
+    p.res.money = 3000; const m0 = G.units.filter(u => !u.dead && u.owner === 0).length; fire('soeldner'); answerOffer(true);
+    expect(G.units.filter(u => !u.dead && u.owner === 0).length).toBe(m0 + 4);
   });
   it('Geheimabsprachen: Bündnis gegen die dritte Macht, Preis, Wortbruch, Nichtangriffspakt', () => {
     newGame('mittel'); noBandits();

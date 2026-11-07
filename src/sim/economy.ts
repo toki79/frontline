@@ -1,3 +1,4 @@
+import { evActive, evMood, evMul } from '../sim/happen';
 import { FAMINE, RTREE, isAI, DEPOSIT, capOf, foodMulOf, lvlMul, lvlOf, BIOFUEL, ECON, EMERGENCY, EXPORT, MAP_H, MAP_W, MOOD, NUKE, RESEARCH_SPEED, STORAGE, T, hasTech } from '../data/config';
 import { inFallout } from '../sim/nuke';
 import { dist } from '../core/util';
@@ -45,7 +46,7 @@ export function updateEconomy(pid,dt){
       for(const i of b.rockTiles){ if(G.rock[i]>0){ const a=Math.min(G.rock[i],b.def.stone*rb*dt*(powOk?1:0.5)); G.rock[i]-=a; got=a; break; } }
       if(got>0){ p.res.stone+=got*mul; stoneProd+=got*mul/dt; b.empty=false; } else if(!b.empty){ b.empty=true; if(pid===0) msg(`Ein Steinbruch ist erschöpft – alle Felsen im Umkreis von ${DEPOSIT.r} Feldern sind abgebaut. Baue einen neuen an anderen Felsen.`,'#ffb38a'); }
     }
-    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1):1)*foodMulOf(b)*(b.type==='hq'?(G.t<(p.rationUntil||0)?FAMINE.rationMul:1):inFallout(b));   // Bauern arbeiten auch ohne Lohn weiter
+    if(b.def.food) foodProd+=b.def.food*(powOk||b.type==='hq'?1:b.type==='greenhouse'?0.3:0.7)*(b.type==='farm'?(b.fieldF??1)*(b.eff??1)*(hasTech(p,'fert')?1.5:1)*evMul('food'):1)*foodMulOf(b)*(b.type==='hq'?(G.t<(p.rationUntil||0)?FAMINE.rationMul:1):inFallout(b));   // Bauern arbeiten auch ohne Lohn weiter
     if(b.def.metal){ let got=0;
       if(!b.oreTiles.some(i=>G.ore[i]>0)&&G.t>=(b.scanT||0)){ b.scanT=G.t+DEPOSIT.rescan; b.oreTiles=depositTiles(b,G.ore); }   // nächstes Erz im Vorkommen
       for(const i of b.oreTiles){ if(G.ore[i]>0){ const a=Math.min(G.ore[i],b.def.metal*rb*dt*(powOk?1:0.5)); G.ore[i]-=a; got=a; break; } }
@@ -86,6 +87,7 @@ export function updateEconomy(pid,dt){
   { const core=G.buildings.filter(b=>!b.dead&&b.owner===pid&&(b.type==='hq'||b.def.cap));
     target-=pen(G.buildings.some(c=>!c.dead&&c.type==='camp'&&core.some(h=>dist(c.x,c.y,h.x,h.y)<MOOD.banditR)),MOOD.bandits,'Räuber in Stadtnähe'); }
   target-=pen(anyWar(pid),MOOD.war,'Krieg');
+  { const em=evMood(); if(em<0) target-=pen(true,-em,'Ereignis: '+evActive().filter(e=>e.mood<0).map(e=>e.name).join(', ')); else target+=em; }
   { const fc=(G.funCov&&G.funCov[pid])??1; target-=pen(fc<1,MOOD.fun*(1-fc),'zu wenig Unterhaltung (Park, Theater, Schwimmbad …)'); }
   target-=pen(G.t-(p.lastFire??-999)<60,MOOD.fires,'Brände in der Stadt');
   target-=pen(G.t<(p.shockUntil||0),NUKE.shockMood,'Entsetzen über den eigenen Atomschlag');

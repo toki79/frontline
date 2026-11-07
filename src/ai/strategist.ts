@@ -8,6 +8,7 @@ import { addAtt, atWar, attOf, countBuildings } from '../sim/world';
 import { aiDemand, aiOfferPeace } from './kastrova';
 import { setWar } from '../sim/world';
 import { bound, jointAgainst, pactWith } from '../sim/pacts';
+import { personaText } from '../ai/persona';
 
 /* =====================================================================
    LLM-Stratege (optional): Lagebild für ein Sprachmodell und Umsetzung
@@ -39,6 +40,7 @@ export function strategistPrompt(pid, persona=''){
   L.push(`Spielzeit: ${mm} min. Deine Stadt: ${fmt(p.pop)} Einwohner (Platz für ${fmt(p.cap)}), Zufriedenheit ${Math.round((p.happy??1)*100)} %.`);
   const r=p.rate||{}, net=(r.money||0)+(r.export||0)-(r.upkeep||0)-(r.wages||0)-(r.admin||0);
   L.push(`Kasse ${fmt(p.res.money)} $ (${net>=0?'+':''}${net.toFixed(1)} $/s). Lager: ${['food','wood','stone','metal','oil'].map(k=>`${RES[k].name} ${fmt(p.res[k]||0)}`).join(', ')}.`);
+  { const pt=personaText(pid); if(pt) L.push(`Deine Persönlichkeit in dieser Partie – ${pt}. Handle danach.`); }
   L.push(`Reich an: ${G.profile[pid].rich.map(k=>RES[k].name).join(', ')||'–'}; knapp: ${G.profile[pid].scarce.map(k=>RES[k].name).join(', ')||'–'}.`);
   const bc={}; for(const b of G.buildings) if(!b.dead&&b.owner===pid&&!b.def.def) bc[b.def.name.replace(/­/g,'')]=(bc[b.def.name.replace(/­/g,'')]||0)+1;
   L.push(`Gebäude: ${Object.entries(bc).map(([n,k])=>`${k}× ${n}`).join(', ')}.`);

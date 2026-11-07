@@ -1,8 +1,9 @@
 import { mulberry32 } from '../core/util';
-import { AIS, AI_CHAR, DIFFICULTY, FACTIONS, MAP_H, MAP_W, REGION } from '../data/config';
+import { AIS, AI_CHAR, DIFFICULTY, EVENTS, FACTIONS, MAPTYPES, MAP_H, MAP_W, REGION } from '../data/config';
 import { genMap, setupStart } from '../sim/mapgen';
 import { updateRel, updateVision } from '../sim/world';
 import { msg } from '../core/events';
+import { rollPersona } from '../ai/persona';
 
 /* =====================================================================
    Spielzustand
@@ -11,10 +12,14 @@ import type { Game } from './types';
 export let G: Game = null;
 /** Spielstand ersetzen (z. B. null beim Zurück ins Menü) */
 export function setG(g: Game){ G=g; }
-export function newGame(diffKey='mittel',fog=true,mode='endless'){
-  const seed = (Math.random()*1e9)|0;
+/** Kartentyp aus der Kartennummer (gleiche Nummer = gleiche Karte) */
+export function mapTypeOf(seed:number){ const r=mulberry32(seed^0x5bd1e995)(), L=Object.entries(MAPTYPES), sum=L.reduce((a,[,m])=>a+m.weight,0); let x=r*sum;
+  for(const [k,m] of L){ x-=m.weight; if(x<0) return k; } return 'tal'; }
+export function newGame(diffKey='mittel',fog=true,mode='endless',opts:{seed?:number,map?:string}={}){
+  const seed = opts.seed!=null&&opts.seed>0 ? Math.floor(opts.seed)%1000000 : 1+Math.floor(Math.random()*999999);
+  const mapType = opts.map&&MAPTYPES[opts.map] ? opts.map : mapTypeOf(seed);
   G = {
-    t:0, fog, mode, diffKey, diff:DIFFICULTY[diffKey], rng:mulberry32(seed), nextId:1,
+    t:0, fog, mode, diffKey, seed, mapType, diff:DIFFICULTY[diffKey], rng:mulberry32(seed), nextId:1,
     vis:new Uint8Array(MAP_W*MAP_H), visT:0, feat:new Uint8Array(MAP_W*MAP_H), terr:new Uint8Array(MAP_W*MAP_H), oil:new Float32Array(MAP_W*MAP_H), ore:new Float32Array(MAP_W*MAP_H), occ:new Int32Array(MAP_W*MAP_H),
     wood:new Float32Array(MAP_W*MAP_H), rock:new Float32Array(MAP_W*MAP_H), road:new Uint8Array(MAP_W*MAP_H), roadOwner:new Uint8Array(MAP_W*MAP_H), featOwner:new Uint8Array(MAP_W*MAP_H), fplan:new Uint8Array(MAP_W*MAP_H), fplanOwner:new Uint8Array(MAP_W*MAP_H), mineSeen:new Uint8Array(MAP_W*MAP_H), roadDirty:true, terrChanged:[],
     units:[], buildings:[], projectiles:[], fx:[], scorch:[], missiles:[], fallout:[],
@@ -22,7 +27,7 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
               done:{}, nukes:0, q:{hq:[], kontor:[], silo:[], airbase:[], barracks:[], factory:[], droneshop:[], research:[]}, tech:0, lastAttack:null, fuelShort:false, starveMsg:-99, capMsg:-99})),
     rel:FACTIONS.map((_,a)=>FACTIONS.map((_,b)=>a===b?'-':a===3||b===3?'feind':'neutral')),
     wars:{}, offer:null,
-    contracts:[], pacts:[], pactBreaks:0, chat:{}, embassy:FACTIONS.map(()=>FACTIONS.map(()=>false)),
+    contracts:[], pacts:[], pactBreaks:0, chat:{}, ev:{next:EVENTS.first, on:{}, last:''}, embassy:FACTIONS.map(()=>FACTIONS.map(()=>false)),
     known:FACTIONS.map((_,a)=>FACTIONS.map((_,b)=>a===b||a===2||a===3||b===3)),   // Erstkontakt: wer kennt wen? (Miliz und Räuber kennen alle)
     militiaAlly:-1, militiaWar:FACTIONS.map(()=>false), attitude:FACTIONS.map(()=>0), mercCooldown:0, market:{sellOil:0,buyFood:0,buyMetal:0},
     milSpawnT:20, milRaidT:40, aiHintShown:false,
@@ -35,6 +40,8 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
     const rs=[...REGION.res]; for(let i=rs.length-1;i>0;i--){ const j=Math.floor(G.rng()*(i+1)); [rs[i],rs[j]]=[rs[j],rs[i]]; }
     const rich=rs.slice(0,2), scarce=rs.slice(2,4), none={rich:[],scarce:[]};
     G.profile=[{rich,scarce},{rich:scarce,scarce:rich},none,none,{rich:[rs[4],rs[2]],scarce:[rs[1],rs[3]]}]; }
+  for(const pid of AIS) G.ais[pid].persona=rollPersona(pid);   // jede Partie eine andere Eröffnung und andere Charakterzüge
+  G.personaSeen={};
   if(!fog) G.known=FACTIONS.map(()=>FACTIONS.map(()=>true));
   G.regionTexts=FACTIONS.map((_,i)=>regionText(i));
   genMap();
@@ -45,6 +52,7 @@ export function newGame(diffKey='mittel',fog=true,mode='endless'){
   if(fog) msg('Das Tal jenseits unserer Stadt ist unerforscht. Wer dort lebt, wissen wir nicht – schicke Späher oder Drohnen aus.','#d6b45a');
   else for(const pid of AIS) msg(`Geheimdienst: ${G.players[pid].short} (${AI_CHAR[pid].label}) hat ${G.regionTexts[pid]}.`,'#d6b45a');
   msg('Kommandant, die Stadt wartet. Bauarbeiter errichten alles vor Ort – Holz und Stein holen sie beim Bauen aus dem Lager.', '#d2bd62');
+  msg(`Karte: ${MAPTYPES[mapType].icon} ${MAPTYPES[mapType].name} · Nr. ${seed} – ${MAPTYPES[mapType].desc}`,'#b8c8e0');
 }
 export const isScarce=(pid,r)=>!!G&&G.profile[pid].scarce.includes(r);
 export const isRich=(pid,r)=>!!G&&G.profile[pid].rich.includes(r);

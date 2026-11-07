@@ -1,9 +1,10 @@
-import { AIS, AI_CHAR, AI_WAR, MAJORS, PACT, RESEARCH, isAI } from '../data/config';
+import { AIS, AI_WAR, MAJORS, PACT, PERSONA, RESEARCH, isAI } from '../data/config';
 import { G } from '../sim/state';
 import { addAtt, atWar, attOf, foesOf, setWar } from '../sim/world';
 import { deterrent } from '../sim/nuke';
 import { msg } from '../core/events';
 import { offerHandlers, showOffer } from '../sim/offers';
+import { aiChar, hasTrait, revealPersona } from '../ai/persona';
 
 /* =====================================================================
    Geheimabsprachen zwischen Aldoria und einer KI-Macht
@@ -36,10 +37,10 @@ const why0={krieg:'wir sind im Krieg miteinander', schon:'es gibt schon eine Abm
 export const whyText=k=>why0[k]||k;
 /** Bedingungen der KI f für ein Geschäft: need = Mindestbetrag, den Aldoria zahlt (negativ: die KI zahlt), null = nie */
 export function pactTerms(f, d:Deal){
-  const ai=G.ais[f], A=G.players[f], C=AI_CHAR[f], why:string[]=[];
+  const ai=G.ais[f], A=G.players[f], C=aiChar(f), why:string[]=[];
   if(!ai||beaten(f)) return {need:null, why:['besiegt']};
   if(atWar(f,0)) return {need:null, why:['krieg']};
-  const brk=(G.pactBreaks||0)*PACT.brokenW, att=attOf(f,0), unit=PACT.unit[C.key]||15;
+  const brk=(G.pactBreaks||0)*PACT.brokenW, att=attOf(f,0), unit=(PACT.unit[C.key]||15)*C.pactMul;
   if(brk) why.push('wortbruch'); if(att<0) why.push('misstrauen');
   if(d.kind==='intel'){
     const X=d.target; if(X===undefined||!pactTargets(f).includes(X)) return {need:null, why:['ziel']};
@@ -124,6 +125,10 @@ export function updatePacts(){
       if(p.join&&!atWar(0,X)){ broken(p,`Ihr habt Separatfrieden mit ${XN} geschlossen.`,PACT.peaceBreakAtt); continue; }
       if(!atWar(p.f,X)){ end(p); (G.betrayed=G.betrayed||{})[p.f]=((G.betrayed||{})[p.f]||0)+1;
         msg(`⚠ ${A.short} hat Frieden mit ${XN} geschlossen – die Abmachung ist hinfällig.${p.join?' Ihr steht allein im Krieg.':''}`,'#ffb38a'); continue; } }
+    // verräterische KI: bricht die Abmachung, wenn sie Aldoria deutlich überlegen ist
+    if(hasTrait(p.f,'verraeter')&&G.t-p.t0>PERSONA.betrayAfter&&((G.ais[p.f].rat&&G.ais[p.f].rat[0])??1)>PERSONA.betrayRatio&&Math.random()<PERSONA.betrayChance){
+      end(p); revealPersona(p.f,'verraeter'); setWar(p.f,0,true,p.f);
+      msg(`🗡 Verrat! ${A.leader} bricht die Abmachung und erklärt Aldoria den Krieg. ${A.short} gilt fortan als verräterisch.`,'#ff6a5a'); continue; }
     if(G.t>p.until){ addAtt(p.f,0,PACT.doneAtt); end(p); msg(`🤝 Die Abmachung mit ${A.short} ist ausgelaufen (${p.kind==='joint'?'Bündnis':'Nichtangriffspakt'}). Beide Seiten haben Wort gehalten.`,'#9fd88a'); }
   }
   // Die KI selbst schlägt ein Bündnis gegen die dritte Macht vor
