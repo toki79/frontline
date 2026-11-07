@@ -1,6 +1,8 @@
 // Simulationstests ohne Browser: prüft, dass die Spiellogik unabhängig von Grafik/DOM läuft.
 import { describe, it, expect, vi } from 'vitest';
-import { newGame, G } from '../src/sim/state';
+import { newGame as newGame0, G } from '../src/sim/state';
+/** Tests laufen reproduzierbar: Flusstal, KI ohne Zufallspersönlichkeit, keine Zufallsereignisse (außer der Test will es anders) */
+const newGame = (d = 'mittel', fog = true, mode = 'endless', opts: any = {}) => { newGame0(d, fog, mode, {map: 'tal', ...opts}); for (const p of [1, 4]) G.ais[p].persona = null; G.ev.next = 1e9; };
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar, addAtt as addAttT } from '../src/sim/world';
