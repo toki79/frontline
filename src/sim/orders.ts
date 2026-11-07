@@ -22,11 +22,11 @@ export function orderMove(units,gx,gy,mode='move'){
   const spots=formationSpots(gx,gy,units.length,units.every(u=>u.def.move==='amph'||u.def.cls==='air')&&units.some(u=>u.def.move==='amph')?'amph':'veh');   // Amphibien dürfen aufs Wasser
   const rest=[...units].sort((a,b)=>dist(a.x,a.y,gx,gy)-dist(b.x,b.y,gx,gy)), pace=groupPace(units);   // Verband: gemeinsames Tempo
   rest.forEach((u,i)=>{ const s=spots[i]||spots[spots.length-1]||{x:gx,y:gy};
-    u.mode=mode; u.target=null; u.escort=null; u.patrol=false; u.patrolArea=null; u.resume=null; u.order=null; u.area=null; u.dug=false; u.digT=0; u.goal={x:s.x,y:s.y}; u.pace=pace; if(u.def.harvester&&mode!=='harvest') u.hs=null; setPath(u,s.x,s.y); u.repathT=1; });
+    u.mode=mode; u.target=null; u.escort=null; u.patrol=false; u.patrolArea=null; u.resume=null; u.order=null; u.area=null; u.dug=false; u.dugCover=false; u.digT=0; u.fleeing=null; u.prevTarget=null; u.goal={x:s.x,y:s.y}; u.pace=pace; if(u.def.harvester&&mode!=='harvest') u.hs=null; setPath(u,s.x,s.y); u.repathT=1; });
 }
 export function orderAttack(units,t){
   const armed=units.filter(u=>u.def.weapon), other=units.filter(u=>!u.def.weapon);
-  for(const u of armed){u.mode='attack';u.target=t;u.path=null;u.repathT=0;u.escort=null;u.order=null;u.area=null;u.dug=false;}
+  for(const u of armed){u.mode='attack';u.target=t;u.path=null;u.repathT=0;u.escort=null;u.order=null;u.area=null;u.dug=false;u.dugCover=false;u.fleeing=null;u.prevTarget=null;}
   if(other.length) orderMove(other,t.x,t.y);
 }
 export function orderStop(units){for(const u of units){u.mode='idle';u.escort=null;u.order=null;u.area=null;u.path=null;u.target=null;u.guard={x:u.x,y:u.y};if(u.def.harvester)u.hs=null;}}

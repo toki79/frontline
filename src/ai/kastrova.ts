@@ -171,6 +171,10 @@ export function aiThink(pid=1){
   const armyPop=army.reduce((s,u)=>s+(u.def.cost.pop||0),0);
   if(armyPop>p.pop*0.3+10) want=Math.min(want,army.length);
   if(army.length<want&&(aiKnowsThreat(pid,F,'heavyarmor')||aiKnowsThreat(pid,F,'heavy'))&&available(pid,'at')&&canAfford(pid,'at')&&!p.q.barracks.length&&Math.random()<0.4) enqueue(pid,'at');   // Geheimdienst: schwere Panzer -> Panzerabwehr
+  // Panzer gesichtet: Gewehre sind wirkungslos – Panzerabwehr vorziehen
+  const tanks=G.units.some(e=>!e.dead&&e.def.armor==='heavy'&&hostile(pid,e.owner)&&spotted(pid,e.x,e.y)&&myB.some(b=>dist(e.x,e.y,b.x,b.y)<22));
+  if(tanks) ai.tankSeenT=G.t;
+  if(G.t-(ai.tankSeenT??-1e9)<240&&army.filter(u=>u.type==='at').length<Math.max(3,army.length*0.4)&&available(pid,'at')&&canAfford(pid,'at')&&!p.q.barracks.length) enqueue(pid,'at');
   if(army.length<want&&G.t>40&&p.res.money>2500&&Math.random()<0.35){   // Spätzeit-Waffen: Raketenträger, Schwärme, Jagdbomber
     for(const t of AI_MIX2) if(available(pid,t)&&canAfford(pid,t)&&p.res.money>UNITS[t].cost.money+1200&&!p.q[UNITS[t].prod].length){ enqueue(pid,t); break; } }
   if(army.length<want&&G.t>40&&(!saving||army.length<4)){

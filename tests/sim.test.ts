@@ -1009,6 +1009,38 @@ describe('Simulation', () => {
     G.ais[1].defT = 0; aiThink(1);
     expect(G.buildings.some(b => !b.dead && b.owner === 1 && (b.type === 'flak' || b.type === 'sam'))).toBe(true);   // Flugabwehr geplant
   });
+  it('Gefecht: Selbstverteidigung, Deckung, Nebel, Rückzug, Erholung, Dach-MG, Gewehre gegen Panzer', () => {
+    newGame('mittel'); noBandits(); for (const a of [0, 1, 4]) for (const b of [0, 1, 4]) G.known[a][b] = true; setWar(0, 1, true, 0);
+    const hq = findBuilding(0, 'hq'), khq = findBuilding(1, 'hq');
+    // Selbstverteidigung: Panzer greift ein Gebäude an, wird von Panzerabwehr beschossen -> wehrt sich, dann zurück zum Gebäude
+    const dep = placeBuilding(1, 'house', khq.tx + 8, khq.ty + 8, false);
+    const tank = spawnAt(0, 'mbt', dep.x - 4, dep.y); orderAttack([tank], dep);
+    const at = spawnAt(1, 'at', dep.x - 4, dep.y + 3);
+    for (let i = 0; i < 60 && tank.target === dep; i++) update(0.05);
+    expect(tank.target).toBe(at); expect(tank.prevTarget).toBe(dep);
+    expect(tank.smokeT).toBeGreaterThan(G.t);                              // Nebelwand gegen den Lenkflugkörper
+    at.hp = 1; for (let i = 0; i < 200 && !at.dead; i++) update(0.05);
+    expect(at.dead).toBe(true); for (let i = 0; i < 5; i++) update(0.05); expect(tank.target).toBe(dep);
+    // Gewehre gegen Kampfpanzer: wirkungslos
+    const tank2 = spawnAt(0, 'mbt', hq.x + 6, hq.y - 6), hp2 = tank2.hp;
+    for (let k = 0; k < 4; k++) spawnAt(1, 'inf', hq.x + 8, hq.y - 6 + k * 0.5);
+    for (let i = 0; i < 200; i++) update(0.05);
+    expect(tank2.hp).toBeGreaterThanOrEqual(hp2);
+    // Dach-MG holt eine Drohne
+    const dr = spawnAt(1, 'drone', tank2.x + 3, tank2.y); dr.mode = 'idle'; dr.lurk = false;
+    for (let i = 0; i < 120 && !dr.dead; i++) { dr.x = tank2.x + 3; dr.y = tank2.y; update(0.05); }
+    expect(dr.dead).toBe(true);
+    // Deckung und Rückzug
+    newGame('mittel'); noBandits(); setWar(0, 1, true, 0); G.known[0][1] = G.known[1][0] = true;
+    const h0 = findBuilding(0, 'hq'), inf = spawnAt(0, 'inf', h0.x + 12, h0.y - 12), foe = spawnAt(1, 'inf', h0.x + 15, h0.y - 12);
+    for (let i = 0; i < 100; i++) update(0.05);
+    expect(inf.dug || inf.dead).toBe(true); if (!inf.dead) expect(inf.dugCover).toBe(true);
+    const runner = spawnAt(0, 'inf', h0.x + 12, h0.y - 10); runner.hp = runner.maxHp * 0.2; runner.lastHit = G.t;
+    update(0.05); expect(runner.fleeing).toBeTruthy(); expect(runner.mode).toBe('move');
+    foe.dead = true; inf.dead = true;
+    for (let i = 0; i < 20 * 120 && runner.fleeing; i++) update(0.05);
+    expect(runner.hp).toBeGreaterThanOrEqual(runner.maxHp * 0.8); expect(runner.fleeing).toBeFalsy();   // erholt und auf dem Rückweg
+  });
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); expect(G.terr.every((v, i) => v === a[i])).toBe(true); expect(G.ore.every((v, i) => v === ore[i])).toBe(true);

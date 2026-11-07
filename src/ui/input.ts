@@ -235,6 +235,7 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.caravan) t+=` · Ladung ${e.cargoAmt} ${RES[e.cargoRes].icon} → ${G.players[e.dest?e.dest.owner:0].short}`;
     if(e.kind==='unit'&&e.def.pioneer) t+=e.clearing?' · räumt eine Mine':e.working?' · baut':e.pjob?' · auf dem Weg zum Bauplatz':' · wartet auf Aufträge (Verteidigung planen)';
     if(e.kind==='unit'&&e.order) t+=` · ${ORDER_NAME[e.order]}${e.order==='hold'?(e.dug?' (eingegraben 🛡)':' (gräbt sich ein …)'):''}`;
+    if(e.kind==='unit'){ if(e.fleeing) t+=' · 🏃 zieht sich zurück, erholt sich'; else if(e.dugCover) t+=' · in Deckung'; if(e.smokeT>G.t) t+=' · 🌫 Nebelwand'; if(e.prevTarget&&!e.prevTarget.dead) t+=' · wehrt sich, dann zurück zum Ziel'; }
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;

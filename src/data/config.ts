@@ -15,6 +15,13 @@ export const LOOT = {treasury:{hq:[0.3,700], kontor:[0.12,250]}, goods:{farm:['f
 export const COMBINED = {radius:7, minArms:2, dmg:0.15, def:0.12};
 // Verteidigungsvorteil: Stellungen schießen genauer (vorbereitete Schussfelder) und halten direktem Feuer besser stand.
 // Artillerie, Raketen und Bomben wirken voll – wer Befestigungen knacken will, braucht sie (oder Luftlandungen, Amphibien).
+// Gefechtsverhalten: Selbstverteidigung, Deckung, Nebelwand, Rückzug, Erholung
+export const COMBAT_AI = {
+  cover: 0.75, coverT: 3,               // Infanterie unter Feuer geht nach 3 s in Deckung (Schaden ×0,75)
+  smokeMul: 0.35, smokeT: 6, smokeCd: 45, smokeVs: ['missile','shell'],   // Panzer: Nebelwand gegen Lenkwaffen und Granaten
+  fleeHp: 0.25, fleeHit: 4, backHp: 0.8,   // unter 25 % und beschossen: Rückzug; ab 80 % zurück auf den alten Posten
+  fieldHeal: 0.005, fieldHealVeh: 0.003, fieldDelay: 20,   // Erholung im Feld je Sekunde (Anteil der Lebenspunkte), wenn 20 s kein Beschuss
+};
 export const FORTIFY = {dmgOut:1.3, direct:0.65, artillery:['rocket','ballistic','glide'], dugOut:1.15};
 // Minen und Steinbrüche bauen das ganze Vorkommen im Umkreis ab (nicht nur die angrenzenden Felder)
 export const DEPOSIT = {r:8, rescan:20};
@@ -133,7 +140,7 @@ export const isPlain = t => t===T.GRASS || t===T.MEADOW;
 // ---------- Schaden: Waffentyp gegen Panzerung ----------
 // air = tieffliegende Drohnen, airHigh = hochfliegende (nur Flugabwehr, schwach Maschinenkanone); 0 heißt: kann dieses Ziel gar nicht bekämpfen
 export const DAMAGE = {
-  bullet:     {none:1.0,  light:0.18, heavy:0.03, building:0.15, fort:0.06, air:0.45, airHigh:0},   // Gewehre kratzen Panzer kaum
+  bullet:     {none:1.0,  light:0.18, heavy:0,    building:0.15, fort:0.06, air:0.45, airHigh:0},   // Gewehre sind gegen Kampfpanzer wirkungslos
   autocannon: {none:0.9,  light:0.8, heavy:0.25, building:0.4,  fort:0.25, air:1.0, airHigh:0.12},
   hellfire:   {none:1.6,  light:1.0, heavy:0.45, building:0.35, fort:0.2,  air:0, airHigh:0},     // Reaper: Präzisionsraketen von oben – tödlich für Schützen
   shell:      {none:0.5,  light:1.0, heavy:1.0,  building:0.9,  fort:0.4, air:0, airHigh:0},
@@ -178,9 +185,9 @@ export const UNITS = {
   ifv:   {name:'Schützenpanzer', cls:'veh', cost:{money:300, metal:60, oil:40, pop:4}, time:11, hp:320, upkeep:0.05, combat:true, armor:'light', speed:2.3, sight:7, size:0.6,
           weapon:{type:'autocannon', dmg:15, range:5, rof:0.5}, prod:'factory', req:[], desc:'Schnell, gut gegen Infanterie'},
   mbt:   {name:'Kampfpanzer', cls:'veh', cost:{money:450, metal:120, oil:70, pop:4}, time:20, hp:650, upkeep:0.1, combat:true, armor:'heavy', speed:1.55, sight:7, size:0.72,
-          weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge'},
+          weapon:{type:'shell', dmg:70, range:5.5, rof:2.4}, aux:{type:'bullet', dmg:12, range:5, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Schwer gepanzert, knackt Fahrzeuge. Dachmaschinengewehr gegen Drohnen und Hubschrauber'},
   heavy: {name:'Schwerer Kampf\u00ADpanzer', cls:'veh', cost:{money:900, metal:260, oil:120, pop:5}, time:30, hp:1300, upkeep:0.18, combat:true, armor:'heavy', speed:1.1, sight:7, size:0.85, research:'heavyarmor',
-          weapon:{type:'shell', dmg:120, range:6, rof:2.8}, prod:'factory', req:[], desc:'Doppelt gepanzert, schwere Kanone – langsam. Gegenmittel: Panzerabwehr, Panzerminen, Artillerie'},
+          weapon:{type:'shell', dmg:120, range:6, rof:2.8}, aux:{type:'bullet', dmg:14, range:5, rof:0.35, airOnly:true}, prod:'factory', req:[], desc:'Doppelt gepanzert, schwere Kanone – langsam, Dachmaschinengewehr gegen Drohnen. Gegenmittel: Panzerabwehr, Panzerminen, Artillerie'},
   spaag: {name:'Flakpanzer', cls:'veh', tech:1, cost:{money:400, metal:70, oil:30, pop:3}, time:12, hp:300, upkeep:0.06, combat:true, armor:'light', speed:2.0, sight:8, size:0.62, radar:8.5,
           weapon:{type:'flak', dmg:20, range:8, rof:0.4, airOnly:true}, prod:'factory', req:[], desc:'Mobile Flugabwehr mit kleinem Radar – Begleitschutz gegen Drohnen'},
   jammer:{name:'Störsender', cls:'veh', tech:1, cost:{money:350, metal:40, oil:20, pop:2}, time:10, hp:220, upkeep:0.04, armor:'light', speed:1.9, sight:7, size:0.6, jam:true,

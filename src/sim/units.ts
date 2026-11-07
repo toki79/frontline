@@ -1,5 +1,5 @@
 import { angDiff, clamp, dist, idx, inMap, rotTo } from '../core/util';
-import { RTREE, isMajor, mcls, AIR, CAGE, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, hasTech } from '../data/config';
+import { RTREE, isMajor, mcls, AIR, CAGE, COMBAT_AI, DRONE, FEAT, JAM, LEASH, MAP_H, MAP_W, canHit, hasTech } from '../data/config';
 import { applyDamage, distTo, findTarget, fire, homeTurf, splash, updateFire } from '../sim/combat';
 import { setPath } from '../sim/pathfinding';
 import { G } from '../sim/state';
@@ -11,6 +11,7 @@ import { updateWorker } from '../sim/build';
 import { checkMine, updatePioneer } from '../sim/pioneers';
 import { updateCaravan, updateDiplomat } from '../sim/trade';
 import { chaseLimit, updateMission } from '../sim/missions';
+import { orderMove } from '../sim/orders';
 
 /* =====================================================================
    Einheiten-Update
@@ -19,7 +20,10 @@ export function updateUnit(u,dt){
   const d=u.def;
   if(u.carried||u.mode==='board'){ if(updateRider(u,dt)) return; if(u.carried) return; }   // Truppentransport / Luftlandung
   u.cd-=dt;
-  if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner)||!detected(u.target,u.owner))){u.target=null;if(u.mode==='attack'){u.mode='idle';u.guard={x:u.x,y:u.y};}}
+  if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner)||!detected(u.target,u.owner))){u.target=null;
+    const pv=u.prevTarget; u.prevTarget=null;
+    if(pv&&!pv.dead&&hostile(u.owner,pv.owner)){ u.target=pv; u.repathT=0; }   // Angreifer erledigt: zurück zum eigentlichen Ziel
+    else if(u.mode==='attack'){u.mode='idle';u.guard={x:u.x,y:u.y};}}
   let firing=false;
   if(d.weapon){
     u.scanT-=dt;
@@ -55,6 +59,8 @@ export function updateUnit(u,dt){
       }
     }
   }
+  if(d.aux) updateAux(u,dt);
+  if(d.weapon&&!d.weapon.kamikaze&&d.cls!=='air'&&!u.carried){ if(behave(u,dt,firing)) return; }
   if(d.weapon&&d.weapon.kamikaze){   // Störsender in der Nähe: Verbindung weg, Drohne taumelt und stürzt ab
     u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=!d.swarm&&!hasTech(G.players[u.owner],'ai')&&G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }   // mit KI fliegen sie autonom
     if(u.jammed){ u.target=null; if(Math.random()<dt*3){ u.path=[{x:u.x+(Math.random()-.5)*2,y:u.y+(Math.random()-.5)*2}]; u.pathI=0; }
@@ -68,6 +74,7 @@ export function updateUnit(u,dt){
   if(d.diplomat) updateDiplomat(u);
   if(u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15&&d.cls!=='air'&&(u.healChk=(u.healChk||0)-dt)<=0){ u.healChk=1; u.home=homeTurf(u); }
   if(u.home&&u.hp<u.maxHp&&G.t-(u.lastHit||-99)>15) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*0.015*dt);   // Versorgung zu Hause
+  else if(!u.home&&u.hp<u.maxHp&&d.cls!=='air'&&G.t-(u.lastHit||-99)>COMBAT_AI.fieldDelay) u.hp=Math.min(u.maxHp,u.hp+u.maxHp*(d.cls==='inf'?COMBAT_AI.fieldHeal:COMBAT_AI.fieldHealVeh)*dt);   // Erholung im Feld (langsamer)
   if(d.sortie) updateSortie(u,dt);
   if(d.battery){   // Drohnen-Akku: entlädt sich außerhalb der eigenen Stadt (Schweben braucht wenig)
     const home=G.buildings.some(b=>!b.dead&&!b.site&&b.owner===u.owner&&!b.def.def&&distTo(u,b)<=9);
@@ -120,6 +127,39 @@ function returnToBase(u,t){
 }
 /** hat das Flugzeug noch eine Bombe an Bord? */
 export const armed=u=>(u.bombs??AIR.bombs)>0;
+/** Zweitwaffe (Dach-MG der Kampfpanzer): schießt selbstständig auf Drohnen und Hubschrauber in Reichweite */
+function updateAux(u,dt){
+  const w=u.def.aux; u.cd2=(u.cd2||0)-dt; if(u.cd2>0) return;
+  let t=u.target2; if(!t||t.dead||!hostile(u.owner,t.owner)||!detected(t,u.owner)||dist(u.x,u.y,t.x,t.y)>w.range) t=null;
+  if(!t){ let bd=w.range; for(const e of G.units){ if(e.dead||e.carried||!hostile(u.owner,e.owner)||!canHit(w,e)||!detected(e,u.owner)) continue; const dd=dist(u.x,u.y,e.x,e.y); if(dd<=bd){ bd=dd; t=e; } } }
+  u.target2=t; if(t) fire(u,t,w); else u.cd2=0.3;
+}
+/** Gefechtsverhalten: Deckung suchen, bei schweren Treffern zurückziehen, erholt auf den alten Posten zurück */
+function behave(u,dt,firing){
+  const d=u.def, hit=G.t-(u.lastHit||-99);
+  // Deckung: Infanterie, die steht und schießt oder beschossen wird, wirft sich hin (wenn sie nicht ohnehin eingegraben ist)
+  if(d.cls==='inf'){
+    if(u.path&&u.path.length){ u.coverT=0; if(u.dugCover){ u.dug=false; u.dugCover=false; } }
+    else if(!u.dug&&(firing||hit<2)){ u.coverT=(u.coverT||0)+dt; if(u.coverT>=COMBAT_AI.coverT){ u.dug=true; u.dugCover=true; } }
+  }
+  // Rückzug: schwer angeschlagen und noch unter Feuer
+  if(!u.fleeing&&u.hp<u.maxHp*COMBAT_AI.fleeHp&&hit<COMBAT_AI.fleeHit&&!d.worker&&!d.pioneer&&!d.harvester){
+    const safe=retreatTo(u); if(safe){ const back={x:u.x,y:u.y};
+      orderMove([u],safe.x,safe.y); u.fleeing={x:back.x,y:back.y,t:G.t};
+      if(u.owner===0&&G.t-(G.fleeMsg||-99)>20){ G.fleeMsg=G.t; msg('🏃 Schwer getroffene Einheiten ziehen sich zurück, um sich zu erholen.','#ffb38a'); }
+      return true; } }
+  // erholt: zurück auf den alten Posten
+  if(u.fleeing&&u.mode==='idle'&&u.hp>=u.maxHp*COMBAT_AI.backHp){ const f=u.fleeing; u.fleeing=null; orderMove([u],f.x,f.y,'amove'); }
+  return false;
+}
+/** nächster sicherer Ort: eigenes Gebäude (am liebsten Rathaus, Kaserne, Fabrik) außer Reichweite des Gegners */
+function retreatTo(u){
+  let best=null, bd=1e9;
+  for(const b of G.buildings){ if(b.dead||b.owner!==u.owner||b.def.def||b.site) continue;
+    const pref=b.type==='hq'||b.type==='barracks'||b.type==='factory'||b.type==='hospital'?0:6, dd=dist(u.x,u.y,b.x,b.y)+pref;
+    if(dd<bd&&dist(u.x,u.y,b.x,b.y)>3){ bd=dd; best=b; } }
+  if(!best) return null; const p=nearestPassable(best.x+1.5,best.y+best.h/2+1.2,u.def.cls); return p?{x:p.x+0.5,y:p.y+0.5}:null;
+}
 export function updateSortie(u,dt){
   // leer und nicht auf dem Heimweg (z. B. neuer Angriffsbefehl): erst zum Fliegerhorst, dann das neue Ziel
   if(!armed(u)&&u.mode!=='rtb'&&u.mode!=='rearm'&&u.mode!=='move'){ if(G.t<(u.rtbT||0)) return; u.rtbT=G.t+3; returnToBase(u,u.target||u.strike); return; }

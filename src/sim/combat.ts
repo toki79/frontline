@@ -1,6 +1,6 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { RTREE, hasTech, MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit } from '../data/config';
+import { RTREE, hasTech, MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit , COMBAT_AI } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
@@ -37,8 +37,8 @@ export function splash(x,y,r,dmg,type,src){
   for(let ty=Math.floor(y-r);ty<=y+r;ty++)for(let tx=Math.floor(x-r);tx<=x+r;tx++) if(inMap(tx,ty)&&G.feat[idx(tx,ty)]===FEAT.WIRE&&dist(x,y,tx+0.5,ty+0.5)<=r) G.feat[idx(tx,ty)]=0;
 }
 export function aimPoint(t){ if(t.kind==='building') return {x:t.x+(Math.random()-0.5)*t.w*0.6,y:t.y+(Math.random()-0.5)*t.h*0.6}; return {x:t.x+(Math.random()-0.5)*0.3,y:t.y+(Math.random()-0.5)*0.3}; }
-export function fire(s,t){
-  const w=s.def.weapon; s.cd=w.rof*(0.9+Math.random()*0.2);
+export function fire(s,t,w=s.def.weapon){
+  const cd=w.rof*(0.9+Math.random()*0.2); if(w===s.def.weapon) s.cd=cd; else s.cd2=cd;   // Zweitwaffe (Dach-MG) mit eigenem Takt
   if(s.kind==='unit'&&s.def.armor==='airHigh') s.revealT=G.t+1.5;   // Abschuss verrät den Hochflieger ganz kurz
   const a=Math.atan2(t.y-s.y,t.x-s.x), ml=s.kind==='unit'?s.def.size*0.75:0.55;
   const mx=s.x+Math.cos(a)*ml, my=s.y+Math.sin(a)*ml, hp=aimPoint(t);
@@ -80,6 +80,7 @@ export function applyDamage(t,dmg,type,src){
   if(src&&src.dug) m*=FORTIFY.dugOut;   // eingegrabene Truppen schießen ruhiger
   if(t.kind==='building'&&t.def.def&&!FORTIFY.artillery.includes(type)) m*=FORTIFY.direct;   // Befestigung hält direktem Feuer stand
   if(t.cmb) m*=1-COMBINED.def;
+  if(t.kind==='unit'&&t.smokeT>G.t&&COMBAT_AI.smokeVs.includes(type)) m*=COMBAT_AI.smokeMul;   // Nebelwand: Lenkwaffen und Kanonen finden das Ziel schlechter
   if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
   t.hp-=dmg*m*(0.85+Math.random()*0.3);
@@ -93,7 +94,16 @@ export function onAttacked(t,src){
     G.militiaWar[a]=true; G.attitude[a]=-100; if(G.militiaAlly===a) G.militiaAlly=-1; updateRel();
     if(a===0) msg('Ihr habt die Grenzmiliz angegriffen – sie erklärt euch den Krieg!','#ff8a7a'); else if(G.known[0][a]) msg(`${G.players[a].short} hat die Grenzmiliz angegriffen. Die Miliz kämpft jetzt gegen ${G.players[a].short}.`,'#d6b45a');
   } else if(v===2) G.attitude[a]=Math.max(-100,G.attitude[a]-0.5);
-  if(t.kind==='unit'&&t.def.weapon&&!t.target&&t.mode!=='move'&&hostile(v,a)&&!src.dead) t.target=src;
+  if(t.kind==='unit'&&t.def.weapon&&t.mode!=='move'&&hostile(v,a)&&!src.dead&&canHit(t.def.weapon,src)&&!t.def.weapon.kamikaze){
+    // Selbstverteidigung: wer beschossen wird, wehrt sich zuerst – das Gebäude kommt danach wieder dran
+    const cur=t.target;
+    if(!cur) t.target=src;
+    else if(cur!==src&&cur.kind==='building'&&(src.kind==='unit'||src.def.weapon)){ t.prevTarget=cur; t.target=src; t.path=null; }
+  }
+  // Panzer werfen bei Lenkwaffen- oder Granatbeschuss Nebel
+  if(t.kind==='unit'&&t.def.cls==='veh'&&t.def.combat&&(t.def.armor==='heavy'||t.def.armor==='light')&&G.t>(t.smokeCd||0)&&src.def&&src.def.weapon&&COMBAT_AI.smokeVs.includes(src.def.weapon.type)){
+    t.smokeT=G.t+COMBAT_AI.smokeT; t.smokeCd=G.t+COMBAT_AI.smokeCd;
+    for(let i=0;i<6;i++) fxAdd({k:'smoke',x:t.x+(Math.random()-.5)*1.4,y:t.y+(Math.random()-.5)*1.4,r:0.7,life:COMBAT_AI.smokeT}); }
   G.players[v].lastAttack={t:G.t,x:t.x,y:t.y};
   // Heimverteidigung: untätige Truppen in der Nähe eilen zu Hilfe
   if(v<2&&hostile(v,a)&&!src.dead&&G.t-(G.players[v].defendT||-9)>3){ G.players[v].defendT=G.t;

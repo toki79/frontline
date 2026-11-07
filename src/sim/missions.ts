@@ -1,5 +1,5 @@
 import { dist } from '../core/util';
-import { MISSION, isMajor } from '../data/config';
+import { MISSION, isMajor , COMBAT_AI } from '../data/config';
 import { distTo } from '../sim/combat';
 import { orderLurk, orderMove, orderPatrol } from '../sim/orders';
 import { G } from '../sim/state';
@@ -39,7 +39,7 @@ export function applyOrder(units, kind: OrderKind, x, y){
 /** Leine: wie weit darf eine Einheit ihrem Ziel nachlaufen? (null = Standard) */
 export function chaseLimit(u){ if(u.order==='hold') return 0; if(u.area) return u.area.r+2; return null; }
 /** Schadensfaktor für eingegrabene Truppen */
-export const dugFactor = t => t.dug ? (t.def.cls==='inf'?MISSION.dugInf:MISSION.dugVeh) : 1;
+export const dugFactor = t => t.dug ? (t.dugCover?COMBAT_AI.cover:t.def.cls==='inf'?MISSION.dugInf:MISSION.dugVeh) : 1;   // Deckung im Gefecht schützt weniger als ein ausgehobener Graben
 
 export function updateMission(u,dt){
   if(!u.order) return;
