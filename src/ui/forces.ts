@@ -24,7 +24,7 @@ const GROUPS: [string,string[]][] = [
 const PICKABLE = new Set(['inf','at','para','apc','amphib','volunteer','militia','ifv','mbt','mlrs','tel','spaag','jammer','drone','swarm','spy','reaper','jet']);
 export const fs: {kind: OrderKind, pick: Record<string,number>} = {kind:'hold', pick:{}};
 const KINDS: [OrderKind,string,string][] = [
-  ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung'],
+  ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung, kein Rückzug: bis zum letzten Mann'],
   ['clear','🔍 Gebiet klären','Feinde und Räuberlager im Umkreis ausschalten, dann halten'],
   ['assault','⚔ Angriff','vorrücken, alles im großen Umkreis angreifen – auch Gebäude'],
   ['move','➜ Sammeln','nur hinbewegen'],

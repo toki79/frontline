@@ -143,7 +143,7 @@ function behave(u,dt,firing){
     else if(!u.dug&&(firing||hit<2)){ u.coverT=(u.coverT||0)+dt; if(u.coverT>=COMBAT_AI.coverT){ u.dug=true; u.dugCover=true; } }
   }
   // Rückzug: schwer angeschlagen und noch unter Feuer
-  if(!u.fleeing&&u.hp<u.maxHp*COMBAT_AI.fleeHp&&hit<COMBAT_AI.fleeHit&&!d.worker&&!d.pioneer&&!d.harvester){
+  if(!u.fleeing&&u.order!=='hold'&&u.hp<u.maxHp*COMBAT_AI.fleeHp&&hit<COMBAT_AI.fleeHit&&!d.worker&&!d.pioneer&&!d.harvester){   // Haltebefehl: bis zum letzten Mann
     const safe=retreatTo(u); if(safe){ const back={x:u.x,y:u.y};
       orderMove([u],safe.x,safe.y); u.fleeing={x:back.x,y:back.y,t:G.t};
       if(u.owner===0&&G.t-(G.fleeMsg||-99)>20){ G.fleeMsg=G.t; msg('🏃 Schwer getroffene Einheiten ziehen sich zurück, um sich zu erholen.','#ffb38a'); }

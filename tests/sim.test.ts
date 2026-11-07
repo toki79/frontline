@@ -1037,6 +1037,8 @@ describe('Simulation', () => {
     expect(inf.dug || inf.dead).toBe(true); if (!inf.dead) expect(inf.dugCover).toBe(true);
     const runner = spawnAt(0, 'inf', h0.x + 12, h0.y - 10); runner.hp = runner.maxHp * 0.2; runner.lastHit = G.t;
     update(0.05); expect(runner.fleeing).toBeTruthy(); expect(runner.mode).toBe('move');
+    const holder = spawnAt(0, 'inf', h0.x + 12, h0.y - 11); holder.order = 'hold'; holder.hp = holder.maxHp * 0.2; holder.lastHit = G.t;
+    update(0.05); expect(holder.fleeing).toBeFalsy();   // Haltebefehl: kein Rückzug
     foe.dead = true; inf.dead = true;
     for (let i = 0; i < 20 * 120 && runner.fleeing; i++) update(0.05);
     expect(runner.hp).toBeGreaterThanOrEqual(runner.maxHp * 0.8); expect(runner.fleeing).toBeFalsy();   // erholt und auf dem Rückweg
