@@ -15,6 +15,38 @@ export const LOOT = {treasury:{hq:[0.3,700], kontor:[0.12,250]}, goods:{farm:['f
 export const COMBINED = {radius:7, minArms:2, dmg:0.15, def:0.12};
 // Verteidigungsvorteil: Stellungen schießen genauer (vorbereitete Schussfelder) und halten direktem Feuer besser stand.
 // Artillerie, Raketen und Bomben wirken voll – wer Befestigungen knacken will, braucht sie (oder Luftlandungen, Amphibien).
+// ---------- Werkstatt: Ausrüstung für Fahrzeuge ----------
+// Jedes Modul wird einmal entwickelt (dev, devTime) und dann je Fahrzeug eingebaut (cost, Einbauzeit fit).
+// slot: höchstens ein Modul je Platz; weight: Tragfähigkeit des Fahrgestells (WORKSHOP.cap) begrenzt die Ausstattung.
+export const MODULES = {
+  turbo:    {name:'Turbomotor',        icon:'⚡', slot:'antrieb',    weight:1, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:1500, metal:100}, devTime:90,  cost:{money:300, metal:30},  need:[],
+             speed:1.3, upkeep:1.6, desc:'+30 % Tempo – verbraucht mehr Öl'},
+  langrohr: {name:'Langrohr',          icon:'🎯', slot:'waffe',      weight:1, fits:['ifv','mbt','heavy','spaag'], dev:{money:1800, metal:150}, devTime:100, cost:{money:350, metal:40}, need:[],
+             range:1.5, rof:1.15, desc:'+1,5 Felder Reichweite – lädt etwas langsamer'},
+  flamme:   {name:'Flammenwerfer',     icon:'🔥', slot:'waffe',      weight:1, fits:['ifv','mbt','heavy'], dev:{money:1600, metal:80, oil:100}, devTime:90, cost:{money:300, metal:20, oil:40}, need:[],
+             weapon:{type:'flame', dmg:34, range:3, rof:0.6, splash:1.0}, desc:'Ersetzt die Kanone: vernichtend gegen Schützen und Bunker, setzt Gebäude in Brand – kurze Reichweite, schwach gegen Panzer'},
+  raketen:  {name:'Raketenbehälter',   icon:'🚀', slot:'aufsatz',    weight:2, fits:['ifv','mbt','heavy','apc'], dev:{money:2200, metal:150}, devTime:110, cost:{money:450, metal:60}, need:['rocketry'],
+             pod:{type:'rocket', dmg:42, range:10, minRange:2, rof:1, salvo:6, splash:1.4, spread:1.3}, desc:'Eine Salve aus 6 Raketen auf bis zu 10 Felder – danach zu Hause oder in der Werkstatt nachladen'},
+  flak:     {name:'Flak-Aufsatz',      icon:'🛡', slot:'aufsatz',    weight:1, fits:['ifv','mbt','heavy','apc'], dev:{money:1400, metal:120}, devTime:80, cost:{money:350, metal:40}, need:[],
+             aux:{type:'flak', dmg:16, range:7, rof:0.4, airOnly:true}, desc:'Zwillingsflak statt Dach-MG: holt Drohnen, Hubschrauber und auch Hochflieger'},
+  ki:       {name:'KI-Zielerfassung',  icon:'🧠', slot:'elektronik', weight:1, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:3000, metal:200}, devTime:140, cost:{money:600, metal:40}, need:['computing'],
+             dmg:1.15, sight:2, smart:true, desc:'Trifft besser (+15 %), sieht weiter, bekämpft zuerst, was ihm gefährlich wird'},
+  aps:      {name:'Aktiver Schutz',    icon:'🛰', slot:'schutz',     weight:2, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:3500, metal:250}, devTime:150, cost:{money:700, metal:80}, need:['computing'],
+             aps:3, desc:'Fängt 3 Lenkflugkörper, Drohnen oder Präzisionsraketen ab (lädt zu Hause nach) – gegen Granaten und Artillerie wirkungslos'},
+  era:      {name:'Reaktivpanzerung',  icon:'🧱', slot:'schutz',     weight:2, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:2000, metal:300}, devTime:100, cost:{money:400, metal:120}, need:[],
+             hp:1.35, speed:0.88, desc:'+35 % Lebenspunkte – schwerer, 12 % langsamer'},
+};
+export const WORKSHOP = {
+  radius: 4.5, fitTime: 20,                                  // Fahrzeuge in diesem Umkreis stehen „in der Werkstatt“
+  cap: {ifv:3, apc:2, mbt:4, heavy:5, spaag:2, mlrs:2},     // Tragfähigkeit je Fahrgestell
+  reloadT: 30, apsT: 40,                                     // Nachladen von Raketenbehälter und aktivem Schutz zu Hause
+  apsChance: 0.85,
+};
+// Veteranen: Abschüsse bringen Ränge; Fahrzeuge tragen Namen
+export const VETERAN = {
+  kills: [2, 5, 10, 18], names: ['Erfahren','Veteran','Elite','Legende'], dmg: 0.07, armor: 0.04,
+  vehNames: ['Greif','Falke','Keiler','Habicht','Dachs','Uhu','Rabe','Hornisse','Bussard','Eber','Sperber','Steinbock','Kranich','Otter','Iltis','Hermelin','Wolf','Bär','Adler','Fuchs','Elch','Bison','Lanze','Donner','Sturm','Blitz','Eiche','Fels','Hammer','Amboss'],
+};
 // Gefechtsverhalten: Selbstverteidigung, Deckung, Nebelwand, Rückzug, Erholung
 export const COMBAT_AI = {
   cover: 0.75, coverT: 3,               // Infanterie unter Feuer geht nach 3 s in Deckung (Schaden ×0,75)
@@ -152,6 +184,7 @@ export const DAMAGE = {
   ballistic:  {none:0.8,  light:1.0, heavy:0.8,  building:1.3,  fort:0.9,  air:0,   airHigh:0},     // ballistische Rakete: Flächenschaden, stark gegen Gebäude
   glide:      {none:0.8,  light:1.0, heavy:0.9,  building:1.3,  fort:0.9,  air:0,   airHigh:0},     // Gleit-/Freifallbombe
   sam:        {none:0,    light:0,   heavy:0,    building:0,    fort:0,    air:2.5, airHigh:1.2},   // Flugabwehrrakete
+  flame:      {none:1.7,  light:0.55, heavy:0.06, building:0.7,  fort:1.5,  air:0,   airHigh:0},     // Flammenwerfer: räuchert Schützen und Bunker aus
 };
 export const canHit=(w,t)=>{ const air=t.kind==='unit'&&t.def.cls==='air'; if(w.airOnly) return air; return (DAMAGE[w.type][t.armor]||0)>0; };
 // ---------- Geländeausbau (Graben, Stacheldraht) ----------
@@ -262,6 +295,8 @@ export const BUILDINGS = {
   kontor:  {name:'Handelskontor', w:2,h:2, hp:600, power:-10, cost:{money:400, wood:60}, time:9, req:[], noise:0.15, sight:4, export:4,
             desc:'Exportiert Überschüsse automatisch gegen Geld'},
   university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:900, metal:60, stone:120}, time:16, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
+  workshop:{name:'Werk\u00ADstatt',  w:3,h:2, hp:800, power:-25, cost:{money:1200, metal:150, stone:120}, time:16, req:['factory'], noise:0.25, sight:5,
+            desc:'Entwickelt Ausrüstung für Fahrzeuge und baut sie ein – Fahrzeuge müssen dafür hierher kommen'},
   droneshop:{name:'Drohnen\u00ADwerkstatt',w:2,h:2, hp:550, power:-20, cost:{money:1300, metal:120, stone:100}, time:14, req:['barracks'], tech:1, noise:0.15, sight:5, desc:`Baut FPV-Drohnen (max. ${DRONES_PER_SHOP} je Werkstatt)`},
   // --- Verteidigung (def:true): direkt auf der Karte platzieren, Stellungen brauchen danach Bauzeit ---
   wall:    {name:'Betonmauer',    w:1,h:1, hp:1000, power:0,   cost:{money:20, stone:10},  time:3, req:[], def:true, line:true, sight:1, desc:'Blockiert Bodentruppen, hält viel aus'},

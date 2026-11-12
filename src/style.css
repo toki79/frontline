@@ -222,6 +222,17 @@ body.held #pauseTag{display:block}
 #llm .seg.on{background:#4a3f7a;border-color:#8a7ad0;color:#fff}
 #llm .seg.copy{margin-left:auto;font-weight:500;opacity:.85}
 
+/* Werkstatt */
+#werk .card{max-width:760px}
+.wcard{border:1px solid #3a4430;border-radius:9px;padding:8px 10px;margin:6px 0;background:#161b10}
+.wcard .wh{margin-bottom:4px}.wcard .row{flex-wrap:wrap;gap:6px;margin:4px 0}
+.wcard button{font-size:12.5px;padding:6px 8px}.wcard button small{color:var(--dim);margin-left:4px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:#2a3420;border:1px solid #4a5a34;border-radius:14px;padding:3px 4px 3px 9px;font-size:12.5px}
+.chip .x{padding:0 6px;font-size:11px;background:#4a2a22;border-color:#8a4a3a;border-radius:10px}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.wmod{border:1px solid #333b28;border-radius:9px;padding:8px;background:#12160d;display:flex;flex-direction:column;gap:5px}
+.wmod.done{border-color:#4a7a3a}.wmod .ok{color:#9fd88a;font-size:13px}.wmod button{font-size:12.5px;padding:6px}
+.wmod .bar{height:8px;background:#222;border-radius:4px;overflow:hidden}.wmod .bar i{display:block;height:100%;background:#d8c040}
 /* Ereignisse */
 #evPill{color:#e8d48a;font-size:12.5px;gap:10px}#evPill span{white-space:nowrap}
 /* Kartenwahl */

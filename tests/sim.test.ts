@@ -40,7 +40,8 @@ import { connected, SIDE_TF } from '../src/sim/mapgen';
 import { aiChar, revealPersona, personaKnown } from '../src/ai/persona';
 import { fire, evMul, evOn, evMarket } from '../src/sim/happen';
 import { priceFactor } from '../src/sim/market';
-import { MAPTYPES } from '../src/data/config';
+import { startDev, fitModule, fitPlan, fitBlock, rankOf, creditKill, weightOf } from '../src/sim/modules';
+import { MAPTYPES, UNITS } from '../src/data/config';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
 /** Baustelle nahe dem Rathaus setzen */
@@ -1042,6 +1043,45 @@ describe('Simulation', () => {
     foe.dead = true; inf.dead = true;
     for (let i = 0; i < 20 * 120 && runner.fleeing; i++) update(0.05);
     expect(runner.hp).toBeGreaterThanOrEqual(runner.maxHp * 0.8); expect(runner.fleeing).toBeFalsy();   // erholt und auf dem Rückweg
+  });
+  it('Werkstatt: entwickeln, einbauen, Tragfähigkeit, Wirkung, Abschüsse, Speichern', () => {
+    newGame('mittel'); noBandits(); const p = G.players[0], hq = findBuilding(0, 'hq');
+    p.res.money = 50000; p.res.metal = 5000; p.res.oil = 2000; p.res.stone = 2000;
+    const ws = placeBuilding(0, 'workshop', hq.tx + 6, hq.ty - 5, true);
+    const rich = () => { p.res.money = 50000; p.res.metal = 2000; p.res.oil = 1000; };
+    for (const k of ['turbo', 'era', 'langrohr', 'raketen', 'aps', 'flamme']) { rich(); if (k === 'raketen') p.done.rocketry = true; if (k === 'aps') p.done.computing = true;
+      expect(startDev(0, k)).toBe(''); expect(startDev(0, 'flak')).not.toBe('');   // nur eine Entwicklung zugleich
+      p.mdevQ.t = p.mdevQ.time - 1; run(2); expect(p.mdev[k]).toBe(true); }   // Entwicklungszeit abkürzen
+    rich(); const tank = spawnAt(0, 'mbt', ws.x, ws.y + 2); const sp0 = tank.def.speed, r0 = tank.def.weapon.range, hp0 = tank.maxHp;
+    expect(fitBlock(tank, 'turbo')).toBe('');
+    const far = spawnAt(0, 'mbt', hq.x - 10, hq.y); expect(fitBlock(far, 'turbo')).toBe('nicht in der Werkstatt');
+    const m0 = p.res.money; expect(fitPlan(tank, ['turbo', 'langrohr', 'era'])).toBe(''); expect(p.res.money).toBeLessThan(m0);
+    run(70); expect(tank.mods.sort()).toEqual(['era', 'langrohr', 'turbo']);
+    expect(tank.def.speed).toBeCloseTo(sp0 * 1.3 * 0.88); expect(tank.def.weapon.range).toBeCloseTo(r0 + 1.5); expect(tank.maxHp).toBeGreaterThan(hp0 * 1.3);
+    expect(UNITS.mbt.speed).toBe(sp0);                                         // Grundwerte unverändert
+    expect(weightOf(tank.mods)).toBe(4); expect(fitBlock(tank, 'raketen')).toBe('zu schwer');   // Kampfpanzer trägt 4
+    expect(fitBlock(tank, 'aps')).toBe('');                                    // ersetzt die Reaktivpanzerung (gleicher Platz)
+    // Flammenwerfer ersetzt die Kanone
+    rich(); const ifv = spawnAt(0, 'ifv', ws.x + 1, ws.y + 2); fitModule(ifv, 'flamme'); run(25); expect(ifv.def.weapon.type).toBe('flame');
+    // Einbau abgebrochen: Geld zurück
+    const ifv2 = spawnAt(0, 'ifv', ws.x - 1, ws.y + 2), mB = p.res.money; fitModule(ifv2, 'turbo'); orderMove([ifv2], hq.x - 12, hq.y); run(3);
+    expect(ifv2.fit).toBeFalsy(); expect(p.res.money).toBeGreaterThan(mB - 30);   // Einbaukosten erstattet (Steuern laufen weiter)
+    // aktiver Schutz fängt Lenkflugkörper ab
+    rich(); const a2 = spawnAt(0, 'mbt', ws.x + 2, ws.y + 2); fitModule(a2, 'aps'); run(25); expect(a2.aps).toBe(3);
+    const hpA = a2.hp; let blocked = 0; for (let i = 0; i < 3; i++) { const h = a2.hp; applyDamage(a2, 60, 'missile', null); if (a2.hp === h) blocked++; }
+    expect(blocked).toBeGreaterThanOrEqual(1); expect(a2.aps).toBeLessThan(3);
+    // Raketenbehälter: eine Salve, Nachladen in der Werkstatt
+    rich(); const rk = spawnAt(0, 'ifv', ws.x - 2, ws.y + 2); fitModule(rk, 'raketen'); run(25); expect(rk.podAmmo).toBe(1);
+    setWar(0, 1, true, 0); G.known[0][1] = G.known[1][0] = true;
+    const foe = spawnAt(1, 'mbt', rk.x + 8, rk.y); foe.mode = 'move'; orderAttack([rk], foe);
+    for (let i = 0; i < 40 && rk.podAmmo > 0; i++) { foe.x = rk.x + 8; foe.y = rk.y; update(0.05); }
+    expect(rk.podAmmo).toBe(0); foe.dead = true; run(2); expect(rk.podAmmo).toBe(1);   // in der Werkstatt sofort nachgeladen
+    // Veteranen
+    for (let i = 0; i < 5; i++) creditKill(tank, {kind: 'unit', def: UNITS.inf}); expect(rankOf(tank)).toBe(2);
+    expect(tank.name).toBeTruthy();
+    // Speichern/Laden: Ausrüstung bleibt wirksam
+    const id = tank.id; loadGame(serialize()); const t2 = G.units.find(u => u.id === id);
+    expect(t2.def.weapon.range).toBeCloseTo(r0 + 1.5); expect(t2.kills).toBe(5);
   });
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();

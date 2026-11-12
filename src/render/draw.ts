@@ -362,6 +362,15 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
       c.fillStyle='#c49a3a'; c.fillRect(W-30,H/2+2+nod,5,7); c.fillStyle='#1a1410'; c.beginPath(); c.arc(W-12,H-10,4,0,7); c.fill();
       box(W-12,4,8,5,col,dark);
       break; }
+    case 'workshop': {   // Werkstatthalle mit Rolltor und Kranbahn
+      box(3,4,W-6,H-10,'#6a6f60','#3e4236');
+      c.fillStyle='#2e302a'; c.fillRect(8,H-20,W/2-12,14); c.fillRect(W/2+4,H-20,W/2-12,14);   // zwei Tore
+      c.strokeStyle='#55584c'; c.lineWidth=1; for(let y=H-18;y<H-6;y+=3){ c.beginPath(); c.moveTo(8,y); c.lineTo(W/2-4,y); c.moveTo(W/2+4,y); c.lineTo(W-8,y); c.stroke(); }
+      c.strokeStyle='#d8c040'; c.lineWidth=2; c.beginPath(); c.moveTo(6,10); c.lineTo(W-6,10); c.stroke();   // Kranbahn
+      c.fillStyle='#d8c040'; c.fillRect(W*0.62,8,7,6); c.strokeStyle='#222'; c.lineWidth=1; c.beginPath(); c.moveTo(W*0.62+3.5,14); c.lineTo(W*0.62+3.5,22); c.stroke();
+      c.fillStyle='#c0c4b8'; c.beginPath(); c.arc(W*0.2,H*0.38,5,0,7); c.fill(); c.fillStyle='#6a6f60'; c.beginPath(); c.arc(W*0.2,H*0.38,2.2,0,7); c.fill();   // Zahnrad
+      box(W-12,4,8,5,col,dark);
+      break; }
     case 'droneshop':
       box(3,5,W-6,H-12,'#6d7258','#3f4229'); c.fillStyle='#4d523c'; c.beginPath(); c.arc(W/2,5,W/2-3,0,Math.PI); c.fill();
       c.save(); c.translate(W/2,H/2+2); c.strokeStyle='#222'; c.lineWidth=1.4; c.beginPath(); c.moveTo(-6,-6); c.lineTo(6,6); c.moveTo(6,-6); c.lineTo(-6,6); c.stroke();

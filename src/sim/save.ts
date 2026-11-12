@@ -1,3 +1,4 @@
+import { buildDef } from '../sim/modules';
 import { mulberry32 } from '../core/util';
 import { BUILDINGS, DIFFICULTY, UNITS } from '../data/config';
 import { G, setG } from '../sim/state';
@@ -35,7 +36,7 @@ export function deserialize(str: string): Game {
   if(!o||o.v!==SAVE_VERSION) throw new Error('Spielstand stammt aus einer älteren Version (vor der großen Karte mit drei Mächten)');
   const g=o.g, map=new Map();
   for(const e of [...g.units,...g.buildings]) map.set(e.id,e);
-  for(const u of g.units) u.def=UNITS[u.type];
+  for(const u of g.units) u.def=buildDef(u.type,u.mods||[]);   // ausgerüstete Fahrzeuge: eigene Spielwerte
   for(const b of g.buildings) b.def=BUILDINGS[b.type];
   g.units=g.units.filter(u=>u.def); g.buildings=g.buildings.filter(b=>b.def);
   const walk=(obj)=>{ for(const k in obj){ const v=obj[k]; if(!v||typeof v!=='object'||ArrayBuffer.isView(v)) continue;

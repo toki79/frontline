@@ -1,3 +1,4 @@
+import { nameUnit } from '../sim/modules';
 import type { Entity } from './types';
 import { aiRally } from '../ai/kastrova';
 import { clamp, idx, inMap } from '../core/util';
@@ -80,7 +81,7 @@ export function makeUnit(pid,type,x,y){
   const u: Entity={id:G.nextId++, kind:'unit', type, def:d, owner:pid, x, y, hp:d.hp, maxHp:d.hp, armor:d.armor, angle:a, tur:a,
     mode:'idle', guard:{x,y}, goal:null, path:null, pathI:0, target:null, cd:0, scanT:Math.random()*0.4, repathT:0,
     cargo:0, hs:null, stuck:0, oilTile:-1, ref:null, wave:false, raid:false, born:G.t};
-  G.units.push(u); return u;
+  nameUnit(u); G.units.push(u); return u;
 }
 export function spawnAt(pid,type,x,y){ const u=makeUnit(pid,type,x,y); if(UNITS[type].harvester) u.hs='seek'; return u; }
 export function ringTiles(tx,ty,w,h){const out=[];for(let y=ty-1;y<=ty+h;y++)for(let x=tx-1;x<=tx+w;x++){if((x===tx-1||x===tx+w||y===ty-1||y===ty+h)&&inMap(x,y))out.push(idx(x,y));}return out;}

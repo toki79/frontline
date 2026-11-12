@@ -24,7 +24,7 @@ export const ui: any={tab:'bau',btns:{},cat:{}};
 export const CATS = {
   bau: [['alle','Alle'],['wohnen','🏠 Wohnen',['house','block']],['versorgung','🌾 Nahrung & ⚡ Strom',['farm','greenhouse','power','npp']],
         ['rohstoffe','⛏ Rohstoffe',['lumber','forester','quarry','mine','refinery','derrick']],['wege','🛣 Wege, Lager, Handel',['road','depot','kontor']],
-        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär & Geheimdienst',['barracks','factory','droneshop','airbase','intel']],
+        ['stadtleben','🎭 Stadtleben',['park','theater','pool','stadium','firest']],['militaer','🪖 Militär & Geheimdienst',['barracks','factory','workshop','droneshop','airbase','intel']],
         ['hightech','🎓 Wissen & Hightech',['university','datacenter','enrich','silo']]],
   truppen: [['alle','Alle'],['zivil','👷 Zivil',['worker','volunteer','diplomat','truck']],['inf','🪖 Infanterie',['inf','at','para']],
         ['fahrz','🚜 Fahrzeuge',['apc','amphib','ifv','mbt','heavy','mlrs','tel','spaag','jammer']],['drohnen','🛸 Drohnen',['drone','swarm','spy','reaper']],['luft','✈ Luftwaffe',['jet','para']]],

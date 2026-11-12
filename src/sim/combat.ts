@@ -1,10 +1,11 @@
 import { dist, fmt, idx, inMap } from '../core/util';
 import { blast } from '../sim/nuke';
-import { RTREE, hasTech, MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit , COMBAT_AI } from '../data/config';
+import { RTREE, hasTech, MAJORS, isAI, isMajor, COMBINED, FORTIFY, capOf, FIRE, BANDITS, CAGE, DAMAGE, LOOT, NUKE, TRADE, DENSITY, ECON, FEAT, RES, canHit , COMBAT_AI , VETERAN, WORKSHOP } from '../data/config';
 import { orderMove } from '../sim/orders';
 import { G } from '../sim/state';
 import { fxAdd } from '../sim/units';
 import { dugFactor } from '../sim/missions';
+import { creditKill, mourn, rankOf } from '../sim/modules';
 import { coverAt, detected, hostile, nameFor0, recalcPower, rectDist, spotted, updateRel } from '../sim/world';
 import { emit } from '../core/events';
 import { bailOut } from '../sim/transport';
@@ -24,7 +25,7 @@ export function findTarget(src,range){
   const far=src.kind==='unit'?src.def.sight+0.5:1e9;   // jenseits der eigenen Sicht nur auf aufgeklärte Ziele (Raketenwerfer)
   for(const e of G.units){ if(e.dead||!hostile(src.owner,e.owner)||!canHit(w,e)||!detected(e,src.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
     if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
-    const sc=d-(drone&&e.def.cls==='veh'?3:0)-(w.type==='hellfire'&&e.def.cls==='inf'?4:0); if(sc<bs){bs=sc;best=e;} }   // Reaper jagen Schützen
+    const sc=d-(drone&&e.def.cls==='veh'?3:0)-(w.type==='hellfire'&&e.def.cls==='inf'?4:0)-(src.def.smart&&e.def.weapon&&canHit(e.def.weapon,src)?3+(e.def.weapon.type==='missile'||e.def.weapon.type==='shell'?2:0):0); if(sc<bs){bs=sc;best=e;} }   // KI-Zielerfassung: gefährliche Gegner zuerst   // Reaper jagen Schützen
   if(!w.airOnly) for(const e of G.buildings){ if(e.dead||!hostile(src.owner,e.owner)) continue; const d=distTo(src,e); if(d>range||d<minR) continue;
     if(d>far&&!spotted(src.owner,e.x,e.y)) continue;
     const sc=d+1.5+(e.def.def&&!e.def.weapon?3:0); if(sc<bs){bs=sc;best=e;} }   // Mauern nur, wenn sonst nichts da ist
@@ -38,7 +39,7 @@ export function splash(x,y,r,dmg,type,src){
 }
 export function aimPoint(t){ if(t.kind==='building') return {x:t.x+(Math.random()-0.5)*t.w*0.6,y:t.y+(Math.random()-0.5)*t.h*0.6}; return {x:t.x+(Math.random()-0.5)*0.3,y:t.y+(Math.random()-0.5)*0.3}; }
 export function fire(s,t,w=s.def.weapon){
-  const cd=w.rof*(0.9+Math.random()*0.2); if(w===s.def.weapon) s.cd=cd; else s.cd2=cd;   // Zweitwaffe (Dach-MG) mit eigenem Takt
+  const cd=w.rof*(0.9+Math.random()*0.2); if(w===s.def.weapon) s.cd=cd; else if(w===s.def.aux) s.cd2=cd;   // Zweitwaffe (Dach-MG) mit eigenem Takt
   if(s.kind==='unit'&&s.def.armor==='airHigh') s.revealT=G.t+1.5;   // Abschuss verrät den Hochflieger ganz kurz
   const a=Math.atan2(t.y-s.y,t.x-s.x), ml=s.kind==='unit'?s.def.size*0.75:0.55;
   const mx=s.x+Math.cos(a)*ml, my=s.y+Math.sin(a)*ml, hp=aimPoint(t);
@@ -48,6 +49,10 @@ export function fire(s,t,w=s.def.weapon){
     fxAdd({k:'flash',x:mx,y:my,r:6,life:0.15}); fxAdd({k:'smoke',x:mx,y:my,r:0.5,life:1.2});
     if(s.owner===0||t.owner===0) {} return;
   }
+  if(w.type==='flame'){   // Flammenwerfer: Feuerstrahl, Flächenschaden, Gebäude fangen Feuer
+    for(let i=1;i<=4;i++){ const k=i/4; fxAdd({k:'boom',x:mx+(hp.x-mx)*k+(Math.random()-.5)*0.2,y:my+(hp.y-my)*k+(Math.random()-.5)*0.2,r:0.12+k*0.25,life:0.25}); }
+    applyDamage(t,w.dmg,'flame',s); splash(hp.x,hp.y,w.splash,w.dmg*0.35,'flame',s);
+    if(t.kind==='building'&&!t.dead&&Math.random()<0.25) ignite(t); return; }
   if(w.type==='flak'){ for(let i=0;i<2;i++) fxAdd({k:'tracer',x1:mx,y1:my,x2:hp.x+(Math.random()-.5)*0.4,y2:hp.y+(Math.random()-.5)*0.4,life:0.08,col:'#ffd27a'});
     fxAdd({k:'boom',x:hp.x,y:hp.y,r:0.22,life:0.3}); applyDamage(t,w.dmg,w.type,s); return; }
   if(w.type==='bullet'||w.type==='autocannon'){
@@ -80,6 +85,10 @@ export function applyDamage(t,dmg,type,src){
   if(src&&src.dug) m*=FORTIFY.dugOut;   // eingegrabene Truppen schießen ruhiger
   if(t.kind==='building'&&t.def.def&&!FORTIFY.artillery.includes(type)) m*=FORTIFY.direct;   // Befestigung hält direktem Feuer stand
   if(t.cmb) m*=1-COMBINED.def;
+  if(src&&src.kind==='unit'){ if(src.def.dmgMul) m*=src.def.dmgMul; const r=rankOf(src); if(r) m*=1+VETERAN.dmg*r; }   // KI-Zielerfassung, Erfahrung
+  if(t.kind==='unit'){ const r=rankOf(t); if(r) m*=1-VETERAN.armor*r; }
+  // aktiver Schutz: fängt Lenkflugkörper, Drohnen und Präzisionsraketen ab
+  if(t.kind==='unit'&&t.aps>0&&(type==='missile'||type==='drone'||type==='hellfire')&&Math.random()<WORKSHOP.apsChance){ t.aps--; fxAdd({k:'boom',x:t.x+(Math.random()-.5)*0.8,y:t.y+(Math.random()-.5)*0.8,r:0.3,life:0.3}); t.lastHit=G.t; if(src) onAttacked(t,src); return; }
   if(t.kind==='unit'&&t.smokeT>G.t&&COMBAT_AI.smokeVs.includes(type)) m*=COMBAT_AI.smokeMul;   // Nebelwand: Lenkwaffen und Kanonen finden das Ziel schlechter
   if(t.dug) m*=dugFactor(t);                                    // eingegraben: Stellung gehalten                         // Gitterkäfig schützt vor Drohnen und Lenkwaffen
   t.lastHit=G.t;
@@ -139,6 +148,7 @@ export function loot(e,src){
 }
 export function destroy(e,src){
   if(e.dead) return; e.dead=true; if(e.kind==='building'){ G.qDirty=true; G.roadDirty=true; }
+  creditKill(src,e); if(e.kind==='unit') mourn(e);
   if(e.passengers) bailOut(e);   // Transporter: Mitfahrende springen ab
   loot(e,src);
   if(e.kind==='building'){

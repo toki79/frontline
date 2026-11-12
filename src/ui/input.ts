@@ -1,6 +1,6 @@
 import { $$ } from './dom';
 import { clamp, dist, fmt, idx, inMap, lerp } from '../core/util';
-import { isAI, AIR, COMBINED, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType } from '../data/config';
+import { isAI, AIR, COMBINED, capOf, nextUpgrade, lvlOf, UPGRADES, BUILDINGS, CAGE, CONSTRUCTION, DEF, DEF_RADIUS, DENSITY, FEATURES, MAP_H, MAP_W, NUKE, RES, TILE, isDefType , MODULES, VETERAN } from '../data/config';
 import { launchNuke } from '../sim/nuke';
 import { VH, VW, cam, clampCam, toWorld, zoomAt } from '../render/camera';
 import { lacking } from '../sim/costs';
@@ -16,6 +16,8 @@ import { issuePending } from '../ui/forces';
 import { startUpgrade, upgradeBlock, upgradeEffect } from '../sim/build';
 import { assignWorkers, canPlaceRoad, cancelRoad, demolish, orderRoadTo, planRoadLine, siteLacks, siteStock, siteWorkers } from '../sim/build';
 import { G } from '../sim/state';
+import { isFittable, rankOf } from '../sim/modules';
+import { openWerk, sendToShop } from '../ui/werk';
 import { fxAdd } from '../sim/units';
 import { hostile, knownBuilding, visibleUnit } from '../sim/world';
 import { $, cv, mini } from '../ui/dom';
@@ -143,6 +145,7 @@ export function cmd(c){
   const mine=myUnitsSel();
   if(c==='box'){G.boxMode=!G.boxMode;G.amoveMode=false;}
   else if(c==='amove'){ if(mine.length){G.amoveMode=!G.amoveMode;G.boxMode=false;G.escortMode=false;} else msg('Zuerst Einheiten auswählen.'); }
+  else if(c==='werk'){ const sb=G.sel.find(e=>e.kind==='building'&&e.type==='workshop'&&e.owner===0); if(sb) openWerk(); else if(!sendToShop(mine)) msg('Kampffahrzeuge wählen – sie fahren dann zur Werkstatt.'); }
   else if(c==='cage'){ const n=upgradeCage(0,mine);
     msg(n>0?`▦ ${n} Fahrzeug${n===1?'':'e'} mit Gitterkäfig nachgerüstet ($${CAGE.cost.money} + ⛏${CAGE.cost.metal} je Fahrzeug): Drohnen richten nur noch ${Math.round(CAGE.drone*100)} % Schaden an, etwas langsamer.`:n===-1?`Käfige nur nahe einem eigenen Fahrzeugwerk (bis ${CAGE.range} Felder).`:n===-2?'Zu wenig Geld oder Metall für die Käfige.':'Alle gewählten Fahrzeuge haben schon Käfige.',n>0?'#9fd88a':'#ffb38a'); }
   else if(c==='lurk'){ const fp=mine.filter(u=>u.def.weapon&&u.def.weapon.kamikaze); const on=!fp.every(u=>u.lurk); orderLurk(fp,on);
@@ -192,6 +195,7 @@ export function refreshCmds(){
   const sb=G&&selBuilding(), armed=!!G&&myUnitsSel().some(u=>u.def.weapon);
   document.querySelector('[data-c=escort]').classList.toggle('show',armed&&myUnitsSel().some(u=>u.def.cls!=='air'));
   const fpv=G?myUnitsSel().filter(u=>u.def.weapon&&u.def.weapon.kamikaze):[], scouts=G?myUnitsSel().filter(u=>u.def.cls==='air'&&!u.def.sortie&&!(u.def.weapon&&u.def.weapon.kamikaze)):[];
+  document.querySelector('[data-c=werk]').classList.toggle('show',!!G&&(myUnitsSel().some(isFittable)||G.sel.some(e=>e.kind==='building'&&e.type==='workshop'&&e.owner===0)));
   document.querySelector('[data-c=cage]').classList.toggle('show',!!G&&myUnitsSel().some(u=>u.def.cls==='veh'&&!u.cage));
   const bl=document.querySelector('[data-c=lurk]'), bp=document.querySelector('[data-c=patrol]');
   bl.classList.toggle('show',fpv.length>0); bl.classList.toggle('on',fpv.length>0&&fpv.every(u=>u.lurk));
@@ -235,6 +239,10 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.def.caravan) t+=` · Ladung ${e.cargoAmt} ${RES[e.cargoRes].icon} → ${G.players[e.dest?e.dest.owner:0].short}`;
     if(e.kind==='unit'&&e.def.pioneer) t+=e.clearing?' · räumt eine Mine':e.working?' · baut':e.pjob?' · auf dem Weg zum Bauplatz':' · wartet auf Aufträge (Verteidigung planen)';
     if(e.kind==='unit'&&e.order) t+=` · ${ORDER_NAME[e.order]}${e.order==='hold'?(e.dug?' (eingegraben 🛡)':' (gräbt sich ein …)'):''}`;
+    if(e.kind==='unit'&&(e.name||e.kills)){ const r=rankOf(e); t=t.replace(e.def.name,`${e.def.name}${e.name?` „${e.name}“`:''}${r?' '+'⭐'.repeat(r):''}`)+` · ${e.kills||0} Abschüsse${r?' ('+VETERAN.names[r-1]+')':''}`; }
+    if(e.kind==='unit'&&e.mods&&e.mods.length) t+=` · Ausrüstung ${e.mods.map(k=>MODULES[k].icon+' '+MODULES[k].name).join(', ')}${e.def.pod?(e.podAmmo>0?' · 🚀 Salve bereit':' · 🚀 leer – zu Hause nachladen'):''}${e.def.aps?` · 🛰 ${e.aps||0}/${e.def.aps}`:''}`;
+    if(e.kind==='unit'&&e.fit) t+=` · 🔧 Einbau ${MODULES[e.fit.k].name} (${Math.ceil(e.fit.t)} s)`;
+    if(e.kind==='building'&&e.type==='workshop'&&e.owner===0) t+=' · 🔧 öffnen: Werkstatt-Knopf unten';
     if(e.kind==='unit'){ if(e.fleeing) t+=' · 🏃 zieht sich zurück, erholt sich'; else if(e.dugCover) t+=' · in Deckung'; if(e.smokeT>G.t) t+=' · 🌫 Nebelwand'; if(e.prevTarget&&!e.prevTarget.dead) t+=' · wehrt sich, dann zurück zum Ziel'; }
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';

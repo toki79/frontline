@@ -10,6 +10,7 @@ import { DENSITY } from '../data/config';
 import { canPlace, canPlaceDef, tileBuildable } from '../sim/production';
 import { G } from '../sim/state';
 import { evOn } from '../sim/happen';
+import { rankOf } from '../sim/modules';
 import { fpvRange, fxAdd, rangeOf } from '../sim/units';
 import { housingQuality, knownBuilding, tileVis, visibleUnit } from '../sim/world';
 import { ctx, cv, mctx, mini } from '../ui/dom';
@@ -57,6 +58,16 @@ function drawFog(c){
     for(let i=0;i<v.length;i++){ const k=i*4; im.data[k]=7; im.data[k+1]=9; im.data[k+2]=5; im.data[k+3]=v[i]===2?0:v[i]===1?128:246; }
     g.putImageData(im,0,0); }
   c.save(); c.imageSmoothingEnabled=true; c.drawImage(fogCv,0,0,MAP_W,MAP_H,0,0,MAP_W*TILE,MAP_H*TILE); c.restore();
+}
+/** sichtbare Ausrüstung: Raketenbehälter, Flak-Aufsatz, Schutzmodule */
+function drawMods(c,u){
+  const L=u.def.size*TILE, m=u.mods; c.save(); c.translate(u.x*TILE,u.y*TILE); c.rotate(u.angle);
+  if(m.includes('raketen')){ c.fillStyle='#4a4d3e'; c.strokeStyle='#222'; c.lineWidth=1; for(const s of [-1,1]){ c.fillRect(-L*0.35,s*L*0.42-3,L*0.5,6); c.strokeRect(-L*0.35,s*L*0.42-3,L*0.5,6); } }
+  if(m.includes('era')){ c.fillStyle='rgba(120,110,80,.85)'; for(let i=-2;i<=2;i++) for(const s of [-1,1]) c.fillRect(i*L*0.18-2,s*L*0.36-2,4,4); }
+  if(m.includes('aps')){ c.fillStyle='#9ad'; for(const [x,y] of [[-.35,-.3],[-.35,.3],[.3,-.3],[.3,.3]]) { c.beginPath(); c.arc(x*L,y*L,1.8,0,7); c.fill(); } }
+  c.restore();
+  if(m.includes('flak')){ c.save(); c.translate(u.x*TILE,u.y*TILE); c.rotate(u.tur); c.strokeStyle='#333'; c.lineWidth=1.6; c.beginPath(); c.moveTo(-L*0.15,-2); c.lineTo(L*0.35,-2); c.moveTo(-L*0.15,2); c.lineTo(L*0.35,2); c.stroke(); c.restore(); }
+  if(m.includes('flamme')&&u.cd>u.def.weapon.rof-0.25){ c.fillStyle='rgba(255,140,40,.8)'; c.beginPath(); c.arc(u.x*TILE+Math.cos(u.tur)*L*0.9,u.y*TILE+Math.sin(u.tur)*L*0.9,3,0,7); c.fill(); }
 }
 /** Winter: kalter Schleier und Schneeflocken über dem sichtbaren Ausschnitt */
 function winter(c){
@@ -167,6 +178,8 @@ export function render(){
     if(u.dug){ c.strokeStyle='#a08a5a'; c.lineWidth=3; c.beginPath(); c.arc(u.x*TILE,u.y*TILE,u.def.size*TILE*0.75+3,Math.PI*0.15,Math.PI*1.85); c.stroke();
       c.strokeStyle='rgba(60,45,25,.6)'; c.lineWidth=1; c.stroke(); }   // Sandsäcke: eingegraben
     drawUnitShape(c,u.type,f.col,f.dark,u.x*TILE,u.y*TILE,u.angle,u.tur,u.working?-1:u.hp/u.maxHp);
+    if(u.mods&&u.mods.length) drawMods(c,u);
+    if(u.kills>=2){ const r=rankOf(u); if(r){ c.font=`bold ${Math.round(TILE*0.32)}px sans-serif`; c.textAlign='center'; c.lineWidth=3; c.strokeStyle='rgba(0,0,0,.7)'; const sy=u.y*TILE-u.def.size*TILE*0.75-12; c.strokeText('★'.repeat(r),u.x*TILE,sy); c.fillStyle='#ffd84a'; c.fillText('★'.repeat(r),u.x*TILE,sy); } }
     if(u.cage){ c.save(); c.translate(u.x*TILE,u.y*TILE); c.rotate(u.angle); const L=u.def.size*TILE*0.95, W2=u.def.size*TILE*0.7;
       c.strokeStyle='rgba(60,58,50,.9)'; c.lineWidth=0.8; c.strokeRect(-L/2-1.5,-W2/2-1.5,L+3,W2+3);
       c.beginPath(); for(let k=-L/2;k<=L/2;k+=3.5){ c.moveTo(k,-W2/2-1.5); c.lineTo(k+1.5,W2/2+1.5); } c.stroke(); c.restore(); }   // Gitterkäfig

@@ -20,6 +20,7 @@ export function updateUnit(u,dt){
   const d=u.def;
   if(u.carried||u.mode==='board'){ if(updateRider(u,dt)) return; if(u.carried) return; }   // Truppentransport / Luftlandung
   u.cd-=dt;
+  if(u.mode==='refit') return;   // steht in der Werkstatt: wird umgebaut
   if(u.target&&(u.target.dead||!hostile(u.owner,u.target.owner)||!detected(u.target,u.owner))){u.target=null;
     const pv=u.prevTarget; u.prevTarget=null;
     if(pv&&!pv.dead&&hostile(u.owner,pv.owner)){ u.target=pv; u.repathT=0; }   // Angreifer erledigt: zurück zum eigentlichen Ziel
@@ -60,6 +61,7 @@ export function updateUnit(u,dt){
     }
   }
   if(d.aux) updateAux(u,dt);
+  if(d.pod&&u.podAmmo>0&&u.target&&!u.target.dead){ const dd=distTo(u,u.target); if(dd<=d.pod.range&&dd>=d.pod.minRange){ fire(u,u.target,d.pod); u.podAmmo=0; } }   // Raketenbehälter: eine Salve
   if(d.weapon&&!d.weapon.kamikaze&&d.cls!=='air'&&!u.carried){ if(behave(u,dt,firing)) return; }
   if(d.weapon&&d.weapon.kamikaze){   // Störsender in der Nähe: Verbindung weg, Drohne taumelt und stürzt ab
     u.jamT=(u.jamT||0)-dt; if(u.jamT<=0){ u.jamT=0.3; u.jammed=!d.swarm&&!hasTech(G.players[u.owner],'ai')&&G.units.some(j=>!j.dead&&j.def.jam&&hostile(u.owner,j.owner)&&dist(j.x,j.y,u.x,u.y)<=JAM.radius); }   // mit KI fliegen sie autonom

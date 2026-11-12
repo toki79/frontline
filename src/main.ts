@@ -22,6 +22,7 @@ import { init as initDev } from './ui/devui';
 import { init as initTree } from './ui/tree';
 import { init as initLLM, llmTick } from './ui/llm';
 import { init as initChat } from './ui/chat';
+import { init as initWerk } from './ui/werk';
 import { autosave } from './ui/saves';
 
 let last = performance.now();
@@ -49,7 +50,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-initForces(); initDev(); initTree(); initLLM(); initChat(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
+initForces(); initDev(); initTree(); initLLM(); initChat(); initWerk(); initMessages(); initCamera(); initInput(); initPanel(); initTooltips(); initAdvisor(); initDialogs(); initMenus();
 resize();
 requestAnimationFrame(frame);
 
@@ -62,6 +63,7 @@ import * as offers from './sim/offers';
 import * as units from './sim/units';
 import * as build from './sim/build';
 import * as dialogs from './ui/dialogs';
-Object.assign(window as any, world, production, costs, combat, offers, units, build, { showOffer: offers.showOffer });
+import * as modules from './sim/modules';
+Object.assign(window as any, world, production, costs, combat, offers, units, build, modules, { showOffer: offers.showOffer });
 (window as any).__fl = { aiQuotes, tradeAI, needLevel, advise, tipFor, HUD_TIPS, get G() { return G; }, newGame, startGame, update,
   aiThink, enqueue, placeSite, canPlace, findBuilding, orderMove, handleTap, toWorld, cam, answerOffer, trade, setWar };
