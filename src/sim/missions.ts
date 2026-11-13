@@ -1,7 +1,7 @@
 import { dist } from '../core/util';
 import { MISSION, isMajor , COMBAT_AI } from '../data/config';
 import { distTo } from '../sim/combat';
-import { orderLurk, orderMove, orderPatrol } from '../sim/orders';
+import { orderEscort, orderLurk, orderMove, orderPatrol } from '../sim/orders';
 import { G } from '../sim/state';
 import { detected, hostile, spotted } from '../sim/world';
 import { msg } from '../core/events';
@@ -11,25 +11,29 @@ import { msg } from '../core/events';
    ---------------------------------------------------------------------
    u.order = 'hold' | 'clear' | 'assault', u.area = {x,y,r}, u.dug = eingegraben.
    ===================================================================== */
-export type OrderKind = 'hold'|'clear'|'assault'|'move';
-export const ORDER_NAME = {hold:'Stellung halten', clear:'Gebiet klären', assault:'Angriff', move:'Sammeln'};
+export type OrderKind = 'hold'|'clear'|'assault'|'move'|'guard';
+export const ORDER_NAME = {hold:'Stellung halten', clear:'Gebiet klären', assault:'Zerstören', move:'Sammeln', guard:'Bewachen/Begleiten'};
 const isFpv = u => !!(u.def.weapon&&u.def.weapon.kamikaze);
 const isScout = u => u.def.cls==='air'&&!isFpv(u);
 
 /** Befehl an eine Gruppe – jede Einheitenart setzt ihn passend um */
 export function applyOrder(units, kind: OrderKind, x, y){
   if(!units.length) return 0;
+  if(kind==='guard'){   // eigene Einheit angetippt: begleiten; sonst das Gebiet (z. B. ein Gebäude) bewachen
+    const prot=G.units.find(o=>!o.dead&&o.owner===units[0].owner&&!units.includes(o)&&dist(o.x,o.y,x,y)<0.9);
+    if(prot){ const n=orderEscort(units.filter(u=>u.def.cls!=='air'),prot); for(const u of units) if(u.mode==='escort'){ u.order=null; u.area=null; } if(n) return n; } }
   const id=G.nextId++, ground=units.filter(u=>u.def.cls!=='air'), fpv=units.filter(isFpv), scouts=units.filter(isScout);
   if(ground.length){
     const armed=ground.filter(u=>u.def.weapon), other=ground.filter(u=>!u.def.weapon);
     if(armed.length){ orderMove(armed,x,y,kind==='hold'||kind==='move'?'move':'amove');
-      const r=kind==='clear'?MISSION.clearR:kind==='assault'?MISSION.assaultR:0;
+      const r=kind==='clear'?MISSION.clearR:kind==='assault'?MISSION.assaultR:kind==='guard'?MISSION.guardR:0;
       for(const u of armed){ u.order=kind==='move'?null:kind; u.msn=id; u.area=r?{x,y,r}:null; u.digT=0; u.dug=false; u.quietT=0; } }
     if(other.length) orderMove(other,x,y,'move');
   }
   if(fpv.length){ orderMove(fpv,x,y,'move'); orderLurk(fpv,kind!=='move'); }
   if(scouts.length){
     if(kind==='hold'||kind==='move') orderMove(scouts,x,y,'move');
+    else if(kind==='guard'){ orderPatrol(scouts,true); for(const u of scouts) u.patrolArea={x,y,r:MISSION.guardR}; }
     else if(kind==='assault'&&scouts.some(u=>u.def.weapon)){ orderMove(scouts.filter(u=>u.def.weapon),x,y,'amove'); const sp=scouts.filter(u=>!u.def.weapon); if(sp.length){ orderPatrol(sp,true); for(const u of sp) u.patrolArea={x,y,r:MISSION.scoutR}; } }
     else { orderPatrol(scouts,true); for(const u of scouts) u.patrolArea={x,y,r:MISSION.scoutR}; }
   }
@@ -47,15 +51,16 @@ export function updateMission(u,dt){
   // Eingraben: nur wer still steht und Stellung hält
   if(u.order==='hold'&&u.mode==='idle'&&!moving){ u.digT=(u.digT||0)+dt; if(!u.dug&&u.digT>=MISSION.digTime){ u.dug=true; } }
   else if(moving){ u.digT=0; u.dug=false; }
-  if((u.order==='clear'||u.order==='assault')&&u.mode==='idle'&&u.area){
+  if((u.order==='clear'||u.order==='assault'||u.order==='guard')&&u.mode==='idle'&&u.area){
     u.msnT=(u.msnT||0)-dt; if(u.msnT>0) return; u.msnT=0.8;
     if(u.target&&!u.target.dead) { u.quietT=0; return; }
     let best=null, bd=1e9; const A=u.area;
     for(const e of G.units){ if(e.dead||!hostile(u.owner,e.owner)||!detected(e,u.owner)) continue; if(e.def.cls==='air'&&!(u.def.weapon&&(u.def.weapon.type==='flak'||u.def.weapon.type==='autocannon'||u.def.weapon.type==='bullet'))) continue;
       const da=dist(e.x,e.y,A.x,A.y); if(da>A.r) continue; if(isMajor(u.owner)&&!spotted(u.owner,e.x,e.y)) continue; const d=dist(u.x,u.y,e.x,e.y); if(d<bd){bd=d;best=e;} }
-    for(const b of G.buildings){ if(b.dead||!hostile(u.owner,b.owner)) continue; if(u.order==='clear'&&b.type!=='camp') continue;
+    for(const b of G.buildings){ if(u.order==='guard') break; if(b.dead||!hostile(u.owner,b.owner)) continue; if(u.order==='clear'&&b.type!=='camp') continue;
       if(distTo({x:A.x,y:A.y},b)>A.r) continue; if(u.owner===0&&!b.seen&&G.fog) continue; const d=distTo(u,b)+1; if(d<bd){bd=d;best=b;} }
     if(best){ u.target=best; u.quietT=0; return; }
+    if(u.order==='guard'){ if(dist(u.x,u.y,u.area.x,u.area.y)>3.5&&!u.fleeing){ const a=u.area, m=u.msn; orderMove([u],a.x+(Math.random()-.5)*3,a.y+(Math.random()-.5)*3,'amove'); u.order='guard'; u.area=a; u.msn=m; } return; }   // Wache: zurück auf den Posten, bleibt dabei
     u.quietT=(u.quietT||0)+0.8;
     if(u.quietT>=MISSION.quiet){   // geklärt: dort Stellung halten
       const m=(G.missions||[]).find(m=>m.id===u.msn); if(m&&!m.done&&u.owner===0){ m.done=true; msg(u.order==='clear'?'🔍 Gebiet geklärt – die Truppen halten dort Stellung.':'⚔ Angriffsziel genommen – die Truppen halten dort Stellung.','#9fd88a'); }

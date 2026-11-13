@@ -78,7 +78,7 @@ export function handleTap(w,right,shift){
     else msg('Zum Begleiten einen eigenen Arbeiter, Laster oder eine andere Einheit antippen.','#ffb38a');
     G.escortMode=false; refreshCmds(); return; }
   if(G.amoveMode&&mine.length){ applyOrder(mine,'assault',w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:'#ff7a5a',life:0.5}); G.amoveMode=false; refreshCmds(); return; }
-  if(G.orderMode&&mine.length){ applyOrder(mine,G.orderMode,w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:G.orderMode==='hold'?'#7fb0ea':'#ffd36a',life:0.6});
+  if(G.orderMode&&mine.length){ applyOrder(mine,G.orderMode,w.x,w.y); fxAdd({k:'marker',x:w.x,y:w.y,col:G.orderMode==='hold'||G.orderMode==='guard'?'#7fb0ea':'#ffd36a',life:0.6});
     msg(`${mine.length} Einheit${mine.length===1?'':'en'}: ${ORDER_NAME[G.orderMode]}.`); G.orderMode=null; refreshCmds(); return; }
   if(ent&&ent.owner===0&&ent.kind==='unit'&&ent.def.carry&&mine.some(u=>canRide(u))&&!mine.includes(ent)){   // Einsteigen
     const n=orderBoard(mine,ent); fxAdd({k:'marker',x:ent.x,y:ent.y,col:'#9ff07a',life:0.6});
@@ -219,7 +219,7 @@ export function updateInfo(){
   if(G.dropAim){ el.textContent=`🪂 Luftlandung: Absprungziel antippen – erkundet, höchstens ${AIR.dropRange} Felder vom Fliegerhorst (Kreis) · ✕ bricht ab`; return; }
   if(G.nukeAim){ el.textContent=G.nukeArm?'☢ Ziel markiert – dieselbe Stelle nochmal antippen = START · ✕ Abwählen bricht ab':`☢ Atomschlag: erkundetes Ziel antippen (Radius ${NUKE.radius} Felder) · ✕ Abwählen bricht ab`; return; }
   if(G.orderPending){ const n=Object.values(G.orderPending.pick).reduce((s: number,v: any)=>s+v,0); el.textContent=`🎯 Einsatz „${ORDER_NAME[G.orderPending.kind]}“ mit ${n} Einheiten: Ziel auf der Karte antippen · ✕ Abwählen bricht ab`; return; }
-  if(G.orderMode){ el.textContent=`${ORDER_NAME[G.orderMode]}: Ziel antippen – ${G.orderMode==='hold'?'Truppen ziehen hin und graben sich ein':'Truppen säubern den Umkreis und halten dann Stellung'}`; return; }
+  if(G.orderMode){ el.textContent=`${ORDER_NAME[G.orderMode]}: Ziel antippen – ${G.orderMode==='hold'?'Truppen ziehen hin und graben sich ein':G.orderMode==='guard'?'Gebäude/Gebiet: Wache im Umkreis · eigene Einheit: Begleitschutz':'Truppen säubern den Umkreis und halten dann Stellung'}`; return; }
   if(G.amoveMode){el.textContent='Angriff: Ziel antippen – vorrücken und alles im Umkreis angreifen';return;}
   if(G.escortMode){el.textContent='Begleiten: eigenen Arbeiter oder Laster antippen – die Auswahl bleibt bei ihm und verteidigt ihn';return;}
   if(G.boxMode){el.textContent='Rahmen aufziehen, um Einheiten zu wählen';return;}

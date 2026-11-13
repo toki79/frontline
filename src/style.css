@@ -223,6 +223,7 @@ body.held #pauseTag{display:block}
 #llm .seg.copy{margin-left:auto;font-weight:500;opacity:.85}
 
 #cmdMe{margin-left:8px;color:#d8c890}#cmdMe.full{color:#ffb38a}
+.grp .soll{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;font-size:12.5px}.grp .soll .chip button{padding:0 7px;font-size:12px}.grp .soll .chip b{min-width:14px;text-align:center}.grp .soll select{background:#12160d;color:#ddd;border:1px solid #3a4430;border-radius:8px;padding:4px;font-size:12.5px}
 /* Werkstatt */
 #werk .card{max-width:760px}
 .wcard{border:1px solid #3a4430;border-radius:9px;padding:8px 10px;margin:6px 0;background:#161b10}

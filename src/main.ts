@@ -64,6 +64,7 @@ import * as units from './sim/units';
 import * as build from './sim/build';
 import * as dialogs from './ui/dialogs';
 import * as modules from './sim/modules';
-Object.assign(window as any, world, production, costs, combat, offers, units, build, modules, { showOffer: offers.showOffer });
+import * as groupsM from './sim/groups';
+Object.assign(window as any, world, production, costs, combat, offers, units, build, modules, groupsM, { showOffer: offers.showOffer });
 (window as any).__fl = { aiQuotes, tradeAI, needLevel, advise, tipFor, HUD_TIPS, get G() { return G; }, newGame, startGame, update,
   aiThink, enqueue, placeSite, canPlace, findBuilding, orderMove, handleTap, toWorld, cam, answerOffer, trade, setWar };

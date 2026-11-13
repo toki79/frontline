@@ -16,7 +16,7 @@ import { orderMove } from '../sim/orders';
    zurück. Ausnahmen: Haltebefehl (bis zum letzten Mann), Verteidigung
    der eigenen Stadt, Einheiten auf ausdrücklichem Marsch.
    ===================================================================== */
-const R=COMBAT_AI.rout;
+const R=COMBAT_AI.rout, S=COMBAT_AI.service;
 const val=u=>(u.def.cost.money||100)*(1+(u.def.cost.metal||0)/100)*(u.hp/u.maxHp)*(u.dug&&!u.dugCover?1.3:1);
 const bval=b=>R.fort*(b.hp/b.maxHp);
 const fights=u=>!u.dead&&!u.carried&&u.def.weapon&&!u.def.weapon.kamikaze&&u.def.cls!=='air'&&!u.def.worker&&!u.def.pioneer;
@@ -45,10 +45,18 @@ export function updateTactics(dt){
     if(seen.has(u.id)||!MAJORS.includes(u.owner)||!fights(u)) continue;
     // zurück auf den Posten: erholt, gewartet, Auftrag wieder aufnehmen
     if(u.fleeing&&u.fleeing.rout){ const f=u.fleeing;
-      if(u.mode==='idle'&&G.t-f.t>R.wait&&u.hp>=u.maxHp*COMBAT_AI.backHp){ u.fleeing=null; u.routCool=G.t+R.cool;
+      if(u.mode==='idle'&&G.t-f.t>(f.service?8:R.wait)&&u.hp>=u.maxHp*COMBAT_AI.backHp&&!(f.service&&u.def.pod&&!(u.podAmmo>0))){ u.fleeing=null; u.routCool=G.t+R.cool;
         if(u.owner===0){ orderMove([u],f.x,f.y,'amove'); if(f.order){ u.order=f.order; u.area=f.area; u.msn=f.msn; } } }
       continue; }
-    if(u.fleeing||u.order==='hold'||u.mode==='move'||u.mode==='refit'||G.t<(u.routCool||0)) continue;
+    if(u.fleeing||u.order==='hold'||u.mode==='move'||u.mode==='refit') continue;
+    // Wartung: Fahrzeuge des Spielers fahren in ruhigen Momenten selbst zur Werkstatt (Reparatur, Raketen nachladen) und kehren zurück
+    if(u.owner===0&&u.def.cls==='veh'&&(u.order||u.grp)&&!u.escort&&(u.hp<u.maxHp*S.hp||(u.def.pod&&!(u.podAmmo>0)))&&G.t-(u.lastHit||-99)>S.quiet&&!(u.target&&!u.target.dead)){
+      const shop=G.buildings.filter(b=>!b.dead&&!b.site&&b.owner===0&&b.type==='workshop').sort((a,b)=>dist(a.x,a.y,u.x,u.y)-dist(b.x,b.y,u.x,u.y))[0]||safeSpot(u);
+      if(shop&&dist(u.x,u.y,shop.x,shop.y)>4){ const pp=nearestPassable(shop.x+(Math.random()-.5)*2,shop.y+shop.h/2+1.3,u.def.cls);
+        if(pp){ const keep={x:u.x,y:u.y,t:G.t,rout:true,service:true,order:u.order,area:u.area,msn:u.msn}; orderMove([u],pp.x+0.5,pp.y+0.5); u.fleeing=keep;
+          if(G.t-(G.svcMsg||-99)>30){ G.svcMsg=G.t; msg(`🔧 ${u.def.name.replace(/\u00AD/g,'')}${u.name?` „${u.name}“`:''} fährt zur ${shop.type==='workshop'?'Werkstatt':'Stadt'} (${u.hp<u.maxHp*S.hp?'Reparatur':'Raketen nachladen'}) und kehrt danach auf den Posten zurück.`,'#b8c8e0'); }
+          continue; } } }
+    if(G.t<(u.routCool||0)) continue;
     if(G.t-(u.lastHit||-99)>R.hit&&!(u.target&&!u.target.dead)) continue;          // nur im Gefecht
     const grp=G.units.filter(o=>o.owner===u.owner&&fights(o)&&!o.fleeing&&o.order!=='hold'&&o.mode!=='move'&&dist(o.x,o.y,u.x,u.y)<=R.r);
     for(const o of grp) seen.add(o.id);

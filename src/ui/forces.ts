@@ -10,6 +10,7 @@ import { hideTip } from './tooltips';
 import { msg } from '../core/events';
 import { reinfOf } from '../sim/reinforce';
 import { dissolveGroup, groupState, groupsOf, makeGroup, members } from '../sim/groups';
+import { available } from '../sim/production';
 
 /* =====================================================================
    Kräfte-Übersicht: alle eigenen Einheiten nach Art, Status, Einsatz ordern
@@ -26,9 +27,11 @@ export const fs: {kind: OrderKind, pick: Record<string,number>} = {kind:'hold', 
 const KINDS: [OrderKind,string,string][] = [
   ['hold','🛡 Stellung halten','hinziehen und eingraben – besser geschützt, keine Verfolgung, kein Rückzug: bis zum letzten Mann'],
   ['clear','🔍 Gebiet klären','Feinde und Räuberlager im Umkreis ausschalten, dann halten'],
-  ['assault','⚔ Angriff','vorrücken, alles im großen Umkreis angreifen – auch Gebäude'],
+  ['guard','👁 Bewachen/Begleiten','Gebäude oder Gebiet antippen: Wache im Umkreis, kehrt nach jedem Gefecht zurück. Eigene Einheit antippen: Begleitschutz'],
+  ['assault','⚔ Zerstören','vorrücken, alles im großen Umkreis angreifen – auch Gebäude; bei Übermacht weichen sie zurück'],
   ['move','➜ Sammeln','nur hinbewegen'],
 ];
+const ADDABLE=['inf','at','para','apc','ifv','spaag','mbt','heavy','mlrs','amphib','jammer','drone','swarm','spy','reaper'];
 const own = () => G.units.filter(u=>!u.dead&&u.owner===0);
 /** frei = ohne Auftrag, nicht begleitend, nicht auf Patrouille, kein Kampf */
 export const isFree = u => !u.grp&&!u.order&&!u.escort&&!u.patrol&&!u.target&&(u.mode==='idle'||u.mode==='harvest'&&false)&&!u.job&&!u.pjob&&!u.mission;
@@ -46,6 +49,8 @@ function status(u){
   if(u.order==='hold') return u.dug?'eingegraben':'hält';
   if(u.order==='clear') return 'klärt';
   if(u.order==='assault') return 'greift an';
+  if(u.order==='guard') return 'bewacht';
+  if(u.fleeing) return u.fleeing.service?'zur Wartung':'weicht zurück';
   if(u.escort) return 'begleitet';
   if(u.lurk) return 'lauert';
   if(u.mode==='move'||u.mode==='amove') return 'unterwegs';
@@ -59,12 +64,16 @@ function reinfHtml(){
 }
 function groupsHtml(){
   const gs=groupsOf(0); let h='<h4>🎖 Verbände</h4>';
+  h+='<div class="row"><button id="fNew">➕ Neuen Verband aufstellen (Soll festlegen, Werke liefern)</button></div>';
   if(!gs.length) return h+'<div class="barl"><span>Noch keine Verbände. Einheiten unten mit −/+ zusammenstellen und „🎖 Als Verband“ tippen – oder auf der Karte mehrere wählen und 🎖 tippen. Infanterie, Fahrzeuge, Flugabwehr und Drohnen gemischt ergeben <b>verbundene Waffen</b>: mehr Kampfkraft, weniger Verluste.</span></div>';
   for(const g of gs){ const s=groupState(g), cnt={}; for(const u of s.ms){ const n=u.def.name.replace(/\u00AD/g,''); cnt[n]=(cnt[n]||0)+1; }
     const hp=s.ms.reduce((a,u)=>a+u.hp,0)/Math.max(1,s.ms.reduce((a,u)=>a+u.maxHp,0)), stt={}; for(const u of s.ms){ const x=status(u); stt[x]=(stt[x]||0)+1; }
     h+=`<div class="grp"><div class="gh"><b>🎖 ${g.name}</b><span>${Math.round(hp*100)} %</span></div>
       <div class="dim" style="font-size:12.5px">${Object.entries(cnt).map(([k,v])=>v+'× '+k).join(', ')}<br>${Object.entries(stt).map(([k,v])=>v+' '+k).join(' · ')} · ${s.combined?'⭐ verbundene Waffen':'ohne verbundene Waffen'}</div>
-      <div class="gb"><button data-gsel="${g.id}">📍 Wählen</button><button data-gord="${g.id}_hold">⛉ Halten</button><button data-gord="${g.id}_clear">🔍 Klären</button><button data-gord="${g.id}_assault">⚔ Angriff</button><button data-grein="${g.id}" style="${g.reinforce?'border-color:var(--acc);color:var(--acc)':''}">🔁 Ersatz ${g.reinforce?'an':'aus'}</button><button data-gdel="${g.id}" style="background:#4a2a22">Auflösen</button></div></div>`; }
+      <div class="soll">Soll: ${Object.keys({...(g.want||{}),...s.ms.reduce((a,u)=>(a[u.type]=1,a),{})}).filter(t=>UNITS[t]).map(t=>`<span class="chip">${UNITS[t].name.replace(/\u00AD/g,'')} <button data-gw="${g.id}|${t}|-1">−</button><b>${(g.want||{})[t]||0}</b><button data-gw="${g.id}|${t}|1">+</button></span>`).join('')}
+        <select data-gadd="${g.id}"><option value="">+ Art …</option>${ADDABLE.filter(t=>!(g.want||{})[t]&&available(0,t)).map(t=>`<option value="${t}">${UNITS[t].name.replace(/\u00AD/g,'')}</option>`).join('')}</select>
+        ${g.reinforce?(g.short?`<span class="dim">wartet: ${UNITS[g.short]?.name.replace(/\u00AD/g,'')||''} (Geld, Werk oder 🎖)</span>`:''):'<span class="dim">Ersatz ist aus</span>'}</div>
+      <div class="gb"><button data-gsel="${g.id}">📍 Wählen</button><button data-gord="${g.id}_hold">⛉ Halten</button><button data-gord="${g.id}_clear">🔍 Klären</button><button data-gord="${g.id}_guard">👁 Bewachen</button><button data-gord="${g.id}_assault">⚔ Zerstören</button><button data-grein="${g.id}" style="${g.reinforce?'border-color:var(--acc);color:var(--acc)':''}">🔁 Ersatz ${g.reinforce?'an':'aus'}</button><button data-gdel="${g.id}" style="background:#4a2a22">Auflösen</button></div></div>`; }
   return h;
 }
 export function renderForces(){
@@ -116,6 +125,7 @@ function locate(t){
 export function init(){
   $('#bForces').addEventListener('click',openForces);
   $('#bForcesClose').addEventListener('click',close);
+  $('#forcesBody').addEventListener('change',e=>{ const t=e.target as HTMLSelectElement; if(!t.dataset||!t.dataset.gadd||!t.value) return; const g=(G.groups||[]).find(x=>x.id===Number(t.dataset.gadd)); if(g){ g.want=g.want||{}; g.want[t.value]=1; } renderForces(); });
   $('#forcesBody').addEventListener('click',e=>{ const b=(e.target as HTMLElement).closest('button') as HTMLButtonElement; if(!b||b.disabled) return; const d=b.dataset, all=own();
     if(d.k) fs.kind=d.k as OrderKind;
     else if(d.p){ fs.pick[d.p]=Math.min((fs.pick[d.p]||0)+1,all.filter(u=>u.type===d.p).length); }
@@ -123,6 +133,7 @@ export function init(){
     else if(d.all){ const us=all.filter(u=>u.type===d.all), free=us.filter(isFree).length; fs.pick[d.all]=fs.pick[d.all]===free?us.length:free||us.length; }
     else if(d.loc){ locate(d.loc); return; }
     else if(d.rein){ reinfOf(0).on=d.rein==='1'; if(d.rein==='0') reinfOf(0).q=reinfOf(0).q.filter(i=>i.grp); }
+    else if(d.gw){ const [id,t,dn]=d.gw.split('|'), g=(G.groups||[]).find(x=>x.id===Number(id)); if(g){ g.want=g.want||{}; g.want[t]=Math.max(0,Math.min(12,(g.want[t]||0)+Number(dn))); } }
     else if(d.grein){ const g=(G.groups||[]).find(x=>x.id===Number(d.grein)); if(g){ g.reinforce=!g.reinforce; if(!g.reinforce) reinfOf(0).q=reinfOf(0).q.filter(i=>i.grp!==g.id); } }
     else if(d.gsel||d.gord||d.gdel){ const g=(G.groups||[]).find(x=>x.id===Number(d.gsel||d.gdel||d.gord.split('_')[0])); if(!g) return;
       if(d.gdel){ dissolveGroup(g); msg(`${g.name} aufgelöst.`); renderForces(); return; }
@@ -132,6 +143,7 @@ export function init(){
       refreshCmds(); return; }
     else if(b.id==='fGrp'){ const hq=G.buildings.find(x=>!x.dead&&x.owner===0&&x.type==='hq'); const us=pickUnits(fs.pick,hq?hq.x:48,hq?hq.y:48).filter(u=>u.def.weapon||u.def.jam);
       if(us.length>=2){ const g=makeGroup(0,us), s=groupState(g); fs.pick={}; msg(`🎖 ${g.name} gebildet: ${us.length} Einheiten${s.combined?' – verbundene Waffen':''}.`,'#9fd88a'); } renderForces(); return; }
+    else if(b.id==='fNew'){ const g=makeGroup(0,[],{inf:4}); msg(`🎖 ${g.name} aufgestellt – Soll festlegen, die Werke liefern.`,'#9fd88a'); renderForces(); return; }
     else if(b.id==='fGo'){ G.orderPending={kind:fs.kind, pick:{...fs.pick}}; close(); refreshCmds(); return; }
     renderForces(); });
 }

@@ -12,7 +12,7 @@ import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
 import { applyDecision, llmActive, parseDecision, strategistPrompt } from '../src/ai/strategist';
 import { rangeOf } from '../src/sim/units';
-import { makeGroup, groupState, dissolveGroup } from '../src/sim/groups';
+import { makeGroup, groupState, dissolveGroup, members } from '../src/sim/groups';
 import { orderBoard, unload, aboard } from '../src/sim/transport';
 import { orderDrop } from '../src/sim/airdrop';
 import { reinfOf } from '../src/sim/reinforce';
@@ -857,7 +857,6 @@ describe('Simulation', () => {
     const us = [spawnAt(0, 'inf', hq.x + 5, hq.y + 5), spawnAt(0, 'inf', hq.x + 5.6, hq.y + 5)];
     const g = makeGroup(0, us); g.reinforce = true;
     destroy(us[0], { owner: 1, dead: true, x: 0, y: 0 });
-    expect(reinfOf(0).q.length).toBe(1);
     expect(runUntil(() => G.units.some(u => !u.dead && u.owner === 0 && u.type === 'inf' && u.grp === g.id && u !== us[1]), 30)).toBe(true);
     reinfOf(0).on = false; const free = spawnAt(0, 'inf', hq.x + 3, hq.y + 5); destroy(free, null);
     expect(reinfOf(0).q.length).toBe(0);                          // ohne Verband nur, wenn global eingeschaltet
@@ -1126,7 +1125,7 @@ describe('Simulation', () => {
     newGame('mittel'); noBandits(); const p = G.players[0], d = devOf(0); d.build = true;
     expect(citizenWants(0)[0][0]).toBe('lumber');                         // ohne Holz entsteht nichts
     const n0 = G.buildings.length; citizenThink(0); expect(G.buildings.length).toBe(n0 + 1);
-    expect(G.buildings[G.buildings.length - 1].type).toBe('lumber');
+    expect(['lumber', 'depot']).toContain(G.buildings[G.buildings.length - 1].type);   // Holzfäller – oder ein Vorposten, wenn kein Wald in Reichweite liegt
     // Priorität aus: der Bereich wird nicht gebaut
     p.pop = p.cap; d.prio.wohnen = 0; for (let i = 0; i < 6; i++) citizenThink(0);
     expect(G.buildings.some(b => b.owner === 0 && (b.type === 'house' || b.type === 'block'))).toBe(false);
@@ -1164,6 +1163,27 @@ describe('Simulation', () => {
     for (let i = 0; i < 20 * 150 && r.fleeing; i++) update(0.05);
     expect(r.fleeing).toBeFalsy();
   }, 20000);
+  it('Verbände: Soll-Stärke wird nachgebaut, Bewachen kehrt auf den Posten zurück, Wartung in der Werkstatt', () => {
+    newGame('mittel', false); noBandits(); const p = G.players[0], hq = findBuilding(0, 'hq');
+    placeBuilding(0, 'barracks', hq.tx + 5, hq.ty, true); p.res.money = 20000; p.pop = 200; p.cap = 300;
+    const a = spawnAt(0, 'inf', hq.x + 3, hq.y + 5), b = spawnAt(0, 'inf', hq.x + 3.6, hq.y + 5);
+    const g: any = makeGroup(0, [a, b]); expect(g.want.inf).toBe(2); expect(g.reinforce).toBe(true);
+    g.want.inf = 3; run(4); expect(p.q.barracks.some((i: any) => i.grp === g.id)).toBe(true);
+    expect(runUntil(() => members(g).length === 3, 60)).toBe(true); run(4); expect(p.q.barracks.filter((i: any) => i.grp === g.id).length).toBe(0);
+    a.dead = true; expect(runUntil(() => members(g).length === 3, 60)).toBe(true);     // Verlust ersetzt
+    // Bewachen: nach dem Gefecht zurück zum Posten
+    const post = {x: hq.x + 10, y: hq.y - 8}; applyOrder([b], 'guard', post.x, post.y); expect(b.order).toBe('guard');
+    expect(runUntil(() => Math.hypot(b.x - post.x, b.y - post.y) < 2.5 && b.mode === 'idle', 60)).toBe(true);
+    b.x += 6; b.path = null; b.mode = 'idle'; run(3); expect(b.order).toBe('guard'); expect(b.mode).toBe('amove');
+    // Begleiten: eigene Einheit antippen
+    const w = G.units.find(u => u.owner === 0 && u.def.worker); const c = spawnAt(0, 'inf', w.x + 1, w.y); applyOrder([c], 'guard', w.x, w.y); expect(c.mode).toBe('escort');
+    // Wartung: beschädigter Panzer im Verband fährt zur Werkstatt und kommt zurück
+    const ws = placeBuilding(0, 'workshop', hq.tx - 7, hq.ty - 5, true), t1 = spawnAt(0, 'mbt', hq.x + 14, hq.y + 10), t2 = spawnAt(0, 'mbt', hq.x + 15, hq.y + 10);
+    makeGroup(0, [t1, t2]); applyOrder([t1, t2], 'guard', t1.x, t1.y); t1.hp = t1.maxHp * 0.3; const px = t1.x, py = t1.y;
+    run(3); expect(t1.fleeing && t1.fleeing.service).toBe(true); expect(t2.fleeing).toBeFalsy();
+    expect(runUntil(() => !t1.fleeing && t1.hp > t1.maxHp * 0.75, 150)).toBe(true); expect(t1.order).toBe('guard');
+    expect(runUntil(() => Math.hypot(t1.x - px, t1.y - py) < 5, 80)).toBe(true); void ws;
+  }, 30000);
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); expect(G.terr.every((v, i) => v === a[i])).toBe(true); expect(G.ore.every((v, i) => v === ore[i])).toBe(true);
