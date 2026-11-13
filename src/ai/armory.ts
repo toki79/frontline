@@ -1,4 +1,6 @@
-import { AI_ARMORY, MODULES, hasTech } from '../data/config';
+import { AI_ARMORY, MODULES, UNITS, hasTech } from '../data/config';
+import { available, cmdCap, cmdUsed, enqueue } from '../sim/production';
+import { canAfford } from '../sim/costs';
 import { trade } from '../sim/market';
 import { G } from '../sim/state';
 import { dist } from '../core/util';
@@ -79,3 +81,25 @@ export function aiArmory(pid,calm:boolean,dt:number){
 }
 /** sieht die KI gerade Ausrüstungsbedarf? (für die Gebäudewahl) */
 export const wantsWorkshop=(pid)=>G.units.filter(u=>!u.dead&&u.owner===pid&&isFittable(u)).length>=3;
+
+/* ---------- Fahrzeugpark: wenige, starke Fahrzeuge nach Persönlichkeit ---------- */
+const FLEET={
+  rush:    ['mbt','ifv','mbt','apc','heavy'],
+  boom:    ['ifv','mbt','spaag','ifv','heavy'],
+  igel:    ['mbt','spaag','mlrs','mbt','heavy'],
+  technik: ['ifv','mlrs','spaag','mbt','heavy'],
+};
+/** Fahrzeugwerk auslasten, bis die Kommandopunkte (je nach Lage) gefüllt sind */
+export function aiFleet(pid,s:{war:boolean,lead:boolean,urgent:boolean,saving:boolean}){
+  const p=G.players[pid], ai=G.ais[pid];
+  if(!G.buildings.some(b=>!b.dead&&!b.site&&b.owner===pid&&b.type==='factory')||p.q.factory.length) return;
+  if(s.saving&&!s.war&&!s.urgent) return;
+  const cap=cmdCap(pid), used=cmdUsed(pid), fill=s.war||s.urgent?1:s.lead?0.85:0.6; if(used>=cap*fill) return;
+  const P=personaOf(pid), L=[...(FLEET[P&&P.opening]||FLEET.boom)];
+  if(G.t-(ai.airSeenT??-1e9)<300&&!G.units.some(u=>!u.dead&&u.owner===pid&&u.type==='spaag')) L.unshift('spaag');   // Drohnen über der Stadt: Flakpanzer zuerst
+  for(let n=0;n<L.length;n++){ const t=L[(ai.fleetI||0)%L.length]; ai.fleetI=(ai.fleetI||0)+1;
+    if(!available(pid,t)||(UNITS[t].cmd||0)>cap-used) continue;
+    const c=UNITS[t].cost; if(p.res.money<(c.money||0)+250) return;   // auf das nächste Fahrzeug sparen
+    for(let k=0;k<4&&(c.metal||0)>p.res.metal;k++) if(!trade(pid,'buyMetal')) break;
+    if(canAfford(pid,t)) enqueue(pid,t); return; }
+}

@@ -16,7 +16,7 @@ import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, detected
 import { msg } from '../core/events';
 import { bound, jointAgainst } from '../sim/pacts';
 import { aiChar, hasTrait } from '../ai/persona';
-import { aiArmory } from '../ai/armory';
+import { aiArmory, aiFleet } from '../ai/armory';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
 import { makeGroup } from '../sim/groups';
@@ -178,6 +178,7 @@ export function aiThink(pid=1){
   const tanks=G.units.some(e=>!e.dead&&e.def.armor==='heavy'&&hostile(pid,e.owner)&&spotted(pid,e.x,e.y)&&myB.some(b=>dist(e.x,e.y,b.x,b.y)<22));
   if(tanks) ai.tankSeenT=G.t;
   if(G.t-(ai.tankSeenT??-1e9)<240&&army.filter(u=>u.type==='at').length<Math.max(3,army.length*0.4)&&available(pid,'at')&&canAfford(pid,'at')&&!p.q.barracks.length) enqueue(pid,'at');
+  aiFleet(pid,{war:!!war,lead:!!lead,urgent:!!urgent,saving});   // Fahrzeugpark nach Persönlichkeit, begrenzt durch Kommandopunkte
   if(army.length<want&&G.t>40&&p.res.money>2500&&Math.random()<0.35){   // Spätzeit-Waffen: Raketenträger, Schwärme, Jagdbomber
     for(const t of AI_MIX2) if(available(pid,t)&&canAfford(pid,t)&&p.res.money>UNITS[t].cost.money+1200&&!p.q[UNITS[t].prod].length){ enqueue(pid,t); break; } }
   if(army.length<want&&G.t>40&&(!saving||army.length<4)){
@@ -414,7 +415,10 @@ export function armyText(units){ const c={}; for(const u of units) c[u.def.name.
 export function aiNextResearch(p){
   if(!findBuilding(p.id,'university')) return null;
   const ai=G.ais[p.id]; if(llmActive(ai)&&ai.llm.research&&!hasTech(p,ai.llm.research)&&!exclBlock(p,ai.llm.research)&&available(p.id,ai.llm.research)) return ai.llm.research;   // Vorgabe des LLM-Strategen
-  const L=(AI_RESEARCH[p.id]||AI_RESEARCH[1]) as [string,number][];
+  const L=[...(AI_RESEARCH[p.id]||AI_RESEARCH[1])] as [string,number][];
+  // Persönlichkeit: Technik will früh ins Rechenzentrum (KI-Zielerfassung, aktiver Schutz), Ansturm früh schwere Panzer
+  const op=(ai.persona||{}).opening, early={technik:['computing'], boom:['computing'], rush:['cars','heavyarmor'], igel:['airdef','missiledef']}[op]||[];
+  for(const k of [...early].reverse()){ const i=L.findIndex(([x])=>x===k); if(i>2){ const [it]=L.splice(i,1); L.splice(2,0,[k,Math.min(it[1],200)]); } }
   for(const [k,pop] of L){ if(hasTech(p,k)||exclBlock(p,k)) continue;   // Entweder-oder: ausgeschlossene Zweige überspringen
     if((RESEARCH[k].needB||[]).includes('intel')&&!findBuilding(p.id,'intel')) continue;
     return p.pop>pop&&available(p.id,k)?k:null; }

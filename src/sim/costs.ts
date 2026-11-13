@@ -1,4 +1,4 @@
-import { AIR, BUILDINGS, DEF, DRONES_PER_SHOP, ECON, RESEARCH, RTREE, UNITS, VEH_PER_FACTORY, hasTech, isAI, FAMINE } from '../data/config';
+import { AIR, BUILDINGS, COMMAND, DEF, DRONES_PER_SHOP, ECON, RESEARCH, RTREE, UNITS, hasTech, isAI, FAMINE } from '../data/config';
 import { G } from '../sim/state';
 import { aiChar } from '../ai/persona';
 import { countBuildings } from '../sim/world';
@@ -23,7 +23,8 @@ export function lacking(pid,type){
   const c=BUILDINGS[type]&&!BUILDINGS[type].def&&BUILDINGS[type].buildable!==false?{money:c0.money||0}:c0;
   for(const k in c){ if(k==='pop'){ if(p.pop-c.pop<ECON.minPop) out.push('pop'); } else if((p.res[k]||0)<c[k]) out.push(k); }
   const d=DEF(type);
-  if(d.combat&&combatVehicles(pid)>=VEH_PER_FACTORY*countBuildings(pid,'factory')) out.push('vehcap');
+  if(d.combat&&!countBuildings(pid,'factory')) out.push('vehcap');
+  if(d.cmd&&cmdCap(pid)-cmdUsed(pid)<d.cmd) out.push('cmd');   // Kommandopunkte
   if(UNITS[type]&&UNITS[type].prod==='droneshop'&&droneCount(pid)>=DRONES_PER_SHOP*countBuildings(pid,'droneshop')) out.push('dronecap');
   if(UNITS[type]&&UNITS[type].prod==='airbase'&&G.units.filter(u=>!u.dead&&u.owner===pid&&u.def.sortie).length+G.players[pid].q.airbase.length>=AIR.perBase*countBuildings(pid,'airbase')) out.push('jetcap');
   return out;
@@ -32,3 +33,10 @@ export const canAfford=(pid,type)=>lacking(pid,type).length===0;
 export function combatVehicles(pid){let n=0;for(const u of G.units) if(!u.dead&&u.owner===pid&&u.def.combat) n++;for(const i of G.players[pid].q.factory) if(UNITS[i.type].combat) n++;return n;}
 export function droneCount(pid){let n=0;for(const u of G.units) if(!u.dead&&u.owner===pid&&u.def.cls==='air'&&u.def.prod==='droneshop') n++;return n+G.players[pid].q.droneshop.length;}
 export function pay(pid,type,sign){const p=G.players[pid],c=costOf(type,pid);for(const k in c){if(k==='pop')p.pop-=sign*c.pop;else p.res[k]-=sign*c[k];}}
+
+/** Kommandopunkte: Obergrenze (16, je weiteres Fahrzeugwerk +4), belegt durch lebende Einheiten und Warteschlangen */
+export function cmdCap(pid){ const f=G.buildings.filter(b=>!b.dead&&!b.site&&b.owner===pid&&b.type==='factory').length; return COMMAND.base+COMMAND.perFactory*Math.min(COMMAND.maxExtra,Math.max(0,f-1)); }
+export function cmdUsed(pid){ const p=G.players[pid]; let n=0;
+  for(const u of G.units) if(!u.dead&&u.owner===pid&&u.def.cmd) n+=u.def.cmd;
+  for(const qn in p.q) for(const it of p.q[qn]) n+=(UNITS[it.type]&&UNITS[it.type].cmd)||0;
+  return n; }

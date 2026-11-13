@@ -6,7 +6,8 @@ const newGame = (d = 'mittel', fog = true, mode = 'endless', opts: any = {}) => 
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar, addAtt as addAttT } from '../src/sim/world';
-import { enqueue, missingReq } from '../src/sim/production';
+import { enqueue, missingReq, available } from '../src/sim/production';
+import { lacking as lackingT } from '../src/sim/costs';
 import { launchNuke, inFallout, rebuildFallMap } from '../src/sim/nuke';
 import { aiThink } from '../src/ai/kastrova';
 import { applyDecision, llmActive, parseDecision, strategistPrompt } from '../src/ai/strategist';
@@ -41,7 +42,8 @@ import { aiChar, revealPersona, personaKnown } from '../src/ai/persona';
 import { fire, evMul, evOn, evMarket } from '../src/sim/happen';
 import { priceFactor } from '../src/sim/market';
 import { startDev, fitModule, fitPlan, fitBlock, rankOf, creditKill, weightOf } from '../src/sim/modules';
-import { aiArmory, wishList } from '../src/ai/armory';
+import { aiArmory, wishList, aiFleet } from '../src/ai/armory';
+import { cmdCap, cmdUsed, cmdFree } from '../src/sim/production';
 import { MAPTYPES, UNITS } from '../src/data/config';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
@@ -408,7 +410,8 @@ describe('Simulation', () => {
     const hq = findBuilding(1, 'hq');
     const t1 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 8), t2 = spawnAt(1, 'mbt', hq.x + 8, hq.y + 10); t2.cage = true;
     applyDamage(t1, 80, 'drone', {owner:0, dead:true, x:0, y:0}); applyDamage(t2, 80, 'drone', {owner:0, dead:true, x:0, y:0});
-    expect(t1.dead).toBe(true);                       // ein Treffer genügt
+    expect(t1.dead || t1.hp < t1.maxHp * 0.4).toBe(true);   // ein Treffer: Panzer schwer beschädigt (Elite-Panzer halten mehr aus)
+    applyDamage(t1, 80, 'drone', {owner:0, dead:true, x:0, y:0}); expect(t1.dead).toBe(true);   // zwei genügen
     expect(t2.dead).toBeFalsy();                      // Käfig: Panzer überlebt
     expect(t2.maxHp - t2.hp).toBeLessThan(t2.maxHp * 0.45);
     const m = spawnAt(1, 'mlrs', hq.x + 10, hq.y + 8); applyDamage(m, 80, 'drone', {owner:0, dead:true, x:0, y:0});
@@ -1102,6 +1105,20 @@ describe('Simulation', () => {
     // Sichtung: Aldoria sieht den ausgerüsteten Panzer
     G.known[0][1] = true; tank.x = G.players[0] && findBuilding(0, 'hq').x + 3; tank.y = findBuilding(0, 'hq').y; tank.mode = 'idle'; tank.path = null;
     run(5); expect(knows(0, 1).mods && knows(0, 1).mods.era).toBe(true);
+  });
+  it('Kommandopunkte: Fahrzeuge begrenzt, Infanterie nicht; KI füllt ihren Fahrzeugpark', () => {
+    newGame('mittel'); noBandits(); const p = G.players[0], hq = findBuilding(0, 'hq');
+    placeBuilding(0, 'barracks', hq.tx + 5, hq.ty, true); placeBuilding(0, 'factory', hq.tx - 6, hq.ty + 4, true);
+    expect(cmdCap(0)).toBe(16); expect((UNITS.mbt as any).cmd).toBe(3); expect((UNITS.inf as any).cmd).toBeFalsy();
+    for (let i = 0; i < 5; i++) spawnAt(0, 'mbt', hq.x + 8, hq.y + i);   // 15 Punkte
+    expect(cmdUsed(0)).toBe(15); p.res.money = 99999; p.res.metal = 999; p.res.oil = 999; p.tech = 3;
+    expect(enqueue(0, 'mbt')).toBe(false); expect(enqueue(0, 'apc')).toBe(true); expect(cmdFree(0)).toBe(0);
+    expect(enqueue(0, 'inf')).toBe(true);                                 // Infanterie bleibt Masse
+    placeBuilding(0, 'factory', hq.tx - 6, hq.ty - 6, true); expect(cmdCap(0)).toBe(20);
+    // KI: Fahrzeugwerk wird nach Persönlichkeit belegt
+    const K = G.players[1], kh = findBuilding(1, 'hq'); placeBuilding(1, 'factory', kh.tx + 6, kh.ty, true);
+    G.ais[1].persona = {opening: 'rush', traits: []}; K.res.money = 5000; K.res.metal = 500; K.res.oil = 300;
+    aiFleet(1, {war: false, lead: false, urgent: false, saving: false}); expect(K.q.factory[0] && K.q.factory[0].type).toBe('mbt');
   });
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();

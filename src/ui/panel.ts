@@ -1,10 +1,10 @@
 import { $$ } from './dom';
 import { fmt } from '../core/util';
-import { AIS, BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType } from '../data/config';
+import { AIS, BUILDINGS, DEF, ECON, FACTIONS, FEATURES, NUKE, RES, RESEARCH, TILE, UNITS, hasTech, isDefType , COMMAND } from '../data/config';
 import { drawBuildingShape, drawFeature, drawRoad, drawUnitShape } from '../render/draw';
 import { canAfford, costOf, lacking } from '../sim/costs';
 import { nextMilestone } from '../sim/economy';
-import { cancelItem, enqueue, missingReq, queueName } from '../sim/production';
+import { cancelItem, cmdCap, cmdFree, cmdUsed, enqueue, missingReq, queueName } from '../sim/production';
 import { G } from '../sim/state';
 import { evActive } from '../sim/happen';
 import { atWar } from '../sim/world';
@@ -92,6 +92,7 @@ export function buildClick(k){
   if(k==='nuke'&&(p.nukes||0)+p.q.silo.length>=NUKE.maxStock){msg(`Höchstens ${NUKE.maxStock} Atomraketen gleichzeitig.`,'#ffb38a');return;}
   if(k==='nuke'&&p.q.silo.length){msg('Im Silo wird bereits eine Rakete gebaut.','#ffb38a');return;}
   if(RESEARCH[k]){ if(hasTech(p,k)){msg('Bereits erforscht.');return;} if(p.q.research.length){msg('Die Universität forscht bereits.','#ffb38a');return;} }
+  if(UNITS[k]&&UNITS[k].cmd&&cmdFree(0)<UNITS[k].cmd){ msg(`🎖 Kommandopunkte voll (${cmdUsed(0)}/${cmdCap(0)}) – ${UNITS[k].name.replace(/\u00AD/g,'')} braucht ${UNITS[k].cmd}. Ein weiteres Fahrzeugwerk bringt +${COMMAND.perFactory} (höchstens zwei), Verluste machen Punkte frei.`,'#ffb38a'); return; }
   const lack=lacking(0,k);
   if(lack.length){msg('Es fehlt: '+lack.map(r=>r==='pop'?`Einwohner (mind. ${ECON.minPop} müssen bleiben)`:RES[r].name).join(', '),'#ffb38a');return;}
   enqueue(0,k);
@@ -105,13 +106,14 @@ export function updatePanel(){
     if(RESEARCH[k]||(UNITS[k]&&UNITS[k].cls==='veh')||k==='farm'){ const ch=costHtml(costOf(k,0)); if(b.cost!==ch){ b.cost=ch; const c=b.el.querySelector('.c'); if(c) c.innerHTML=ch; } }   // steigende Forschungskosten, Kfz-Rabatt
     b.el.classList.toggle('ready',G.placing===k);
     b.el.classList.toggle('locked',miss.length>0);
-    b.el.classList.toggle('poor',!miss.length&&!canAfford(0,k)&&!n);
+    const full=!!(UNITS[k]&&UNITS[k].cmd&&cmdFree(0)<UNITS[k].cmd);
+    b.el.classList.toggle('poor',!miss.length&&(!canAfford(0,k)||full)&&!n);
     b.pr.style.width=cur?(cur.t/cur.time*100)+'%':'0';
     b.q.style.display=n>0&&!isDefType(k)?'block':'none'; b.q.textContent=String(n);
     if(RESEARCH[k]&&hasTech(p,k)){ b.el.classList.add('locked','done'); b.st.textContent='✓ erforscht'; continue; }
     if(k==='nuke'&&p.nukes>0&&!cur){ b.st.textContent=`☢ ${p.nukes} bereit – Silo wählen`; continue; }
     if(cur&&cur.stalled){ b.st.textContent=cur.stalled; continue; }
-    b.st.textContent=G.placing===k?(isDefType(k)?'Feld antippen…':'Bauplatz antippen…'):miss.length?'benötigt: '+miss.join(', '):'';
+    b.st.textContent=G.placing===k?(isDefType(k)?'Feld antippen…':'Bauplatz antippen…'):miss.length?'benötigt: '+miss.join(', '):full?`🎖 voll (${cmdUsed(0)}/${cmdCap(0)})`:'';
   }
   $('#rMoney').textContent='$'+fmt(p.res.money);
   $('#rFood').textContent=fmt(p.res.food);
@@ -125,6 +127,7 @@ export function updatePanel(){
   $('#rOil').textContent=fmt(p.res.oil);
   const pw=$('#power'); pw.textContent=`⚡ ${p.use}/${p.power}`; pw.classList.toggle('low',p.use>p.power);
   $('#popMe').textContent=`${Math.floor(p.pop)}/${p.cap}`;
+  { const el=$('#cmdMe'); if(el){ const u=cmdUsed(0), c=cmdCap(0), t=`🎖 ${u}/${c}`; if(el.textContent!==t){ el.textContent=t; el.classList.toggle('full',u>=c); } } }
   { const ev=evActive(), el=$('#evPill') as HTMLElement; el.hidden=!ev.length;
     if(ev.length){ const h=ev.map(e=>`<span title="${e.txt}">${e.icon} ${e.name} ${Math.floor(e.left/60)}:${String(Math.floor(e.left%60)).padStart(2,'0')}</span>`).join(''); if(el.innerHTML!==h) el.innerHTML=h; } }
   { const h=p.happy??0.8, el=$('#happy'); el.textContent=`${h>=0.75?'😊':h>=0.5?'😐':h>=0.35?'😟':'😠'} ${Math.round(h*100)} %`; el.classList.toggle('low',h<0.5); }

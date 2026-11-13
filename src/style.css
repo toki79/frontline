@@ -222,6 +222,7 @@ body.held #pauseTag{display:block}
 #llm .seg.on{background:#4a3f7a;border-color:#8a7ad0;color:#fff}
 #llm .seg.copy{margin-left:auto;font-weight:500;opacity:.85}
 
+#cmdMe{margin-left:8px;color:#d8c890}#cmdMe.full{color:#ffb38a}
 /* Werkstatt */
 #werk .card{max-width:760px}
 .wcard{border:1px solid #3a4430;border-radius:9px;padding:8px 10px;margin:6px 0;background:#161b10}

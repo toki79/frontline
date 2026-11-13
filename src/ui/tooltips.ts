@@ -1,6 +1,7 @@
+import { cmdCap, cmdUsed } from '../sim/production';
 import { $$ } from './dom';
 import { clamp, fmt } from '../core/util';
-import { AIS, AI_CHAR, BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, DEPOSIT, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType } from '../data/config';
+import { AIS, AI_CHAR, BUILDINGS, CAGE, CONSTRUCTION, DEF, JAM, DEF_RADIUS, DENSITY, HAUL, MOOD, PIONEER, DEPOSIT, FORT, DRONE, EMERGENCY, BIOFUEL, FUN, FIRE, FOREST, AIR, FORTIFY, NUKE, RESEARCH_SPEED, STORAGE, DRONES_PER_SHOP, ECON, EXPORT, FEATURES, NOISE_R, REGION, RES, RESEARCH, TECH_UNLOCKS, VEH_PER_FACTORY, UPGRADES, hasTech, isDefType , COMMAND, UNITS } from '../data/config';
 import { lacking } from '../sim/costs';
 import { upgradeEffect } from '../sim/build';
 import { nextMilestone, rankOf } from '../sim/economy';
@@ -90,7 +91,8 @@ export function tipFor(k){
     if(d.radar) L.push(`Radar ${d.radar} Felder: entdeckt getarnte Hochflieger in der Nähe.`);
     if(d.emergency) L.push(`🚨 <b>Notstand:</b> nur verfügbar, wenn die Stadt in den letzten ${Math.round(EMERGENCY.window/60)} Minuten angegriffen wurde oder Krieg herrscht. Kostet kein Geld und keinen Sold – auch bei leerer Kasse sofort bereit. Höchstens ${EMERGENCY.maxVolunteers} Trupps; ist es ${Math.round(EMERGENCY.disband/60*10)/10} Minuten ruhig, gehen die Freiwilligen wieder nach Hause.`);
     if(k==='drone') L.push(`Billig, aber tödlich für Fahrzeuge: <b>ein Treffer zerstört Kampfpanzer oder Raketenwerfer</b> (mit Gitterkäfig braucht es 3–4). 📡 Funkreichweite ${DRONE.fpvRange} Felder ab eigenen Gebäuden – sie wirken im Grenzgebiet; Grenzbunker erweitern die Reichweite, erforschte KI um ${DRONE.fpvRangeAI}. Gegenmittel: Käfige, Störsender, Flakpanzer, Flugabwehr.`);
-    if(d.combat) L.push(`Höchstens ${VEH_PER_FACTORY} Kampffahrzeuge je Fahrzeugwerk. Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
+    if(d.cmd) L.push(`Belegt 🎖 ${d.cmd} Kommandopunkte (Obergrenze ${COMMAND.base}, je weiteres Fahrzeugwerk +${COMMAND.perFactory}).`);
+    if(d.combat) L.push(`Verbraucht ${f1(d.upkeep)} 🛢 Öl pro Sekunde (ohne Öl halbes Tempo).`);
     if(d.armor==='airHigh') L.push('Fliegt hoch und getarnt: Gegner sehen sie nur, wenn ihre Flugabwehr sie per Radar erfasst (oder ganz kurz nachdem sie feuert). Selbst dann tun ihr nur Flugabwehr und kaum Maschinenkanonen etwas.');
     if(d.sortie) L.push(`✈ Startet vom Fliegerhorst, fliegt zum befohlenen Ziel, wirft eine Bombe und kehrt zum Nachladen (${AIR.rearm} s) zurück – danach fliegt er dasselbe Ziel erneut an, bis es zerstört ist. Ohne Forschung „Gleitbomben“ muss er das Ziel überfliegen (Flak!), mit Gleitbomben wirft er aus ${2+AIR.glideExtra} Feldern. Höchstens ${AIR.perBase} je Fliegerhorst. Ziele jenseits der eigenen Sicht müssen aufgeklärt sein.`);
     if(d.swarm) L.push(`🐝 ${d.swarm} Drohnen in einer Einheit: Jeder Treffer kostet eine Drohne, der Rest sucht sich das nächste Ziel. Autonom – Störsender wirken nicht, Funkreichweite +${AIR.swarmRangeExtra} Felder. Gegenmittel: Flugabwehr, Flakpanzer, MGs.`);
@@ -124,6 +126,7 @@ export const HUD_TIPS: Record<string, ()=>string> = {
     return `<b>👥 Einwohner: ${Math.floor(p.pop)} von ${p.cap} Wohnraum</b><br>${G.mode==='race'?`Siegziel: ${ECON.target} Einwohner (Balken).`:`Stadtstufe: <b>${ECON.ranks[rankOf(p.pop)][1]}</b> · Balken = Weg zur nächsten Stufe (${nextMilestone(p.pop)}).`} Wachstum zurzeit ${p.growth>=0?'+':''}${f1((p.growth||0)*60)} pro Minute.<br>Neue Bewohner ziehen zuerst in die ruhigsten Häuser.${why?`<br><span style="color:#ffb38a">${why}</span>`:''}<br><span class="dim">Soldaten kosten Einwohner. Zerstörte Wohnhäuser vertreiben Bewohner.</span>`;},
   popAi1:()=>popAiTip(1), popAi4:()=>popAiTip(4),
   llm1:()=>llmTip(1), llm4:()=>llmTip(4),
+  cmd:()=>{ const u=cmdUsed(0), c=cmdCap(0); return `<b>🎖 Kommandopunkte: ${u} von ${c} belegt</b><br>Fahrzeuge und Flugzeuge sind teure Einzelstücke: ${Object.entries(COMMAND.pts).map(([k,n])=>`${UNITS[k].name.replace(/\u00AD/g,'')} ${n}`).join(', ')}. Schützen, Panzerabwehr und Drohnen kosten nichts.<br>Jedes weitere Fahrzeugwerk bringt +${COMMAND.perFactory} (höchstens +${COMMAND.perFactory*COMMAND.maxExtra}). Verluste machen Punkte frei – Veteranen und Ausrüstung aber sind dann weg.`; },
   power:()=>{const p=G.players[0];return `<b>⚡ Strom: ${p.use} verbraucht / ${p.power} erzeugt</b><br>${p.use>p.power?'<span style="color:#ff9a8a">Mangel! Produktion, Wachstum und Abwehr laufen nur halb so schnell → Kraftwerk bauen.</span>':`Noch ${p.power-p.use} frei. Ein Kraftwerk liefert +100.`}`;},
   stance1:()=>stanceTip(1), stance4:()=>stanceTip(4),
 };

@@ -1,6 +1,6 @@
 import { idx, inMap } from '../core/util';
-import { FAMINE, INTEL, RTREE, isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS } from '../data/config';
-import { canAfford, costOf, famine, pay } from '../sim/costs';
+import { FAMINE, INTEL, RTREE, isMajor, CONSTRUCTION, lvlMul, BUILDINGS, BUILD_RADIUS, DEF, DEF_RADIUS, ECON, EMERGENCY, FEATURES, FORT, hasTech, isDefType, isPlain, NUKE, RESEARCH, RESEARCH_SPEED, T, TECH_UNLOCKS, TERRAIN, UNITS , COMMAND } from '../data/config';
+import { canAfford, cmdCap, cmdUsed, costOf, famine, pay } from '../sim/costs';
 import { G } from '../sim/state';
 import { intelEvent, mastery, branchCount } from '../sim/intel';
 import { endGame } from '../sim/combat';
@@ -38,12 +38,15 @@ export function exclBlock(p,type){ const g=RESEARCH[type]&&RESEARCH[type].excl; 
 /** Notstand: Stadt kürzlich angegriffen oder Krieg */
 export const emergency = pid => isMajor(pid)&&anyWar(pid) || !!(G.players[pid].lastAttack&&G.t-G.players[pid].lastAttack.t<EMERGENCY.window);
 export const available=(pid,type)=>missingReq(pid,type).length===0;
+export { cmdCap, cmdUsed };
+export const cmdFree=pid=>cmdCap(pid)-cmdUsed(pid);
 export function enqueue(pid,type){
   const p=G.players[pid], qn=queueName(type), q=p.q[qn]; if(!q) return false;
   if(!available(pid,type)||!canAfford(pid,type)) return false;
   if(qn==='research'&&(q.length||hasTech(p,type))) return false;
   if(qn==='silo'&&(q.length||(p.nukes||0)>=NUKE.maxStock)) return false;
   if(q.length>=(qn==='factory'?2:qn==='droneshop'?3:6)) return false;   // Fahrzeuge nur in kleinen Stückzahlen vorbestellen
+  if(cmdFree(pid)<(DEF(type).cmd||0)) return false;   // Kommandopunkte voll
   pay(pid,type,1); q.push({type,t:0,time:DEF(type).time});
   if(qn==='research'&&isMajor(pid)) intelEvent(pid,'research',type);   // fremde Geheimdienste können davon erfahren
   return true;

@@ -156,7 +156,7 @@ export const ECON = {
   ranks: <[number,string][]>[[0,'Dorf'],[100,'Kleinstadt'],[250,'Stadt'],[500,'Großstadt'],[1000,'Metropole'],[2000,'Weltstadt']],
 };
 export const RES = {money:{icon:'$',name:'Geld'}, food:{icon:'🌾',name:'Nahrung'}, wood:{icon:'🪵',name:'Holz'}, stone:{icon:'🪨',name:'Stein'}, metal:{icon:'⛏',name:'Metall'}, oil:{icon:'🛢',name:'Öl'}, pop:{icon:'👥',name:'Einwohner'},
-  vehcap:{icon:'🛠',name:`Fahrzeuglimit (${VEH_PER_FACTORY} je Fahrzeugwerk)`}, dronecap:{icon:'🛠',name:`Drohnenlimit (${DRONES_PER_SHOP} je Werkstatt)`}, jetcap:{icon:'🛠',name:'Flugzeuglimit (4 je Fliegerhorst)'}};
+  vehcap:{icon:'🛠',name:'Fahrzeugwerk'}, cmd:{icon:'🎖',name:'Kommandopunkte'}, dronecap:{icon:'🛠',name:`Drohnenlimit (${DRONES_PER_SHOP} je Werkstatt)`}, jetcap:{icon:'🛠',name:'Flugzeuglimit (4 je Fliegerhorst)'}};
 // ---------- Gelände ----------
 export const TERRAIN = [
   {key:'grass',  name:'Steppe',    col:['#6f7e45','#73834a','#6a7942'], cost:{inf:1,  veh:1, amph:1},   cover:0,    build:true},
@@ -262,6 +262,17 @@ export const UNITS = {
           weapon:{type:'bullet', dmg:7, range:4, rof:1.0}, prod:null, desc:'Überfällt Arbeiter, Laster und Außenposten'},
   // Drohnen und Raketenwerfer: siehe drawUnitShape
 };
+// ---------- Kommandopunkte: wenige, wertvolle Fahrzeuge statt Masse ----------
+// Infantrie, Drohnen und Versorger kosten keine Punkte – die Masse bleibt. Fahrzeuge und Flugzeuge
+// sind teurer, robuster und begrenzt; man rüstet sie in der Werkstatt aus.
+export const COMMAND = {
+  base: 16, perFactory: 4, maxExtra: 2,          // 16 Punkte, je weiteres Fahrzeugwerk +4 (höchstens zwei)
+  pts: {apc:1, jammer:1, ifv:2, spaag:2, amphib:2, swarm:2, mbt:3, mlrs:3, reaper:3, jet:3, tel:3, heavy:5},
+  elite: {hp:1.3, cost:1.25, time:1.15},         // Fahrzeuge mit Kommandopunkten: robuster, teurer
+};
+for(const [k,n] of Object.entries(COMMAND.pts)){ const u:any=UNITS[k]; if(!u) continue; u.cmd=n;
+  u.hp=Math.round(u.hp*COMMAND.elite.hp); u.time=Math.round(u.time*COMMAND.elite.time);
+  for(const r of ['money','metal','oil']) if(u.cost[r]) u.cost[r]=Math.round(u.cost[r]*COMMAND.elite.cost/5)*5; }
 // ---------- Gebäude ----------
 // cap = Wohnraum, food/metal = Produktion pro Sekunde, needsOre = muss an Erz grenzen
 export const BUILDINGS = {
@@ -292,7 +303,7 @@ export const BUILDINGS = {
   derrick: {name:'Bohrturm',      w:2,h:2, hp:600,  power:-40, cost:{money:1500, stone:100, metal:150}, time:20, req:[], research:'deepdrill', oilOut:1.2, noise:0.3, sight:4, desc:'Fördert 1,2 Öl/s aus der Tiefe – überall baubar, braucht Strom'},
   refinery:{name:'Raffinerie',    w:3,h:2, hp:900,  power:-30, cost:{money:700, stone:60}, time:11, req:['power'], spawn:'truck', noise:0.4, sight:5, refine:3, tank:800, desc:'Verarbeitet Rohöl (3 Öl/s), inkl. Tanklaster'},
   barracks:{name:'Kaserne',       w:2,h:2, hp:700,  power:-20, cost:{money:200, wood:40, stone:20}, time:7, req:['power'], noise:0.15, sight:5, desc:'Bildet Infanterie aus'},
-  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:1800, metal:180, stone:160}, time:20, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge (max. ${VEH_PER_FACTORY} Kampffahrzeuge je Werk)`},
+  factory: {name:'Fahrzeugwerk',  w:3,h:3, hp:1100, power:-40, cost:{money:1800, metal:180, stone:160}, time:20, req:['barracks'], noise:0.35, sight:5, desc:`Baut Fahrzeuge. Jedes weitere Werk bringt +4 Kommandopunkte (höchstens zwei weitere)`},
   kontor:  {name:'Handelskontor', w:2,h:2, hp:600, power:-10, cost:{money:400, wood:60}, time:9, req:[], noise:0.15, sight:4, export:4,
             desc:'Exportiert Überschüsse automatisch gegen Geld'},
   university:{name:'Universität', w:3,h:2, hp:700, power:-30, cost:{money:900, metal:60, stone:120}, time:16, req:['power'], sight:4, desc:'Forschung: Stufe 1, ausbaubar bis Stufe 3'},
