@@ -155,6 +155,8 @@ export function destroy(e,src){
     for(let y=e.ty;y<e.ty+e.h;y++)for(let x=e.tx;x<e.tx+e.w;x++) if(G.occ[idx(x,y)]===e.id) G.occ[idx(x,y)]=0;
     for(let i=0;i<6;i++) fxAdd({k:'boom',x:e.x+(Math.random()-.5)*e.w,y:e.y+(Math.random()-.5)*e.h,r:0.6+Math.random()*0.8,life:0.7+Math.random()*0.5,delay:i*0.12});
     G.scorch.push({x:e.x,y:e.y,r:Math.max(e.w,e.h)*0.7,t:G.t});
+    if(!e.def.def&&e.type!=='wall'){ G.rubble=(G.rubble||[]).filter(r=>G.t-r.t<r.life).slice(-40); G.rubble.push({x:e.x,y:e.y,w:e.w,h:e.h,t:G.t,life:150}); }   // Trümmer bleiben eine Weile liegen
+    for(let i=0;i<4;i++) fxAdd({k:'smoke',x:e.x+(Math.random()-.5)*e.w*0.7,y:e.y+(Math.random()-.5)*e.h*0.7,r:0.5+Math.random()*0.4,life:2.5+Math.random()*2,col:1,delay:0.4+i*0.5});
     recalcPower(e.owner);
     for(const n of touching(e)) ignite(n);   // Feuer springt auf direkt angrenzende Gebäude über
     if(e.type==='npp'&&!e.site){ msg('☢ Kernschmelze! Das zerstörte Kernkraftwerk verstrahlt die Umgebung.','#ff5a4a'); const M=NUKE.meltdown; blast(e.x,e.y,M.radius,M.dmg,M.fallout,null); }
@@ -170,7 +172,8 @@ export function destroy(e,src){
   } else {
     const big=e.def.cls==='veh'; if(e.def.cls==='air') fxAdd({k:'boom',x:e.x,y:e.y,r:0.3,life:0.3});
     fxAdd({k:'boom',x:e.x,y:e.y,r:big?0.8:0.35,life:big?0.8:0.4});
-    if(big) G.scorch.push({x:e.x,y:e.y,r:0.6,t:G.t});
+    if(big){ G.scorch.push({x:e.x,y:e.y,r:0.6,t:G.t}); G.wrecks=(G.wrecks||[]).filter(w=>G.t-w.t<w.life).slice(-60); G.wrecks.push({x:e.x,y:e.y,a:e.angle||0,size:e.def.size,t:G.t,life:90});   // Wrack
+      for(let i=0;i<5;i++) fxAdd({k:'smoke',x:e.x+(Math.random()-.5)*0.4,y:e.y+(Math.random()-.5)*0.4,r:0.3+Math.random()*0.25,life:2+Math.random()*2,col:1,delay:0.3+i*0.9}); }
     if(e.owner===0) G.stats.lost++;
     noteLoss(e);   // ggf. automatisch nachbauen
     if(src&&src.owner===0&&e.owner!==0) G.stats.kills++;

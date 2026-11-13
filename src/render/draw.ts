@@ -5,7 +5,7 @@ export function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
 /* =====================================================================
    Zeichnen
    ===================================================================== */
-export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
+export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf,rec=0){
   c.save(); c.translate(x,y);
   if(type==='inf'||type==='at'||type==='militia'||type==='bandit'||type==='volunteer'||type==='para'){
     const n=Math.max(1,Math.ceil(hpf*3-0.01)), offs=[[4,0],[-3,-5],[-3,5]];
@@ -50,7 +50,7 @@ export function drawUnitShape(c,type,col,dark,x,y,ang,tur,hpf){
     c.fillStyle='#2b2b26'; c.fillRect(-L/2,-Wd/2-1,L,3.2); c.fillRect(-L/2,Wd/2-2.2,L,3.2);
     c.fillStyle=col; c.strokeStyle=dark; c.lineWidth=1.2; rr(c,-L/2+1,-Wd/2+1.5,L-2,Wd-3,2.5); c.fill(); c.stroke();
     c.fillStyle='rgba(255,255,255,.12)'; c.fillRect(-L/2+3,-Wd/2+3,L-8,2);
-    c.rotate(tur-ang);
+    c.rotate(tur-ang); if(rec) c.translate(-rec*(hv?3.2:big?2.6:1.5),0);   // Rückstoß
     c.fillStyle=dark;
     if(hv){ c.fillRect(4,-2.1,19,4.2); c.fillRect(21,-2.8,3,5.6); c.fillStyle=col; rr(c,-8,-7,15,14,3); c.fill(); c.strokeStyle=dark; c.stroke();   // schwerer Turm, Mündungsbremse
       c.fillStyle='rgba(255,255,255,.14)'; c.fillRect(-6,-5.5,10,2); c.fillStyle=dark; c.beginPath(); c.arc(-3,-2,1.8,0,7); c.fill(); c.fillRect(-7,3,5,2.4); }
@@ -138,7 +138,11 @@ export function drawBuildingShape(c,type,col,dark,px,py,w,h,tur,extra?,lvl=1){
   c.strokeStyle='#5e5d55'; c.lineWidth=1; c.strokeRect(1.5,1.5,W-3,H-3);
   const box=(x,y,ww,hh,f,s?)=>{c.fillStyle=f;c.fillRect(x,y,ww,hh);if(s){c.strokeStyle=s;c.strokeRect(x+0.5,y+0.5,ww-1,hh-1);}};
   // Satteldach: sonnige obere Hälfte, schattige untere, Ziegelreihen, heller First, Kamin
-  const roof=(x,y,ww,hh,chim=true)=>{ c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(x+2,y+3,ww,hh);
+  const roof=(x,y,ww,hh,chim=true)=>{ c.fillStyle='rgba(0,0,0,.22)'; c.fillRect(x+3,y+5,ww,hh+3);
+    // Südwand unter der Traufe: Putz, Sockel, Fenster und Tür – gibt dem Haus Höhe
+    c.fillStyle='#cdc3aa'; c.fillRect(x+0.5,y+hh-1,ww-1,5); c.fillStyle='rgba(0,0,0,.28)'; c.fillRect(x+0.5,y+hh+3,ww-1,1);
+    c.fillStyle='#3d4a5a'; for(let k=x+3;k<x+ww-5;k+=6){ if(Math.abs(k-(x+ww/2-1.5))<3) continue; c.fillRect(k,y+hh+0.3,2.4,2.2); }
+    c.fillStyle='#5a4028'; c.fillRect(x+ww/2-1.5,y+hh,3,4);
     box(x,y,ww,hh,col,dark); c.fillStyle='rgba(255,250,230,.16)'; c.fillRect(x+1,y+1,ww-2,hh/2-1); c.fillStyle='rgba(0,0,0,.24)'; c.fillRect(x+1,y+hh/2,ww-2,hh/2-1);
     c.strokeStyle='rgba(0,0,0,.16)'; c.lineWidth=0.8; c.beginPath(); for(let k=y+3;k<y+hh-1;k+=3){ if(Math.abs(k-(y+hh/2))<1.2) continue; c.moveTo(x+1,k); c.lineTo(x+ww-1,k); } c.stroke();
     c.strokeStyle='rgba(255,245,220,.45)'; c.lineWidth=1.2; c.beginPath(); c.moveTo(x+1,y+hh/2); c.lineTo(x+ww-1,y+hh/2); c.stroke(); c.lineWidth=1;
