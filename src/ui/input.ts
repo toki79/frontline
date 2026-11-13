@@ -157,6 +157,10 @@ export function cmd(c){
   else if(c==='all'){G.sel=G.units.filter(u=>!u.dead&&u.owner===0&&u.def.weapon);G.amoveMode=false;}
   else if(c==='group'){ const fight=mine.filter(u=>u.def.weapon||u.def.jam);
     if(fight.length<2) msg('Für einen Verband mindestens zwei kampffähige Einheiten auswählen (Rahmen ▢ oder Doppeltipp).','#ffb38a');
+    else if(new Set(fight.filter(u=>u.grp).map(u=>u.grp)).size===1&&fight.some(u=>!u.grp)){   // Mitglieder eines Verbands + freie Einheiten: zum Verband hinzufügen
+      const g:any=(G.groups||[]).find(x=>x.id===fight.find(u=>u.grp).grp), add=fight.filter(u=>!u.grp), lead=fight.find(u=>u.grp&&u.order);
+      if(g){ g.want=g.want||{}; for(const u of add){ u.grp=g.id; g.want[u.type]=(g.want[u.type]||0)+1; if(lead){ u.order=lead.order; u.area=lead.area; u.msn=lead.msn; } }
+        msg(`🎖 ${add.length} Einheit${add.length===1?'':'en'} zur ${g.name} hinzugefügt – das Soll wurde mit erhöht.`,'#9fd88a'); } }
     else { const g=makeGroup(0,fight), st=groupState(g); G.sel=fight;
       msg(`🎖 ${g.name} gebildet: ${fight.length} Einheiten (${st.arms.map(a=>ARM_NAME[a]).join(', ')||'–'}). ${st.combined?'Verbundene Waffen: +'+Math.round(COMBINED.dmg*100)+' % Kampfkraft, −'+Math.round(COMBINED.def*100)+' % Schaden.':'Tipp: Infanterie, Fahrzeuge, Flugabwehr und Drohnen gemischt ergeben verbundene Waffen.'} Der Knopf 🎖 links in der Befehlsleiste wählt den Verband (zweimal tippen = hinschauen), Doppeltipp auf ein Mitglied ebenso.`,'#9fd88a'); } }
   else if(c.startsWith('grp')){ const g=(G.groups||[]).find(x=>x.id===Number(c.slice(3))); if(g){ const ms=members(g);
