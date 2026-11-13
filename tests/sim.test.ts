@@ -1138,6 +1138,9 @@ describe('Simulation', () => {
     q.pop = q.cap - 20; q.foodRate = 5; const m0 = q.res.money; citizenThink(0);          // Wohnraum knapp (5): kein Notfall
     expect(q.res.money).toBe(m0); expect(cit().block && cit().block.res).toBe('money');
     q.foodRate = 0; citizenThink(0); expect(q.res.money).toBeLessThan(m0);   // Nahrung reicht nicht (9): Notfall
+    // erschöpfte Mine wird abgerissen
+    { const hq0 = findBuilding(0, 'hq'), mn = placeBuilding(0, 'mine', hq0.tx + 9, hq0.ty + 6, true); mn.empty = true;
+      for (let i = 0; i < 8; i++) citizenThink(0); expect(mn.dead).toBe(true); }
     // ohne Zutun wächst die Stadt
     newGame('mittel'); devOf(0).build = true; const r = G.players[0], pop0 = r.pop;
     for (let i = 0; i < 20 * 420; i++) { update(0.05); if (G.offer) answerOffer(false); }

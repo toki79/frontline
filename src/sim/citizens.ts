@@ -4,7 +4,7 @@ import { msg } from '../core/events';
 import { countBuildings, findBuilding } from '../sim/world';
 import { available, enqueue } from '../sim/production';
 import { canAfford, costOf, famine } from '../sim/costs';
-import { hauls, orderRoadTo } from '../sim/build';
+import { demolish, hauls, orderRoadTo } from '../sim/build';
 import { fireCoverage } from '../sim/city';
 import { devOf, funCoverage } from '../sim/devplan';
 import { aiCanReachOre, aiPlace, expandTarget } from '../ai/kastrova';
@@ -77,6 +77,11 @@ export function citizenThink(pid=0){
   // Bauarbeiter: ohne sie entsteht nichts
   const workers=G.units.filter(u=>!u.dead&&u.owner===pid&&u.def.worker).length, wantW=Math.min(CITIZENS.maxWorkers,3+Math.floor(p.pop/80));
   if(workers<wantW&&!p.q.hq.length&&canAfford(pid,'worker')&&(workers<2||p.res.money>200)) enqueue(pid,'worker');
+  // Erschöpfte Betriebe abreißen: Mine und Steinbruch ohne Vorkommen, Holzfäller ohne Wald (außer ein Forsthaus forstet dort auf)
+  for(const b of G.buildings){ if(b.dead||b.site||b.owner!==pid||!b.empty||!(b.type==='mine'||b.type==='quarry'||b.type==='lumber')){ if(b.owner===pid) b.emptyT=0; continue; }
+    b.emptyT=(b.emptyT||0)+CITIZENS.think; if(b.emptyT<CITIZENS.emptyWait) continue;
+    if(b.type==='lumber'&&G.buildings.some(f=>!f.dead&&f.owner===pid&&f.type==='forester'&&Math.hypot(f.x-b.x,f.y-b.y)<=CITIZENS.foresterR)) continue;
+    demolish(pid,b); if(pid===0) msg(`🧹 Die Bürger reißen ab: ${name(b.type)} (erschöpft) – der Platz ist wieder frei.`,'#b8c8e0'); break; }
   // Straßen: Betriebe mit weitem Transportweg ans Lager anbinden (eine Straße nach der anderen, wenn genug Stein da ist)
   if((d.prio.lager||0)+(d.prio.rohstoffe||0)>0&&p.res.stone>=CITIZENS.roadStone&&!G.road.some((r,i)=>r===1&&G.roadOwner[i]===pid+1)){
     const far=G.buildings.filter(b=>!b.dead&&!b.site&&b.owner===pid&&hauls(b)&&(b.eff??1)<CITIZENS.roadEff&&G.t-(C.roadTry?.[b.id]??-999)>120).sort((a,b)=>(a.eff??1)-(b.eff??1));
