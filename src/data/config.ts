@@ -53,6 +53,7 @@ export const COMBAT_AI = {
   cover: 0.75, coverT: 3,               // Infanterie unter Feuer geht nach 3 s in Deckung (Schaden ×0,75)
   smokeMul: 0.35, smokeT: 6, smokeCd: 45, smokeVs: ['missile','shell'],   // Panzer: Nebelwand gegen Lenkwaffen und Granaten
   fleeHp: 0.25, fleeHit: 4, backHp: 0.8,   // unter 25 % und beschossen: Rückzug; ab 80 % zurück auf den alten Posten
+  rout: {ratio:1.8, minFoe:250, r:7, er:10, hit:5, homeR:12, wait:40, cool:60, fort:500},   // Rückzug der ganzen Gruppe, wenn der Feind örtlich 1,8× stärker ist
   fieldHeal: 0.005, fieldHealVeh: 0.003, fieldDelay: 20,   // Erholung im Feld je Sekunde (Anteil der Lebenspunkte), wenn 20 s kein Beschuss
 };
 export const FORTIFY = {dmgOut:1.3, direct:0.65, artillery:['rocket','ballistic','glide'], dugOut:1.15};

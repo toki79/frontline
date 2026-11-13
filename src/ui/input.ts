@@ -243,7 +243,7 @@ export function updateInfo(){
     if(e.kind==='unit'&&e.mods&&e.mods.length) t+=` · Ausrüstung ${e.mods.map(k=>MODULES[k].icon+' '+MODULES[k].name).join(', ')}${e.def.pod?(e.podAmmo>0?' · 🚀 Salve bereit':' · 🚀 leer – zu Hause nachladen'):''}${e.def.aps?` · 🛰 ${e.aps||0}/${e.def.aps}`:''}`;
     if(e.kind==='unit'&&e.fit) t+=` · 🔧 Einbau ${MODULES[e.fit.k].name} (${Math.ceil(e.fit.t)} s)`;
     if(e.kind==='building'&&e.type==='workshop'&&e.owner===0) t+=' · 🔧 öffnen: Werkstatt-Knopf unten';
-    if(e.kind==='unit'){ if(e.fleeing) t+=' · 🏃 zieht sich zurück, erholt sich'; else if(e.dugCover) t+=' · in Deckung'; if(e.smokeT>G.t) t+=' · 🌫 Nebelwand'; if(e.prevTarget&&!e.prevTarget.dead) t+=' · wehrt sich, dann zurück zum Ziel'; }
+    if(e.kind==='unit'){ if(e.fleeing) t+=e.fleeing.rout?' · 🏳 Rückzug vor Übermacht – sammelt sich, kehrt erholt zurück':' · 🏃 zieht sich zurück, erholt sich'; else if(e.dugCover) t+=' · in Deckung'; if(e.smokeT>G.t) t+=' · 🌫 Nebelwand'; if(e.prevTarget&&!e.prevTarget.dead) t+=' · wehrt sich, dann zurück zum Ziel'; }
     if(e.kind==='unit'&&e.mode==='escort'&&e.escort) t+=` · 🛡 begleitet ${e.escort.def.name}`;
     if(e.kind==='building'&&e.type==='camp') t+=' · Räuber greifen alles in der Umgebung an. Zerstören bringt Beute.';
     if(e.kind==='unit'&&e.def.battery) t+=` · Akku ${Math.round((e.battery??e.def.battery)/e.def.battery*100)} %`;

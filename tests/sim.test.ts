@@ -19,6 +19,7 @@ import { reinfOf } from '../src/sim/reinforce';
 import { depositTiles } from '../src/sim/world';
 import { findPath } from '../src/sim/pathfinding';
 import { devOf } from '../src/sim/devplan';
+import { localBalance } from '../src/sim/tactics';
 import { citizenThink, citizenWants, cit } from '../src/sim/citizens';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, continueGame, destroy } from '../src/sim/combat';
@@ -1143,6 +1144,26 @@ describe('Simulation', () => {
     for (let i = 0; i < 20 * 420; i++) { update(0.05); if (G.offer) answerOffer(false); }
     expect(r.pop).toBeGreaterThan(pop0 + 40); expect(countBuildings(0, 'farm')).toBeGreaterThan(0); expect(countBuildings(0, 'house')).toBeGreaterThan(0);
   }, 30000);
+  it('Rückzug vor der Übermacht: Gruppe löst sich geschlossen, Haltebefehl bleibt, Stadt wird verteidigt', () => {
+    newGame('mittel', false); noBandits(); setWar(0, 1, true, 0);
+    const hq = findBuilding(0, 'hq'), X = hq.x + 30, Y = hq.y - 30;
+    const mine = [0, 1, 2].map(k => spawnAt(0, 'inf', X + k * 0.6, Y)), holder = spawnAt(0, 'inf', X, Y + 1); holder.order = 'hold';
+    const foes = [0, 1, 2, 3].map(k => spawnAt(1, 'mbt', X + 4.5, Y - 1 + k * 0.8));
+    for (const u of mine) { u.mode = 'attack'; u.target = foes[0]; }
+    const B = localBalance(0, X, Y); expect(B.foe).toBeGreaterThan(B.own * 1.8);
+    for (let i = 0; i < 20 * 6 && !mine.every(u => u.dead || u.fleeing); i++) update(0.05);
+    const alive = mine.filter(u => !u.dead); expect(alive.length).toBeGreaterThan(0);
+    expect(alive.every(u => u.fleeing && u.mode === 'move')).toBe(true);
+    if (!holder.dead) expect(holder.fleeing).toBeFalsy();                 // bis zum letzten Mann
+    // in der eigenen Stadt wird nicht gewichen
+    const def = spawnAt(0, 'inf', hq.x + 4, hq.y + 4); for (let k = 0; k < 4; k++) spawnAt(1, 'mbt', hq.x + 8, hq.y + 3 + k * 0.8);
+    for (let i = 0; i < 20 * 4; i++) update(0.05);
+    expect(def.dead || !(def.fleeing && def.fleeing.rout)).toBe(true);
+    // erholt und nach der Wartezeit zurück zum Posten
+    const r = alive[0]; for (const u of G.units) if (u.owner === 1) u.dead = true;
+    for (let i = 0; i < 20 * 150 && r.fleeing; i++) update(0.05);
+    expect(r.fleeing).toBeFalsy();
+  }, 20000);
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); expect(G.terr.every((v, i) => v === a[i])).toBe(true); expect(G.ore.every((v, i) => v === ore[i])).toBe(true);

@@ -151,7 +151,7 @@ function behave(u,dt,firing){
       if(u.owner===0&&G.t-(G.fleeMsg||-99)>20){ G.fleeMsg=G.t; msg('🏃 Schwer getroffene Einheiten ziehen sich zurück, um sich zu erholen.','#ffb38a'); }
       return true; } }
   // erholt: zurück auf den alten Posten
-  if(u.fleeing&&u.mode==='idle'&&u.hp>=u.maxHp*COMBAT_AI.backHp){ const f=u.fleeing; u.fleeing=null; orderMove([u],f.x,f.y,'amove'); }
+  if(u.fleeing&&!u.fleeing.rout&&u.mode==='idle'&&u.hp>=u.maxHp*COMBAT_AI.backHp){ const f=u.fleeing; u.fleeing=null; orderMove([u],f.x,f.y,'amove'); }
   return false;
 }
 /** nächster sicherer Ort: eigenes Gebäude (am liebsten Rathaus, Kaserne, Fabrik) außer Reichweite des Gegners */

@@ -148,7 +148,7 @@ export function loot(e,src){
 }
 export function destroy(e,src){
   if(e.dead) return; e.dead=true; if(e.kind==='building'){ G.qDirty=true; G.roadDirty=true; }
-  creditKill(src,e); if(e.kind==='unit') mourn(e);
+  creditKill(src,e); if(e.kind==='unit'){ mourn(e); G.fallen=(G.fallen||[]).filter(f=>G.t-f.t<8); G.fallen.push({x:e.x,y:e.y,o:e.owner,t:G.t}); }   // Verluste: Kameraden merken, dass es ernst wird
   if(e.passengers) bailOut(e);   // Transporter: Mitfahrende springen ab
   loot(e,src);
   if(e.kind==='building'){

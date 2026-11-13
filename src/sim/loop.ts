@@ -11,6 +11,7 @@ import { famineAid } from '../sim/offers';
 import { updatePacts } from '../sim/pacts';
 import { updateEvents } from '../sim/happen';
 import { updateModules } from '../sim/modules';
+import { updateTactics } from '../sim/tactics';
 import { updateDev } from '../sim/devplan';
 import { updateCitizens } from '../sim/citizens';
 import { updateCity } from '../sim/city';
@@ -37,7 +38,7 @@ export function update(dt){
   if(G.roadDirty) updateRoadNet();
   G.visT-=dt; if(G.visT<=0){G.visT=0.25; updateVision();}
   for(const k in G.market) G.market[k]=Math.max(0,G.market[k]-MARKET_RECOVER*dt);
-  updateModules(dt);
+  updateModules(dt); updateTactics(dt);
   for(const u of G.units) if(!u.dead) updateUnit(u,dt);
   for(const b of G.buildings) if(!b.dead) updateBuilding(b,dt);
   updateProjectiles(dt);
