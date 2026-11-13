@@ -38,7 +38,7 @@ export function renderDev(){
   h+='<h4>Freigabe: so viel der Vorräte dürfen die Bürger verbauen</h4>';
   for(const r of ['money','wood','stone','metal']){ const ic=r==='money'?'💰 Geld':RES[r].icon+' '+RES[r].name;
     h+=`<div class="drow"><span class="dn">${ic}</span>`+DEV.release.map(v=>`<button data-d="r_${r}_${v}" class="${d.release[r]===v?'on':''}">${pct(v)}</button>`).join('')+'</div>'; }
-  h+='<div class="barl"><span>Engpässe haben Vorrang: zu wenig Wohnraum, Nahrung, Strom oder Unterhaltung lässt die Bürger dort zuerst ausbauen. Stellungen, Minen und Straßen nach Wunsch setzt ihr selbst; auch jedes Gebäude geht weiterhin von Hand (Bauleiste unten ausklappen). Ausbau von Hand: Gebäude wählen → ⬆ Ausbau. Ausgebaute Gebäude leisten ×1,4 bzw. ×1,9, kosten aber mehr Unterhalt.</span></div></div>';
+  h+='<div class="barl"><span>Engpässe haben Vorrang: zu wenig Wohnraum, Nahrung, Strom oder Unterhaltung lässt die Bürger dort zuerst ausbauen. Straßen zu abgelegenen Betrieben bauen die Bürger selbst. Stellungen und Minen setzt ihr selbst; auch jedes Gebäude geht weiterhin von Hand (Bauleiste unten ausklappen). Ausbau von Hand: Gebäude wählen → ⬆ Ausbau. Ausgebaute Gebäude leisten ×1,4 bzw. ×1,9, kosten aber mehr Unterhalt.</span></div></div>';
   // laufende Ausbauten
   const run=G.buildings.filter(b=>!b.dead&&b.owner===0&&b.upg);
   if(run.length) h+='<div class="party"><h3>⏳ Im Ausbau</h3>'+run.map(b=>`<div class="stat"><span>${b.def.name.replace(/­/g,'')} → Stufe ${lvlOf(b)+1}${b.autoUp?' (Bürger)':''}</span><b>${Math.floor(b.upg.t/b.upg.time*100)} %</b></div>`).join('')+'</div>';

@@ -106,6 +106,7 @@ export const DENSITY = {
 // Die Bürger bauen neue Gebäude selbst: Takt, gleichzeitige Baustellen, Gewicht der Priorität
 export const CITIZENS = {first:4, think:5, sites:2, sitesPer:400, maxWorkers:10, prioW:2, urgent:6, emergency:8, retry:60,
   big:700, saveT:240, saveGap:120,          // Großprojekte (ab 700 $): bis zu 4 min wird darauf gespart, dann 2 min Pause
+  roadStone:60, roadEff:0.85,               // Straße zu Betrieben, bei denen weniger als 85 % im Lager ankommen
   reserves:[0,500,1500,3000]};              // wählbare Rücklage für den Kommandanten (Truppen, Forschung)
 export const DEV = {
   cats: {wohnen:{name:'Wohnen', icon:'🏠', types:['house','block','hq']}, nahrung:{name:'Nahrung', icon:'🌾', types:['farm','greenhouse']},

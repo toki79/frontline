@@ -4,7 +4,7 @@ import { msg } from '../core/events';
 import { countBuildings, findBuilding } from '../sim/world';
 import { available, enqueue } from '../sim/production';
 import { canAfford, costOf, famine } from '../sim/costs';
-import { hauls } from '../sim/build';
+import { hauls, orderRoadTo } from '../sim/build';
 import { fireCoverage } from '../sim/city';
 import { devOf, funCoverage } from '../sim/devplan';
 import { aiCanReachOre, aiPlace, expandTarget } from '../ai/kastrova';
@@ -77,6 +77,11 @@ export function citizenThink(pid=0){
   // Bauarbeiter: ohne sie entsteht nichts
   const workers=G.units.filter(u=>!u.dead&&u.owner===pid&&u.def.worker).length, wantW=Math.min(CITIZENS.maxWorkers,3+Math.floor(p.pop/80));
   if(workers<wantW&&!p.q.hq.length&&canAfford(pid,'worker')&&(workers<2||p.res.money>200)) enqueue(pid,'worker');
+  // Straßen: Betriebe mit weitem Transportweg ans Lager anbinden (eine Straße nach der anderen, wenn genug Stein da ist)
+  if((d.prio.lager||0)+(d.prio.rohstoffe||0)>0&&p.res.stone>=CITIZENS.roadStone&&!G.road.some((r,i)=>r===1&&G.roadOwner[i]===pid+1)){
+    const far=G.buildings.filter(b=>!b.dead&&!b.site&&b.owner===pid&&hauls(b)&&(b.eff??1)<CITIZENS.roadEff&&G.t-(C.roadTry?.[b.id]??-999)>120).sort((a,b)=>(a.eff??1)-(b.eff??1));
+    for(const b of far){ (C.roadTry=C.roadTry||{})[b.id]=G.t; const n=orderRoadTo(pid,b);
+      if(n>0){ if(pid===0) msg(`🛣 Die Bürger bauen eine Straße zum ${name(b.type)} (${n} Felder) – kürzere Wege, mehr Ertrag.`,'#9fd88a'); break; } } }
   const sites=G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.site&&!b.pio&&!b.def.def);
   const max=CITIZENS.sites+Math.floor(p.pop/CITIZENS.sitesPer);
   const stuck=sites.filter(b=>(b.waitT||0)>90).length;
