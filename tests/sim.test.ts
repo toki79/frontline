@@ -41,6 +41,7 @@ import { aiChar, revealPersona, personaKnown } from '../src/ai/persona';
 import { fire, evMul, evOn, evMarket } from '../src/sim/happen';
 import { priceFactor } from '../src/sim/market';
 import { startDev, fitModule, fitPlan, fitBlock, rankOf, creditKill, weightOf } from '../src/sim/modules';
+import { aiArmory, wishList } from '../src/ai/armory';
 import { MAPTYPES, UNITS } from '../src/data/config';
 
 const run = (sec: number) => { for (let i = 0; i < sec * 20; i++) { update(0.05); if (G.offer) answerOffer(true); } };
@@ -1082,6 +1083,25 @@ describe('Simulation', () => {
     // Speichern/Laden: Ausrüstung bleibt wirksam
     const id = tank.id; loadGame(serialize()); const t2 = G.units.find(u => u.id === id);
     expect(t2.def.weapon.range).toBeCloseTo(r0 + 1.5); expect(t2.kills).toBe(5);
+  });
+  it('KI-Werkstatt: eigener Etat, Entwicklung nach Persönlichkeit, Einbau, Geheimdienst und Sichtung', () => {
+    newGame('mittel', false); noBandits(); const K = G.players[1], kh = findBuilding(1, 'hq');
+    G.ais[1].persona = {opening: 'igel', traits: []};
+    expect(wishList(1)[0]).toBe('era');
+    for (let i = 0; i < 4; i++) spawnAt(0, 'spy', 5 + i, 5); expect(wishList(1)[0]).toBe('flak');   // Gegner mit vielen Drohnen
+    for (const u of G.units) if (u.owner === 0 && u.type === 'spy') u.dead = true; G.ais[1].airSeenT = -1e9;
+    const ws = placeBuilding(1, 'workshop', kh.tx - 6, kh.ty + 5, true);
+    const tank = spawnAt(1, 'mbt', ws.x, ws.y + 2.5);
+    K.rate = {money: 50}; K.res.money = 1000; K.res.metal = 600;
+    aiArmory(1, true, 10); expect(G.ais[1].mfund).toBeGreaterThan(0);
+    G.ais[1].mfund = 5000; aiArmory(1, true, 1);
+    expect(K.mdevQ && K.mdevQ.k).toBe('era');
+    K.mdevQ.t = K.mdevQ.time; update(0.05); expect(K.mdev.era).toBe(true);
+    G.ais[1].mfund = 3000; K.res.metal = 600; aiArmory(1, true, 1);
+    expect(tank.fit && tank.fit.k).toBe('era'); run(25); expect(tank.mods).toContain('era');
+    // Sichtung: Aldoria sieht den ausgerüsteten Panzer
+    G.known[0][1] = true; tank.x = G.players[0] && findBuilding(0, 'hq').x + 3; tank.y = findBuilding(0, 'hq').y; tank.mode = 'idle'; tank.path = null;
+    run(5); expect(knows(0, 1).mods && knows(0, 1).mods.era).toBe(true);
   });
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();

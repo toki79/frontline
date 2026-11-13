@@ -1,5 +1,5 @@
 import { dist, idx, inMap } from '../core/util';
-import { EXPORT, AI_WAR, AIS, AI_CHAR, MAJORS, T, FIRE, FUN, TRIBUTE, AI_MIX2, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS, canHit } from '../data/config';
+import { EXPORT, AI_WAR, AIS, AI_CHAR, MAJORS, T, FIRE, FUN, TRIBUTE, AI_MIX2, AI_MIX, AI_NUKE, AI_RESEARCH, NUKE, RESEARCH, hasTech, BANDITS, BUILDINGS, DEF, ECON, MAP_H, MAP_W, NOISE_R, REGION, RES, STORAGE, UNITS, canHit , AI_ARMORY } from '../data/config';
 import { distTo } from '../sim/combat';
 import { canAfford, costOf, lacking } from '../sim/costs';
 import { aiQuotes, marketOpen, trade } from '../sim/market';
@@ -16,6 +16,7 @@ import { addAtt, anyWar, armyStr, atWar, attOf, countBuildings, defStr, detected
 import { msg } from '../core/events';
 import { bound, jointAgainst } from '../sim/pacts';
 import { aiChar, hasTrait } from '../ai/persona';
+import { aiArmory } from '../ai/armory';
 import { deterrent, launchNuke } from '../sim/nuke';
 import { funCoverage } from '../sim/devplan';
 import { makeGroup } from '../sim/groups';
@@ -61,7 +62,7 @@ export function aiThink(pid=1){
   const p=G.players[pid], ai=G.ais[pid], D=G.diff, C=aiChar(pid);
   const myB=G.buildings.filter(b=>!b.dead&&b.owner===pid); if(!myB.length) return;
   const myU=G.units.filter(u=>!u.dead&&u.owner===pid);
-  const army=myU.filter(u=>u.def.weapon&&!u.patrol&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'), trucks=myU.filter(u=>u.def.harvester);
+  const army=myU.filter(u=>u.def.weapon&&!u.patrol&&u.mode!=='recharge'&&u.mode!=='rtb'&&u.mode!=='rearm'&&u.mode!=='refit'&&!(u.toShop&&G.t-u.toShop<90)), trucks=myU.filter(u=>u.def.harvester);
   const myStr=armyStr(pid)+defStr(pid)*0.3;
   // Stärkeverhältnis und Vorsprung gegenüber jeder anderen Macht
   const race=G.mode==='race'; ai.rat=ai.rat||{}; ai.leads=ai.leads||{};
@@ -97,7 +98,8 @@ export function aiThink(pid=1){
   const uniFirst=C.key==='handel'||C.tech>1.3||G.profile[pid].scarce.includes('metal');   // Handelsmacht (oder Metallmangel): erst Universität, dann Fahrzeugwerk
   const wantF=!hasB('factory')&&p.pop>90&&hasB('barracks'), wantU=!hasB('university')&&p.pop>100/Math.min(1.4,C.tech)&&hasB('power')&&(uniFirst||hasB('factory'));
   const resGoal=nextRes&&!p.q.research.length?nextRes:null;
-  const goal=uniFirst?(wantU?'university':resGoal&&!hasTech(p,'res2')?resGoal:wantF?'factory':resGoal):(wantF?'factory':wantU?'university':resGoal);
+  const wantWS=hasB('factory')&&!hasB('workshop')&&p.pop>AI_ARMORY.minPop&&G.t>AI_ARMORY.minT;
+  const goal=(uniFirst?(wantU?'university':resGoal&&!hasTech(p,'res2')?resGoal:wantF?'factory':resGoal):(wantF?'factory':wantU?'university':resGoal))||(wantWS?'workshop':null);
   const saveFor=goal?(costOf(goal,pid).money||0)+(RESEARCH[goal]?100:40):0;
   if(goal!==ai.goal){ ai.goal=goal; ai.goalT=G.t; }
   ai.save=saveFor&&(G.t-ai.goalT)%360<300?saveFor:0;   // 5 min sparen, dann 1 min normal ausgeben, dann wieder sparen
@@ -110,6 +112,7 @@ export function aiThink(pid=1){
       if(!canAfford(pid,goal)){ const keep=Math.min(Math.max(0,p.res.money),need$); p.res.money-=keep; ai.fund=keep; } } }   // noch nicht bezahlbar: Etat bleibt zurückgelegt
   const calm=!war&&!threat0(pid), saving=ai.save>0&&p.res.money<ai.save&&calm;
   devOf(pid).release.money=saving?0.05:0.3;   // Bürger bauen beim Sparen kaum aus
+  aiArmory(pid,calm,D.think);   // Werkstatt: eigener Etat, Module entwickeln und einbauen
   ai.saving=saving;
   // --- Gebäude ---
   // Baustellen beauftragen (höchstens zwei gleichzeitig offen)
@@ -391,6 +394,7 @@ function aiPickMain(p,need,has,ok){
   if(!has('factory')&&p.pop>90&&rich('factory')) return 'factory';
   if((has('factory')||AI_CHAR[pid].key==='handel'||G.profile[pid].scarce.includes('metal'))&&!has('university')&&p.pop>100&&rich('university')) return 'university';
   if(has('factory')&&!has('droneshop')&&p.tech>=1&&p.pop>140&&rich('droneshop')) return 'droneshop';
+  if(has('factory')&&!has('workshop')&&p.pop>AI_ARMORY.minPop&&G.t>AI_ARMORY.minT&&rich('workshop')) return 'workshop';   // Fahrzeuge ausrüsten
   const hi=aiPickHighTech(p,has,rich); if(hi) return hi;
   // Stadtleben: Feuerwache und Unterhaltung
   if(p.pop>FIRE.minPop&&fireCoverage(pid)<0.7&&has('firest')<4&&rich('firest')) return 'firest';

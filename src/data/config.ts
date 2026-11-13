@@ -20,22 +20,23 @@ export const COMBINED = {radius:7, minArms:2, dmg:0.15, def:0.12};
 // slot: höchstens ein Modul je Platz; weight: Tragfähigkeit des Fahrgestells (WORKSHOP.cap) begrenzt die Ausstattung.
 export const MODULES = {
   turbo:    {name:'Turbomotor',        icon:'⚡', slot:'antrieb',    weight:1, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:1500, metal:100}, devTime:90,  cost:{money:300, metal:30},  need:[],
-             speed:1.3, upkeep:1.6, desc:'+30 % Tempo – verbraucht mehr Öl'},
+             speed:1.3, upkeep:1.6, counter:'Schnelle Vorstöße – Zugänge mit Minen und Stellungen sichern, Panzerabwehr bereithalten', desc:'+30 % Tempo – verbraucht mehr Öl'},
   langrohr: {name:'Langrohr',          icon:'🎯', slot:'waffe',      weight:1, fits:['ifv','mbt','heavy','spaag'], dev:{money:1800, metal:150}, devTime:100, cost:{money:350, metal:40}, need:[],
-             range:1.5, rof:1.15, desc:'+1,5 Felder Reichweite – lädt etwas langsamer'},
+             range:1.5, rof:1.15, counter:'Ihre Panzer schießen weiter – mit Artillerie, Raketen oder Luftwaffe aus der Ferne antworten', desc:'+1,5 Felder Reichweite – lädt etwas langsamer'},
   flamme:   {name:'Flammenwerfer',     icon:'🔥', slot:'waffe',      weight:1, fits:['ifv','mbt','heavy'], dev:{money:1600, metal:80, oil:100}, devTime:90, cost:{money:300, metal:20, oil:40}, need:[],
-             weapon:{type:'flame', dmg:34, range:3, rof:0.6, splash:1.0}, desc:'Ersetzt die Kanone: vernichtend gegen Schützen und Bunker, setzt Gebäude in Brand – kurze Reichweite, schwach gegen Panzer'},
+             weapon:{type:'flame', dmg:34, range:3, rof:0.6, splash:1.0}, counter:'Flammenpanzer räuchern Schützen und Bunker aus – auf Abstand halten, mit Panzern und Panzerabwehr bekämpfen', desc:'Ersetzt die Kanone: vernichtend gegen Schützen und Bunker, setzt Gebäude in Brand – kurze Reichweite, schwach gegen Panzer'},
   raketen:  {name:'Raketenbehälter',   icon:'🚀', slot:'aufsatz',    weight:2, fits:['ifv','mbt','heavy','apc'], dev:{money:2200, metal:150}, devTime:110, cost:{money:450, metal:60}, need:['rocketry'],
-             pod:{type:'rocket', dmg:42, range:10, minRange:2, rof:1, salvo:6, splash:1.4, spread:1.3}, desc:'Eine Salve aus 6 Raketen auf bis zu 10 Felder – danach zu Hause oder in der Werkstatt nachladen'},
+             pod:{type:'rocket', dmg:42, range:10, minRange:2, rof:1, salvo:6, splash:1.4, spread:1.3}, counter:'Raketensalven aus der Distanz – Truppen verteilen, Fahrzeuge nach der Salve jagen, bevor sie nachladen', desc:'Eine Salve aus 6 Raketen auf bis zu 10 Felder – danach zu Hause oder in der Werkstatt nachladen'},
   flak:     {name:'Flak-Aufsatz',      icon:'🛡', slot:'aufsatz',    weight:1, fits:['ifv','mbt','heavy','apc'], dev:{money:1400, metal:120}, devTime:80, cost:{money:350, metal:40}, need:[],
-             aux:{type:'flak', dmg:16, range:7, rof:0.4, airOnly:true}, desc:'Zwillingsflak statt Dach-MG: holt Drohnen, Hubschrauber und auch Hochflieger'},
+             aux:{type:'flak', dmg:16, range:7, rof:0.4, airOnly:true}, counter:'Ihre Panzer holen Drohnen vom Himmel – auf Artillerie, Panzerabwehr und Panzer setzen statt auf Drohnen', desc:'Zwillingsflak statt Dach-MG: holt Drohnen, Hubschrauber und auch Hochflieger'},
   ki:       {name:'KI-Zielerfassung',  icon:'🧠', slot:'elektronik', weight:1, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:3000, metal:200}, devTime:140, cost:{money:600, metal:40}, need:['computing'],
-             dmg:1.15, sight:2, smart:true, desc:'Trifft besser (+15 %), sieht weiter, bekämpft zuerst, was ihm gefährlich wird'},
+             dmg:1.15, sight:2, smart:true, counter:'Ihre Fahrzeuge treffen besser und greifen gefährliche Ziele zuerst an – mit Masse und Nebel überfordern, Elektronik mit Störsendern blenden', desc:'Trifft besser (+15 %), sieht weiter, bekämpft zuerst, was ihm gefährlich wird'},
   aps:      {name:'Aktiver Schutz',    icon:'🛰', slot:'schutz',     weight:2, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:3500, metal:250}, devTime:150, cost:{money:700, metal:80}, need:['computing'],
-             aps:3, desc:'Fängt 3 Lenkflugkörper, Drohnen oder Präzisionsraketen ab (lädt zu Hause nach) – gegen Granaten und Artillerie wirkungslos'},
+             aps:3, counter:'Lenkflugkörper und Drohnen werden abgefangen – Panzerkanonen, Artillerie und Minen wirken weiter', desc:'Fängt 3 Lenkflugkörper, Drohnen oder Präzisionsraketen ab (lädt zu Hause nach) – gegen Granaten und Artillerie wirkungslos'},
   era:      {name:'Reaktivpanzerung',  icon:'🧱', slot:'schutz',     weight:2, fits:['ifv','apc','mbt','heavy','spaag','mlrs'], dev:{money:2000, metal:300}, devTime:100, cost:{money:400, metal:120}, need:[],
-             hp:1.35, speed:0.88, desc:'+35 % Lebenspunkte – schwerer, 12 % langsamer'},
+             hp:1.35, speed:0.88, counter:'Ihre Panzer halten deutlich mehr aus – Feuer bündeln, schwere Waffen und Minen einsetzen', desc:'+35 % Lebenspunkte – schwerer, 12 % langsamer'},
 };
+export const AI_ARMORY = {share:0.18, minT:900, minPop:200, maxFund:6000};   // KI legt einen Teil der Steuern für die Werkstatt zurück
 export const WORKSHOP = {
   radius: 4.5, fitTime: 20,                                  // Fahrzeuge in diesem Umkreis stehen „in der Werkstatt“
   cap: {ifv:3, apc:2, mbt:4, heavy:5, spaag:2, mlrs:2},     // Tragfähigkeit je Fahrgestell

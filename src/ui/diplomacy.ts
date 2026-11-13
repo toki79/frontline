@@ -1,5 +1,5 @@
 import { fmt } from '../core/util';
-import { AIS, AI_CHAR, INTEL, REGION, RES, RESEARCH, TRADE, TRIBUTE, hasTech, isAI } from '../data/config';
+import { AIS, AI_CHAR, INTEL, REGION, RES, RESEARCH, TRADE, TRIBUTE, hasTech, isAI , MODULES } from '../data/config';
 import { armyEstimate, intelChance, intelLevel, knows, researchIntel } from '../sim/intel';
 import { demandTribute, evalTribute, landOffer, tributeOf, waiveTribute } from '../sim/tribute';
 import { rr } from '../render/draw';
@@ -114,9 +114,11 @@ function intelHtml(pid){
   const n=G.players[pid].short, l=intelLevel(0), ch=Math.round(intelChance(0,pid)*100), K=knows(0,pid);
   let h=`<h4>🕵 Lagebericht</h4><div class="barl"><span>${l?`Nachrichtendienst Stufe ${l}`:'Kein Nachrichtendienst – nur Gerüchte'} · Quellenlage ${ch} %${G.embassy[0][pid]?' (mit Botschaft)':''}${hasTech(G.players[pid],'counterintel')&&l?' · Spionageabwehr erschwert die Arbeit':''}</span></div>`;
   if(!l) h+=`<div class="barl"><span>Ein <b>Nachrichtendienst</b> (Gebäude → Militär & Geheimdienst) meldet, was ${n} erforscht, baut und plant – mit Empfehlung für eure Verteidigung. Stufe II schätzt die Truppen, Stufe III sieht die laufende Forschung.</span></div>`;
+  const mods=Object.keys(K.mods||{}).filter(k=>MODULES[k]).map(k=>`${MODULES[k].icon} ${MODULES[k].name}`);
   const tech=Object.keys(K.tech).filter(k=>RESEARCH[k]).map(k=>`${RESEARCH[k].icon} ${RESEARCH[k].name}`), units=Object.entries(K.units).map(([k,c])=>`${c}× ${INTEL.units[k]||k}`);
   if(tech.length) h+=`<div class="barl"><span>Bekannte Technik: ${tech.join(', ')}</span></div>`;
   if(units.length) h+=`<div class="barl"><span>Gesichtet: ${units.join(', ')}</span></div>`;
+  if(mods.length) h+=`<div class="barl"><span>🔧 Fahrzeug-Ausrüstung: ${mods.join(', ')}</span></div>`;
   const rs=researchIntel(0,pid); if(rs&&RESEARCH[rs]) h+=`<div class="barl"><span>Forscht gerade: ${RESEARCH[rs].icon} ${RESEARCH[rs].name}${INTEL.threats[rs]?' ⚠':''}</span></div>`;
   const est=armyEstimate(0,pid); if(est) h+=`<div class="barl"><span>Truppen (geschätzt): 🪖 ${est.inf} Infanterie · 🚙 ${est.veh} Fahrzeuge · 🛡 ${est.heavy} Panzer · ✈ ${est.air} Luft · 🚀 ${est.missile} Raketen/Artillerie</span></div>`;
   { const pk=personaKnown(pid); h+=`<div class="barl"><span>🎭 ${pk.opening||pk.traits.length?personaText(pid,pk):'Strategie und Charakter: unbekannt – der Nachrichtendienst findet es mit der Zeit heraus.'}</span></div>`; }

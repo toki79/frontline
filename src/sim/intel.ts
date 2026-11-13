@@ -1,7 +1,8 @@
 import { msg } from '../core/events';
 import { INTEL, MAJORS, RESEARCH, RTREE, UNITS, hasTech, lvlOf } from '../data/config';
 import { G } from '../sim/state';
-import { PERSONA } from '../data/config';
+import { detected, spotted } from '../sim/world';
+import { MODULES, PERSONA } from '../data/config';
 import { revealPersona } from '../ai/persona';
 
 /* =====================================================================
@@ -43,6 +44,12 @@ export function updateIntel(){
   if(G.t>=(S.personaT??PERSONA.revealEvery)){ S.personaT=G.t+PERSONA.revealEvery;
     for(const pid of MAJORS){ if(pid===0||!G.ais||!G.ais[pid]||!G.known[0][pid]) continue;
       if(Math.random()<intelChance(0,pid)*0.8){ const t=revealPersona(pid); if(t){ const [txt,counter]=t.split('|'); S.pending.push({obs:0, tgt:pid, kind:'persona', key:'', at:G.t+3, extra:{txt,counter}}); } } } }
+  // Gesichtet: Fahrzeuge mit Ausrüstung im eigenen Blickfeld verraten sie (ohne Geheimdienst)
+  if(G.t>=(S.modSeenT||0)){ S.modSeenT=G.t+3;
+    for(const u of G.units){ if(u.dead||u.owner===0||!u.mods||!u.mods.length||!MAJORS.includes(u.owner)||!detected(u,0)||!spotted(0,u.x,u.y)) continue;
+      const K=knows(0,u.owner), M=K.mods||(K.mods={}), neu=u.mods.filter(k=>!M[k]); if(!neu.length) continue;
+      for(const k of neu) M[k]=true;
+      msg(`👁 Gesichtet: ${G.players[u.owner].short} fährt ${u.def.name.replace(/\u00AD/g,'')} mit ${neu.map(k=>MODULES[k].icon+' '+MODULES[k].name).join(', ')}. ➜ ${MODULES[neu[0]].counter}.`,'#ffb38a'); } }
   const due=S.pending.filter(r=>G.t>=r.at); if(!due.length) return;
   S.pending=S.pending.filter(r=>G.t<r.at);
   for(const r of due){ const K=knows(r.obs,r.tgt);
@@ -50,6 +57,7 @@ export function updateIntel(){
     if(r.kind==='done'){ K.tech[r.key]=true; if(K.research===r.key) K.research=null; }
     if(r.kind==='unit') K.units[r.key]=Math.max(K.units[r.key]||0,(r.extra&&r.extra.n)||1);
     if(r.kind==='plan'&&(r.extra||{}).on===r.obs) K.plan={t:G.t, ...(r.extra||{})};
+    if(r.kind==='module') (K.mods||(K.mods={}))[r.key]=true;
     if(r.obs===0) report(r); }
 }
 /** Meldung für den Spieler: Text, Gegenmaßnahme, Eintrag im Lagebericht */
@@ -64,6 +72,7 @@ function report(r){
   else if(r.kind==='plan'){ const e=r.extra||{};
     if(e.on===0){ txt=`🕵 Geheimdienst: ${n} bereitet einen Angriff auf uns vor${e.target?` – Ziel vermutlich: ${e.target}`:''}${e.army?` (${e.army})`:''}.`; warn=true; counter=e.counter||'Truppen dorthin verlegen, Zugänge sichern'; }
     else { txt=`🕵 Geheimdienst: ${n} bereitet einen Angriff auf ${G.known[0][e.on]?G.players[e.on].short:'eine fremde Macht'} vor.`; } }
+  else if(r.kind==='module'){ const M:any=MODULES[r.key]; if(!M) return; txt=`🕵 Geheimdienst: ${n} entwickelt ${M.icon} ${M.name} für seine Fahrzeuge.`; counter=M.counter||''; warn=true; }
   else if(r.kind==='persona'){ txt=`🕵 Geheimdienst: ${(r.extra||{}).txt}`; counter=(r.extra||{}).counter||''; warn=!!counter; }
   else if(r.kind==='victory'){ txt=`🕵 Geheimdienst: ${n} ${r.extra&&r.extra.txt}`; warn=true; counter=r.extra&&r.extra.counter||''; }
   if(!txt) return;

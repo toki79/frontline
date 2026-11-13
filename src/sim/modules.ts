@@ -1,4 +1,4 @@
-import { MODULES, UNITS, VETERAN, WORKSHOP, hasTech } from '../data/config';
+import { MODULES, UNITS, VETERAN, WORKSHOP, hasTech, isAI } from '../data/config';
 import { G } from '../sim/state';
 import { msg } from '../core/events';
 import { dist } from '../core/util';
@@ -39,6 +39,8 @@ export const isFittable=u=>!!u&&u.kind==='unit'&&!u.dead&&capOf(u.type)>0;
 /** eigene, fertige Werkstatt in Reichweite des Fahrzeugs */
 export const shopNear=u=>G.buildings.find(b=>!b.dead&&!b.site&&b.type==='workshop'&&b.owner===u.owner&&dist(b.x,b.y,u.x,u.y)<=WORKSHOP.radius);
 export const devDone=(p,k)=>!!(p.mdev&&p.mdev[k]);
+/** Entwicklungskosten (die KI bekommt denselben Rabatt wie bei der Forschung) */
+export function devCost(pid,k:string){ const M:any=MODULES[k], f=isAI(pid)&&G.diff&&G.diff.aiTech?G.diff.aiTech:1, c:any={}; for(const r in M.dev) c[r]=Math.round(M.dev[r]*f); return c; }
 /** Warum kann dieses Modul gerade nicht eingebaut werden? ('' = geht) */
 export function fitBlock(u,k:string,ignoreMoney=false){
   const M:any=MODULES[k], p=G.players[u.owner]; if(!M) return 'unbekannt';
@@ -77,11 +79,11 @@ export function devBlock(pid,k:string){
   if(!G.buildings.some(b=>!b.dead&&!b.site&&b.type==='workshop'&&b.owner===pid)) return 'keine Werkstatt';
   if(p.mdevQ) return 'Werkstatt entwickelt bereits';
   const miss=M.need.filter(r=>!hasTech(p,r)); if(miss.length) return 'braucht Forschung';
-  for(const r in M.dev) if((p.res[r]||0)<M.dev[r]) return 'zu teuer';
+  const c=devCost(pid,k); for(const r in c) if((p.res[r]||0)<c[r]) return 'zu teuer';
   return '';
 }
 export function startDev(pid,k:string){ const why=devBlock(pid,k); if(why) return why; const M:any=MODULES[k], p=G.players[pid];
-  for(const r in M.dev) p.res[r]-=M.dev[r]; p.mdevQ={k, t:0, time:M.devTime}; return ''; }
+  const c=devCost(pid,k); for(const r in c) p.res[r]-=c[r]; p.mdevQ={k, t:0, time:M.devTime}; return ''; }
 /** jede Sekunde-Bruchteil: Entwicklung, Einbau, Nachladen */
 export function updateModules(dt){
   for(let pid=0;pid<G.players.length;pid++){ const p=G.players[pid], q=p.mdevQ; if(!q) continue;
