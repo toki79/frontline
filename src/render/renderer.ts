@@ -3,6 +3,7 @@ import { dist, hash, idx, inMap } from '../core/util';
 import { capOf, AIR, BANDITS, DEPOSIT, BUILDINGS, FACTIONS, FEAT, FOREST, JAM, MAP_H, MAP_W, NUKE, T, TILE, isDefType } from '../data/config';
 import { VH, VW, cam, dpr } from '../render/camera';
 import { drawBuildingShape, drawFeature, drawRoad, drawSite, drawUnitShape, hpBar, rr } from '../render/draw';
+import { drawSky, drawWalkers } from '../render/ambient';
 import { drawBoom, drawFlash, drawGround, drawSmoke, drawTracer, trackUnit } from '../render/fxdraw';
 import { haulEff, hauls, previewFields, routeRoadBetween, siteLacks, siteWorkers } from '../sim/build';
 import { tradeRoutes } from '../sim/trade';
@@ -181,7 +182,7 @@ export function render(){
   if(G.saplings) for(const i of G.saplings){ const x=i%MAP_W, y=(i/MAP_W)|0; if(x<tx0||x>tx1||y<ty0||y>ty1||tileVis(x+0.5,y+0.5)===0) continue;   // Setzlinge
     const g=1-Math.max(0,G.sapling[i])/FOREST.grow, s=3+g*8, px=x*TILE+16, py=y*TILE+18;
     c.fillStyle='#5a4028'; c.fillRect(px-1,py,2,5); c.fillStyle='#3f6a2a'; c.beginPath(); c.arc(px,py-s*0.3,s,0,7); c.fill(); c.fillStyle='#5a8a3a'; c.beginPath(); c.arc(px-s*0.3,py-s*0.5,s*0.5,0,7); c.fill(); }
-  drawGround(c,vis,tileVis);
+  drawGround(c,vis,tileVis); drawWalkers(c,vis,tileVis,z);
   const bl=[]; for(const b of G.buildings){ if(b.dead||!vis(b.x,b.y,4)||!knownBuilding(b)) continue; bl.push(b); }
   bl.sort((a,b)=>a.ty-b.ty);   // von Nord nach Süd: vordere Gebäude überdecken die hinteren
   for(const b of bl){ const f=G.players[b.owner];
@@ -200,8 +201,8 @@ export function render(){
       c.fillStyle='#000a'; c.fillRect(b.tx*TILE+2,b.ty*TILE+TILE-5,TILE-4,3); c.fillStyle='#d8c040'; c.fillRect(b.tx*TILE+2,b.ty*TILE+TILE-5,(TILE-4)*k2,3); }
     if(b.hp<b.maxHp*0.5&&Math.random()<0.08) fxAdd({k:'smoke',x:b.x+(Math.random()-.5)*b.w*0.6,y:b.y+(Math.random()-.5)*b.h*0.6,r:0.3,life:1.4});
   }
-  const selSet0=new Set(G.sel);
-  for(const u of G.units){ if(u.dead||u.carried||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner];
+  const selSet0=new Set(G.sel), shown=[];
+  for(const u of G.units){ if(u.dead||u.carried||!vis(u.x,u.y)||!visibleUnit(u)) continue; const f=G.players[u.owner]; shown.push(u);
     if(u.dug){ c.strokeStyle='#a08a5a'; c.lineWidth=3; c.beginPath(); c.arc(u.x*TILE,u.y*TILE,u.def.size*TILE*0.75+3,Math.PI*0.15,Math.PI*1.85); c.stroke();
       c.strokeStyle='rgba(60,45,25,.6)'; c.lineWidth=1; c.stroke(); }   // Sandsäcke: eingegraben
     if(trackUnit(u)&&z>=0.6&&Math.random()<0.5) fxAdd({k:'dust',x:u.x-Math.cos(u.angle)*u.def.size*0.7,y:u.y-Math.sin(u.angle)*u.def.size*0.7,r:0.18+Math.random()*0.12,life:0.9});   // Staubfahne
@@ -243,6 +244,7 @@ export function render(){
   }
   if(G.evFound&&G.t-G.evFound.t<40){ const k=((G.t-G.evFound.t)%2)/2;   // neues Vorkommen: pulsierender Ring
     c.strokeStyle=`rgba(232,212,138,${1-k})`; c.lineWidth=3; c.beginPath(); c.arc(G.evFound.x*TILE,G.evFound.y*TILE,TILE*(1.5+k*2.5),0,7); c.stroke(); }
+  drawSky(c,cam.x,cam.y,cv.width/z,cv.height/z,vis,b=>knownBuilding(b)&&(!G.fog||tileVis(b.x,b.y)>0)&&G.players[b.owner].powerOk!==false,shown);
   if(G.fog) drawFog(c);
   if(evOn('winter')) winter(c);
   for(const e of G.fx){ if(e.age<0||e.k!=='nuke') continue; const k=e.age/e.life, R=e.r*TILE;   // Atompilz: sichtbar auch im Nebel
