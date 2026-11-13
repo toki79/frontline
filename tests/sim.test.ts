@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { newGame as newGame0, G } from '../src/sim/state';
 /** Tests laufen reproduzierbar: Flusstal, KI ohne Zufallspersönlichkeit, keine Zufallsereignisse (außer der Test will es anders) */
-const newGame = (d = 'mittel', fog = true, mode = 'endless', opts: any = {}) => { newGame0(d, fog, mode, {map: 'tal', ...opts}); for (const p of [1, 4]) G.ais[p].persona = null; G.ev.next = 1e9; };
+const newGame = (d = 'mittel', fog = true, mode = 'endless', opts: any = {}) => { newGame0(d, fog, mode, {map: 'tal', ...opts}); for (const p of [1, 4]) G.ais[p].persona = null; G.ev.next = 1e9; devOf(0).build = false; };
 import { update } from '../src/sim/loop';
 import { canPlace, placeSite, placeDefense } from '../src/sim/production';
 import { findBuilding, countBuildings, tileCost, spawnAt, placeBuilding, setWar, makeContact, atWar, addAtt as addAttT } from '../src/sim/world';
@@ -19,6 +19,7 @@ import { reinfOf } from '../src/sim/reinforce';
 import { depositTiles } from '../src/sim/world';
 import { findPath } from '../src/sim/pathfinding';
 import { devOf } from '../src/sim/devplan';
+import { citizenThink, citizenWants, cit } from '../src/sim/citizens';
 import { demandTribute, evalTribute, landOffer } from '../src/sim/tribute';
 import { applyDamage, continueGame, destroy } from '../src/sim/combat';
 import { serialize, loadGame } from '../src/sim/save';
@@ -383,7 +384,7 @@ describe('Simulation', () => {
   it('Zufriedenheit: Hunger drückt Stimmung und Steuern', () => {
     newGame('mittel');
     const p = G.players[0];
-    run(5); const h0 = p.happy;
+    devOf(0).on = false; run(5); const h0 = p.happy;
     p.rationCool = 1e9; p.res.food = 0; run(40);                      // ohne Notrationen
     expect(p.happy).toBeLessThan(h0 - 0.1);
     expect(p.rate.taxF).toBeLessThan(1);
@@ -1120,6 +1121,28 @@ describe('Simulation', () => {
     G.ais[1].persona = {opening: 'rush', traits: []}; K.res.money = 5000; K.res.metal = 500; K.res.oil = 300;
     aiFleet(1, {war: false, lead: false, urgent: false, saving: false}); expect(K.q.factory[0] && K.q.factory[0].type).toBe('mbt');
   });
+  it('Bürger bauen die Stadt selbst: Bedarf, Prioritäten, Rücklage, Großprojekt', () => {
+    newGame('mittel'); noBandits(); const p = G.players[0], d = devOf(0); d.build = true;
+    expect(citizenWants(0)[0][0]).toBe('lumber');                         // ohne Holz entsteht nichts
+    const n0 = G.buildings.length; citizenThink(0); expect(G.buildings.length).toBe(n0 + 1);
+    expect(G.buildings[G.buildings.length - 1].type).toBe('lumber');
+    // Priorität aus: der Bereich wird nicht gebaut
+    p.pop = p.cap; d.prio.wohnen = 0; for (let i = 0; i < 6; i++) citizenThink(0);
+    expect(G.buildings.some(b => b.owner === 0 && (b.type === 'house' || b.type === 'block'))).toBe(false);
+    d.prio.wohnen = 2; p.res.money = 2000; p.res.wood = 400; for (const b of G.buildings) if (b.owner === 0 && b.site) { b.site = false; }
+    p.foodRate = 5; for (let i = 0; i < 5; i++) { citizenThink(0); p.res.money = 2000; for (const b of G.buildings) if (b.owner === 0 && b.site) b.site = false; }
+    expect(G.buildings.some(b => b.owner === 0 && b.type === 'house')).toBe(true);
+    // Rücklage: Nicht-Notfälle rühren sie nicht an
+    newGame('mittel'); noBandits(); const q = G.players[0], e = devOf(0); e.build = true; e.reserve = 1500; q.res.money = 1400; q.res.wood = 400; q.res.stone = 300;
+    placeBuilding(0, 'lumber', findBuilding(0, 'hq').tx + 6, findBuilding(0, 'hq').ty, true); placeBuilding(0, 'quarry', findBuilding(0, 'hq').tx - 6, findBuilding(0, 'hq').ty, true); G.t = 60;
+    q.pop = q.cap - 20; q.foodRate = 5; const m0 = q.res.money; citizenThink(0);          // Wohnraum knapp (5): kein Notfall
+    expect(q.res.money).toBe(m0); expect(cit().block && cit().block.res).toBe('money');
+    q.foodRate = 0; citizenThink(0); expect(q.res.money).toBeLessThan(m0);   // Nahrung reicht nicht (9): Notfall
+    // ohne Zutun wächst die Stadt
+    newGame('mittel'); devOf(0).build = true; const r = G.players[0], pop0 = r.pop;
+    for (let i = 0; i < 20 * 420; i++) { update(0.05); if (G.offer) answerOffer(false); }
+    expect(r.pop).toBeGreaterThan(pop0 + 40); expect(countBuildings(0, 'farm')).toBeGreaterThan(0); expect(countBuildings(0, 'house')).toBeGreaterThan(0);
+  }, 30000);
   it('Zufallskarten: gleiche Nummer = gleiche Karte, alle Typen verbunden und fair', () => {
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); const a = G.terr.slice(), ore = G.ore.slice();
     newGame('mittel', true, 'endless', {seed: 31337, map: 'seen'}); expect(G.terr.every((v, i) => v === a[i])).toBe(true); expect(G.ore.every((v, i) => v === ore[i])).toBe(true);

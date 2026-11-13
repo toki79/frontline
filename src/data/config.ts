@@ -101,14 +101,18 @@ export const DENSITY = {
   fireSpread: 0.06,     // Wahrscheinlichkeit je Sekunde, dass ein Brand auf ein angrenzendes Gebäude überspringt
 };
 // ---------- Stadtentwicklung: Bürger bauen selbst aus (Spieler gibt Prioritäten und Mittel frei) ----------
+// Die Bürger bauen neue Gebäude selbst: Takt, gleichzeitige Baustellen, Gewicht der Priorität
+export const CITIZENS = {first:4, think:5, sites:2, sitesPer:400, maxWorkers:10, prioW:2, urgent:6, emergency:8, retry:60,
+  big:700, saveT:240, saveGap:120,          // Großprojekte (ab 700 $): bis zu 4 min wird darauf gespart, dann 2 min Pause
+  reserves:[0,500,1500,3000]};              // wählbare Rücklage für den Kommandanten (Truppen, Forschung)
 export const DEV = {
   cats: {wohnen:{name:'Wohnen', icon:'🏠', types:['house','block','hq']}, nahrung:{name:'Nahrung', icon:'🌾', types:['farm','greenhouse']},
          rohstoffe:{name:'Rohstoffe', icon:'⛏', types:['lumber','forester','quarry','mine','refinery','derrick']}, strom:{name:'Strom', icon:'⚡', types:['power','npp']},
          stadtleben:{name:'Stadtleben', icon:'🎭', types:['park','theater','pool','stadium','firest']}, lager:{name:'Lager & Handel', icon:'📦', types:['depot','kontor']},
-         wissen:{name:'Forschung', icon:'🎓', types:['university','datacenter']}, militaer:{name:'Militär', icon:'🪖', types:['barracks','factory','droneshop']}},
+         wissen:{name:'Forschung', icon:'🎓', types:['university','datacenter']}, militaer:{name:'Militär', icon:'🪖', types:['barracks','factory','workshop','droneshop','airbase','intel']}},
   think: 6, parallel: 2, parallelPer: 1000,     // gleichzeitige Ausbauten: 2 + 1 je 1000 Einwohner
   release: [0, 0.25, 0.5, 0.75],                // wählbare Freigaben (Anteil der Vorräte)
-  defaults: {on:true, prio:{wohnen:1, nahrung:1, rohstoffe:1, strom:1, stadtleben:1, lager:1, wissen:1, militaer:0}, release:{money:0.25, wood:0.5, stone:0.5, metal:0.25}},
+  defaults: {on:true, build:true, reserve:500, prio:{wohnen:1, nahrung:1, rohstoffe:1, strom:1, stadtleben:1, lager:1, wissen:1, militaer:1}, release:{money:0.5, wood:0.75, stone:0.75, metal:0.25}},
 };
 // ---------- Stadtleben: Unterhaltung und Feuerwehr ----------
 // Forsthaus: pflanzt Setzlinge, die nach grow Sekunden zu Wald werden

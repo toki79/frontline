@@ -3,7 +3,7 @@ import { fmt } from '../core/util';
 import { AIS, BUILDINGS, ECON, FAMINE, FIRE, FUN, REGION, RES, T } from '../data/config';
 import { famine } from '../sim/costs';
 import { distTo } from '../sim/combat';
-import { aiQuotes, marketOpen, needLevel } from '../sim/market';
+import { aiQuotes, marketOpen, needLevel, trade } from '../sim/market';
 import { G, regionText } from '../sim/state';
 import { anyWar, atWar, countBuildings, hostile, visibleUnit } from '../sim/world';
 import { $ } from '../ui/dom';
@@ -12,7 +12,9 @@ import { cmd, refreshCmds } from '../ui/input';
 import { siteLacks } from '../sim/build';
 import { emergency } from '../sim/production';
 import { unprotected } from '../sim/fortify';
-import { funCoverage } from '../sim/devplan';
+import { devOf, funCoverage } from '../sim/devplan';
+import { cit } from '../sim/citizens';
+import { openDev } from '../ui/devui';
 import { openDiplo } from '../ui/menus';
 import { msg } from '../core/events';
 import { buildClick, setTab } from '../ui/panel';
@@ -108,6 +110,16 @@ export function advise(){
   if(metAIs.length&&G.t>600&&!has('intel')&&p.res.money>900) T.push({p:29,txt:'<b>Kein Geheimdienst:</b> Ein Nachrichtendienst meldet, wenn die Nachbarn Raketen, Jagdbomber oder schwere Panzer entwickeln – mit Empfehlung, wie ihr euch wappnet.',act:B('intel')});
   if(!sites.length&&G.t>20&&p.res.money>=300) T.push({p:28,txt:'<b>Keine Baustelle offen.</b> Deine Bauarbeiter warten – jeder Bauauftrag bringt die Stadt voran.',act:{label:'Gebäude',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
   if(G.mode==='race'&&p.pop>=ECON.target*0.85) T.push({p:15,txt:`Nur noch <b>${Math.ceil(ECON.target-p.pop)} Einwohner</b> bis zum Sieg! Kastrova wird jetzt alles versuchen, euch aufzuhalten.`});
+  // Die Bürger bauen selbst: Bau-Tipps entfallen, dafür melden die Bürger, was sie aufhält
+  const dv=devOf(0);
+  if(dv.build!==false){
+    for(let i=T.length-1;i>=0;i--){ const a=T[i].act; if(a&&T[i].p<90&&(/ bauen$/.test(a.label)||a===trainW)) T.splice(i,1); }
+    const bl=cit().block;
+    if(bl&&G.t-bl.t<20&&bl.u>=4){ const nm=BUILDINGS[bl.type].name.replace(/\u00AD/g,''), stadt={label:'🏙 Stadt: Prioritäten',fn:openDev};
+      if(bl.res==='platz') T.push({p:55,txt:`<b>Die Bürger finden keinen Bauplatz</b> für ${nm} (${bl.why}). Setzt es von Hand (Bauleiste) oder schafft Platz – ein Lagerhaus als Vorposten erweitert das Baugebiet.`,act:{label:'Bauleiste öffnen',fn:()=>{setTab('bau');$('#panel').classList.remove('min');}}});
+      else if(bl.res==='money'){ if(bl.u>=6) T.push({p:bl.u>=8?80:57,txt:`<b>Den Bürgern fehlt Geld</b> für ${nm} (${bl.why}).${(dv.reserve||0)>0&&p.res.money>=(dv.reserve||0)*0.8?` Eure Rücklage von ${dv.reserve} $ rühren sie nicht an – im Stadt-Fenster lässt sie sich senken.`:' Steuern kommen mit den Einwohnern; Überschüsse lassen sich am Markt oder bei den Nachbarn verkaufen.'}`,act:stadt}); }
+      else T.push({p:bl.u>=8?82:60,txt:`<b>Den Bürgern fehlt ${RES[bl.res].name}</b> für ${nm} (${bl.why}).${bl.res==='metal'&&marketOpen(0)?' Am Milizmarkt gibt es Metall.':' Kauft es bei den Nachbarn oder gebt dem Bereich Rohstoffe Vorrang.'}`,act:bl.res==='metal'&&marketOpen(0)?{label:'Metall kaufen',fn:()=>{ if(!trade(0,'buyMetal')) msg('Dafür reicht das Geld nicht.','#ffb38a'); }}:{label:'🤝 Handel',fn:openDiplo}}); }
+  }
   T.sort((a,b)=>b.p-a.p);
   if(T[0]) T[0].u=T[0].p>=75;
   return T[0]||null;

@@ -1,7 +1,7 @@
 import { $$ } from './dom';
 import { AIS, ECON, MAPTYPES } from '../data/config';
 import { G, newGame, setG } from '../sim/state';
-import { on } from '../core/events';
+import { msg, on } from '../core/events';
 import { fmt } from '../core/util';
 import { findBuilding } from '../sim/world';
 import { cam, centerOn, VW } from '../render/camera';
@@ -26,6 +26,8 @@ export function startGame(diff:string, fog:boolean, mode:string, opts:{seed?:num
   cam.zoom = VW < 700 ? 0.85 : 1;
   centerOn(hq.x, hq.y);
   setTab('bau');
+  $('#panel').classList.add('min'); $('#bFold').textContent='▴';   // die Bürger bauen selbst – Bauleiste eingeklappt
+  msg('🏙 Die Bürger bauen ihre Stadt selbst. Ihr gebt im Fenster „Stadt“ Prioritäten und die Rücklage vor – und kümmert euch um Truppen, Forschung und Diplomatie.','#9fd88a');
 }
 function showEnd(win:boolean, reason:string){
   const mm=Math.floor(G.t/60), ss=String(Math.floor(G.t%60)).padStart(2,'0');

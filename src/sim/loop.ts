@@ -12,6 +12,7 @@ import { updatePacts } from '../sim/pacts';
 import { updateEvents } from '../sim/happen';
 import { updateModules } from '../sim/modules';
 import { updateDev } from '../sim/devplan';
+import { updateCitizens } from '../sim/citizens';
 import { updateCity } from '../sim/city';
 import { updateGroups } from '../sim/groups';
 import { updateFlights } from '../sim/airdrop';
@@ -42,7 +43,7 @@ export function update(dt){
   updateProjectiles(dt);
   updateNukes(dt);
   updateUpgrades(dt);
-  updateDev(dt);
+  updateDev(dt); updateCitizens(dt);
   updateCity(dt);
   updateGroups(dt);
   updateFlights(dt);

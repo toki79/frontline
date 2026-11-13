@@ -1,4 +1,5 @@
-import { DEV, FIRE, FUN, RES, UPGRADES, lvlOf } from '../data/config';
+import { BUILDINGS, CITIZENS, DEV, FIRE, FUN, RES, UPGRADES, lvlOf } from '../data/config';
+import { cit } from '../sim/citizens';
 import { catOf, devOf, funCoverage } from '../sim/devplan';
 import { fireCoverage } from '../sim/city';
 import { G } from '../sim/state';
@@ -19,8 +20,17 @@ export function renderDev(){
     <div class="stat"><span>🚒 Gebäude im Schutz einer Feuerwache</span><b class="${fire<0.8&&p.pop>FIRE.minPop?'bad':'good'}">${pct(fire)}</b></div>
     <div class="stat"><span>🏗 Laufende Ausbauten</span><b>${G.buildings.filter(b=>!b.dead&&b.owner===0&&b.upg).length} / ${DEV.parallel+Math.floor(p.pop/DEV.parallelPer)}</b></div></div>`;
   // An/aus
-  h+=`<div class="party"><h3>🏗 Ausbau durch die Bürger</h3><div class="drow"><span class="dn">Bürger bauen selbst aus</span>
-    <button data-d="on_1" class="${d.on?'on':''}">An</button><button data-d="on_0" class="${!d.on?'on':''}">Aus</button></div>`;
+  const C=cit(), nm=t=>BUILDINGS[t].name.replace(/\u00AD/g,'');
+  h+=`<div class="party"><h3>🏗 Die Bürger bauen die Stadt</h3>
+    <div class="drow"><span class="dn">Neue Gebäude setzen<small>Wohnhäuser, Höfe, Betriebe, Kaserne … nach Bedarf und Priorität</small></span>
+    <button data-d="b_1" class="${d.build!==false?'on':''}">An</button><button data-d="b_0" class="${d.build===false?'on':''}">Aus</button></div>
+    <div class="drow"><span class="dn">Bestehende Gebäude ausbauen</span>
+    <button data-d="on_1" class="${d.on?'on':''}">An</button><button data-d="on_0" class="${!d.on?'on':''}">Aus</button></div>
+    <div class="drow"><span class="dn">💰 Rücklage für den Kommandanten<small>rühren die Bürger nur im Notfall an (Hunger, kein Wohnraum, kein Strom)</small></span>`+CITIZENS.reserves.map(v=>`<button data-d="res_${v}" class="${(d.reserve||0)===v?'on':''}">${v} $</button>`).join('')+`</div>`;
+  if(d.build!==false){
+    if(C.goal) h+=`<div class="barl"><span>🎯 Die Bürger sparen auf: <b>${nm(C.goal.type)}</b> (${C.goal.why}). Bis dahin bauen sie nur das Nötigste.</span></div>`;
+    if(C.block&&G.t-C.block.t<30) h+=`<div class="barl" style="color:#ffb38a"><span>⏳ ${nm(C.block.type)} wartet: ${C.block.res==='platz'?'kein geeigneter Bauplatz':C.block.res==='money'?'zu wenig Geld (über der Rücklage)':'es fehlt '+RES[C.block.res].name}.</span></div>`;
+    if(C.last&&G.t-C.last.t<120) h+=`<div class="barl"><span>Zuletzt gesetzt: ${nm(C.last.type)}.</span></div>`; }
   h+='<h4>Prioritäten</h4>';
   for(const [k,c] of Object.entries(DEV.cats) as [string,any][]){
     const own=G.buildings.filter(b=>!b.dead&&b.owner===0&&!b.site&&c.types.includes(b.type)), max=own.filter(b=>UPGRADES[b.type]&&lvlOf(b)>=UPGRADES[b.type].length).length;
@@ -28,7 +38,7 @@ export function renderDev(){
   h+='<h4>Freigabe: so viel der Vorräte dürfen die Bürger verbauen</h4>';
   for(const r of ['money','wood','stone','metal']){ const ic=r==='money'?'💰 Geld':RES[r].icon+' '+RES[r].name;
     h+=`<div class="drow"><span class="dn">${ic}</span>`+DEV.release.map(v=>`<button data-d="r_${r}_${v}" class="${d.release[r]===v?'on':''}">${pct(v)}</button>`).join('')+'</div>'; }
-  h+='<div class="barl"><span>Engpässe haben Vorrang: zu wenig Wohnraum, Nahrung, Strom oder Unterhaltung lässt die Bürger dort zuerst ausbauen. Von Hand geht es weiterhin: Gebäude wählen → ⬆ Ausbau. Ausgebaute Gebäude leisten ×1,4 bzw. ×1,9, kosten aber mehr Unterhalt.</span></div></div>';
+  h+='<div class="barl"><span>Engpässe haben Vorrang: zu wenig Wohnraum, Nahrung, Strom oder Unterhaltung lässt die Bürger dort zuerst ausbauen. Stellungen, Minen und Straßen nach Wunsch setzt ihr selbst; auch jedes Gebäude geht weiterhin von Hand (Bauleiste unten ausklappen). Ausbau von Hand: Gebäude wählen → ⬆ Ausbau. Ausgebaute Gebäude leisten ×1,4 bzw. ×1,9, kosten aber mehr Unterhalt.</span></div></div>';
   // laufende Ausbauten
   const run=G.buildings.filter(b=>!b.dead&&b.owner===0&&b.upg);
   if(run.length) h+='<div class="party"><h3>⏳ Im Ausbau</h3>'+run.map(b=>`<div class="stat"><span>${b.def.name.replace(/­/g,'')} → Stufe ${lvlOf(b)+1}${b.autoUp?' (Bürger)':''}</span><b>${Math.floor(b.upg.t/b.upg.time*100)} %</b></div>`).join('')+'</div>';
@@ -41,7 +51,7 @@ export function init(){
   $('#bDevClose').addEventListener('click',close);
   $('#devBody').addEventListener('click',e=>{ const t=(e.target as HTMLElement).closest('[data-d]') as HTMLElement; if(!t||!G) return;
     const d=devOf(0), [k,a,b]=t.dataset.d.split('_');
-    if(k==='on') d.on=a==='1'; else if(k==='p') d.prio[a]=Number(b); else if(k==='r') d.release[a]=Number(b);
+    if(k==='on') d.on=a==='1'; else if(k==='b') d.build=a==='1'; else if(k==='res') d.reserve=Number(a); else if(k==='p') d.prio[a]=Number(b); else if(k==='r') d.release[a]=Number(b);
     renderDev(); });
 }
 export { catOf };

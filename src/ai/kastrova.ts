@@ -498,7 +498,8 @@ export function aiPlace(pid,type){
     if(type==='house') s+=(1-housingQuality(pid,x,y,d.w,d.h).q)*30;                           // ruhig wohnen
     if(type==='farm') s-=previewFields(x,y,d.w,d.h)*25;                                        // Wiesen und freie Äcker
     if(type==='depot'&&far.length) s=Math.min(...far.map(b=>dist(x,y,b.x,b.y)));               // Lager zu entlegenen Betrieben
-    if(type==='depot'&&G.ais[pid].expandTo){ const e=G.ais[pid].expandTo; s=dist(x+1,y+1,e.x,e.y); }   // Ausdehnung zum fehlenden Rohstoff
+    const plan=G.ais[pid]||G.cit||{};   // KI oder die Bürger des Spielers
+    if(type==='depot'&&plan.expandTo){ const e=plan.expandTo; s=dist(x+1,y+1,e.x,e.y); }   // Ausdehnung zum fehlenden Rohstoff
     if(type==='forester'){ const l=G.buildings.filter(b=>!b.dead&&b.owner===pid&&b.type==='lumber'); if(l.length) s=Math.min(...l.map(b=>dist(x,y,b.x,b.y))); }   // Forsthaus neben den Holzfäller
     for(let yy=y;yy<y+d.h;yy++)for(let xx=x;xx<x+d.w;xx++) if(G.terr[idx(xx,yy)]===T.FOREST) s+=type==='lumber'?2:6;   // Wald möglichst stehen lassen
     if(d.noise) for(const h of own) if(h.def.cap&&rectDist(h,x,y,d.w,d.h)<=NOISE_R) s+=6;        // Industrie weg von Häusern
